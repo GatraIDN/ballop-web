@@ -34,4 +34,4 @@ const TYPES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'
     console.log('data', f);
   }
   console.log(`Selesai: ${files.length} data, ${Object.keys(map).length} foto.`);
-})().catch((e) => { console.error(e.message); process.exit(1); });
+})().catch((e) => { console.error(e.message); process.exitCode = 1; });
