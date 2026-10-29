@@ -33,6 +33,23 @@ ada, server pakai Supabase.
 Catatan: `service_role` key rahasia (akses penuh database). Taruh hanya di env Vercel, jangan di kode/GitHub.
 Restore backup online dibatasi ±4,5 MB per request oleh Vercel.
 
+## Tim, role, dan data operasional
+
+- **Login**: username + password. Owner = `admin` + password admin. Tim dibuat di **Admin › Pengguna & akses**,
+  satu orang boleh banyak role: admin, ecommerce, offline, gudang, creative, marketing, finance.
+  Sidebar per divisi hanya menampilkan menu sesuai role; server juga menolak akses di luar role.
+- **Penjualan online**: import file export Shopee / TikTok Shop (Order + Income), xlsx atau csv, 1 file berisi
+  beberapa sheet atau beberapa file. Kolom dikenali otomatis; import ulang = update, tidak dobel.
+- Menu lain: Penjualan offline (toko/distributor/event, piutang tempo), Stok 3PL (snapshot gudang),
+  Barang masuk & keluar, KOL seeding (kirim, konten, views, GMV), Keuangan (kas masuk/keluar), Biaya.
+- HPP: pakai HPP produk / restock; kalau tidak ada, estimasi `Pengaturan › Rasio HPP default` (35%).
+
+Isi ulang semua data dari file operasional + stock taking (menghapus data lama di menu bisnis):
+```bash
+python tools/ops-to-json.py "BALLOP_통합운영시트.xlsx" "STOCK TAKING - BALLOP.xlsx" bundle.json
+node tools/apply-bundle.js bundle.json      # lokal; set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY untuk online
+```
+
 ## Halaman
 
 | URL | Isi |

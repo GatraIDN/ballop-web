@@ -14,6 +14,7 @@
   let settings = {};
   let events = [];
   let gallery = [];
+  let me = null; // { user, modules, roles }
   let editing = null; // working copy of the product open in the drawer
   let editingIndex = -1;
 
@@ -55,7 +56,7 @@
     e.preventDefault();
     $('#loginErr').textContent = '';
     try {
-      const r = await fetch('/api/login', json('POST', { password: $('#password').value }));
+      const r = await fetch('/api/login', json('POST', { username: $('#username').value, password: $('#password').value }));
       const body = await r.json();
       if (!r.ok) throw new Error(body.error || 'Gagal login');
       token = body.token;
@@ -69,11 +70,31 @@
     store.set('');
     $('#app').hidden = true;
     $('#login').hidden = false;
+    $('#password').value = '';
   }
   $('#logout').addEventListener('click', logout);
 
+  const canUse = (mod) => !mod || (me && me.modules.includes(mod));
+  const viewAllowed = (name) => { const b = $(`.nav[data-view="${name}"]`); return !!b && canUse(b.dataset.mod); };
+
+  // show only the menu items this user's roles allow; drop division headers left empty
+  function applyAccess() {
+    $$('.nav[data-view]').forEach((b) => { b.hidden = !canUse(b.dataset.mod); });
+    $$('#sideNav .nav-group').forEach((g) => {
+      let n = g.nextElementSibling, any = false;
+      while (n && !n.classList.contains('nav-group')) { if (n.matches('.nav[data-view]') && !n.hidden) any = true; n = n.nextElementSibling; }
+      g.hidden = !any;
+    });
+    const u = me.user;
+    $('#meBox').innerHTML = `<b></b><span>${u.roles.join(' · ')}</span>`;
+    $('#meBox b').textContent = u.name;
+    $('#accountInfo').textContent = `${u.username} · role: ${u.roles.join(', ')}`;
+    $('#accountSlot').appendChild($('#pwForm'));
+  }
+
   async function boot() {
     try {
+      me = await api('/api/me');
       [products, settings, events, gallery] = await Promise.all([
         api('/api/products?all=1'), api('/api/settings'), api('/api/events?all=1'), api('/api/gallery?all=1'),
       ]);
@@ -84,13 +105,14 @@
     renderEvents();
     renderGallery();
     fillSettings();
+    applyAccess();
     document.dispatchEvent(new CustomEvent('admin:ready'));
-    showView((location.hash.match(/^#([a-z]+)$/) || [])[1] || 'dashboard');
+    showView((location.hash.match(/^#([a-z0-9]+)$/) || [])[1] || 'dashboard');
   }
 
   // ---------- navigation ----------
   function showView(name) {
-    if (!$(`#view-${name}`)) name = 'dashboard';
+    if (!$(`#view-${name}`) || !viewAllowed(name)) name = $$('.nav[data-view]').find((b) => !b.hidden)?.dataset.view || 'account';
     $$('.nav[data-view]').forEach((x) => x.classList.toggle('on', x.dataset.view === name));
     $$('.view').forEach((v) => { v.hidden = v.id !== `view-${name}`; });
     const btn = $(`.nav[data-view="${name}"]`);
@@ -381,6 +403,7 @@
     f.tiktokShop.value = settings.tiktokShop || '';
     f.monthlyTarget.value = settings.monthlyTarget || '';
     f.lowStock.value = settings.lowStock || 5;
+    f.cogsPct.value = Math.round((settings.cogsRate ?? 0.35) * 100);
   }
   $('#settingsForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -388,6 +411,7 @@
     try {
       const body = {};
       ['brand', 'currency', 'whatsapp', 'instagram', 'tiktok', 'shopee', 'tiktokShop', 'tokopedia', 'email', 'monthlyTarget', 'lowStock'].forEach((k) => { body[k] = f[k].value.trim(); });
+      body.cogsRate = (Number(f.cogsPct.value) || 0) / 100;
       settings = await api('/api/settings', json('PUT', body));
       fillSettings();
       renderList();
@@ -697,6 +721,8 @@
     $, $$, api, json, toast, money, slug, uploadFiles, dropZone, wireDrag, download, showView, hueCss,
     get products() { return products; },
     get settings() { return settings; },
+    get me() { return me; },
+    can: (mod) => canUse(mod),
     get events() { return events; },
     isPng: (src) => /\.png($|\?)/i.test(src || ''),
     openScrim() {

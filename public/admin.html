@@ -18,6 +18,7 @@
     <form class="login-card glass" id="loginForm">
       <img src="/img/ballop-logo-dark.png" alt="BALLOP">
       <h1>Admin Dashboard</h1>
+      <label>Username<input id="username" autocomplete="username" placeholder="admin" autocapitalize="off" spellcheck="false"></label>
       <label>Password<input type="password" id="password" autocomplete="current-password" required></label>
       <button class="btn primary" type="submit">Masuk</button>
       <p class="err" id="loginErr"></p>
@@ -31,23 +32,34 @@
         <img class="side-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
         <button class="icon side-close" id="sideClose" type="button" aria-label="Tutup menu">✕</button>
       </div>
-      <nav class="side-nav">
-        <p class="nav-group">Bisnis</p>
-        <button class="nav on" data-view="dashboard" type="button"><i>◔</i>Ringkasan</button>
-        <button class="nav" data-view="sales" type="button"><i>◈</i>Penjualan</button>
-        <button class="nav" data-view="stock" type="button"><i>▤</i>Stok</button>
-        <button class="nav" data-view="ads" type="button"><i>◎</i>Iklan</button>
-        <button class="nav" data-view="expenses" type="button"><i>⊖</i>Biaya</button>
-        <p class="nav-group">Website</p>
-        <button class="nav" data-view="products" type="button"><i>◫</i>Produk</button>
-        <button class="nav" data-view="events" type="button"><i>✦</i>Event</button>
-        <button class="nav" data-view="gallery" type="button"><i>▦</i>Galeri</button>
-        <button class="nav" data-view="posts" type="button"><i>✎</i>Jurnal</button>
-        <button class="nav" data-view="content" type="button"><i>¶</i>Konten halaman</button>
-        <p class="nav-group">Sistem</p>
-        <button class="nav" data-view="settings" type="button"><i>⚙</i>Pengaturan</button>
+      <nav class="side-nav" id="sideNav">
+        <button class="nav on" data-view="dashboard" data-mod="dashboard" type="button"><i>◔</i>Ringkasan</button>
+        <p class="nav-group">E-commerce</p>
+        <button class="nav" data-view="online" data-mod="online" type="button"><i>◈</i>Penjualan online</button>
+        <button class="nav" data-view="sales" data-mod="online" type="button"><i>✚</i>Penjualan manual</button>
+        <button class="nav" data-view="ads" data-mod="ads" type="button"><i>◎</i>Iklan</button>
+        <button class="nav" data-view="products" data-mod="products" type="button"><i>◫</i>Produk</button>
+        <p class="nav-group">Offline</p>
+        <button class="nav" data-view="offline" data-mod="offline" type="button"><i>⌂</i>Penjualan offline</button>
+        <p class="nav-group">Gudang</p>
+        <button class="nav" data-view="stock3pl" data-mod="stock3pl" type="button"><i>▣</i>Stok 3PL</button>
+        <button class="nav" data-view="stock" data-mod="mutasi" type="button"><i>⇅</i>Barang masuk & keluar</button>
+        <p class="nav-group">Creative</p>
+        <button class="nav" data-view="kol" data-mod="kol" type="button"><i>★</i>KOL seeding</button>
+        <button class="nav" data-view="posts" data-mod="website" type="button"><i>✎</i>Jurnal</button>
+        <button class="nav" data-view="events" data-mod="website" type="button"><i>✦</i>Event</button>
+        <button class="nav" data-view="gallery" data-mod="website" type="button"><i>▦</i>Galeri</button>
+        <button class="nav" data-view="content" data-mod="website" type="button"><i>¶</i>Konten halaman</button>
+        <p class="nav-group">Finance</p>
+        <button class="nav" data-view="finance" data-mod="finance" type="button"><i>⇄</i>Keuangan</button>
+        <button class="nav" data-view="expenses" data-mod="finance" type="button"><i>⊖</i>Biaya operasional</button>
+        <p class="nav-group">Admin</p>
+        <button class="nav" data-view="users" data-mod="users" type="button"><i>☺</i>Pengguna & akses</button>
+        <button class="nav" data-view="settings" data-mod="settings" type="button"><i>⚙</i>Pengaturan</button>
+        <button class="nav" data-view="account" type="button"><i>◉</i>Akun saya</button>
         <a class="nav" href="/" target="_blank" rel="noopener"><i>↗</i>Lihat website</a>
       </nav>
+      <p class="me" id="meBox"></p>
       <button class="nav logout" id="logout" type="button"><i>⎋</i>Keluar</button>
     </aside>
 
@@ -61,7 +73,17 @@
       <!-- ===== dashboard ===== -->
       <section class="view" id="view-dashboard"></section>
       <!-- ===== ledgers (rendered by admin-biz.js) ===== -->
+      <section class="view" id="view-online" hidden></section>
       <section class="view" id="view-sales" hidden></section>
+      <section class="view" id="view-offline" hidden></section>
+      <section class="view" id="view-stock3pl" hidden></section>
+      <section class="view" id="view-kol" hidden></section>
+      <section class="view" id="view-finance" hidden></section>
+      <section class="view" id="view-users" hidden></section>
+      <section class="view" id="view-account" hidden>
+        <header class="bar"><div><h1>Akun saya</h1><p class="muted" id="accountInfo"></p></div></header>
+        <div class="settings-grid"><div class="settings-side" id="accountSlot"></div></div>
+      </section>
       <section class="view" id="view-stock" hidden></section>
       <section class="view" id="view-ads" hidden></section>
       <section class="view" id="view-expenses" hidden></section>
@@ -135,6 +157,7 @@
             <div class="row">
               <label>Target omzet per bulan<input name="monthlyTarget" type="number" min="0" step="100000"></label>
               <label>Batas stok rendah (pasang)<input name="lowStock" type="number" min="0"></label>
+              <label>Rasio HPP default (% dari omzet)<input name="cogsPct" type="number" min="0" max="100" step="1"></label>
             </div>
             <p class="muted small">Buy Now membuka link beli produk, atau chat WhatsApp kalau link kosong. Shopee/Tokopedia kosong = tombol mencari “BALLOP”.</p>
             <button class="btn primary" type="submit">Simpan pengaturan</button>
@@ -332,8 +355,10 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="/md.js"></script>
+  <script src="/admin-import.js"></script>
   <script src="/admin.js"></script>
   <script src="/admin-biz.js"></script>
   <script src="/admin-content.js"></script>
+  <script src="/admin-users.js"></script>
 </body>
 </html>

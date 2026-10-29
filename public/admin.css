@@ -402,3 +402,23 @@ table.data tfoot td { font-weight: 900; background: var(--panel-2); border-top: 
 .ce-layout > *, .grid-2 > *, .grid-3 > *, .toolbar > *, .main > * { min-width: 0; }
 .seg { flex: 0 1 auto; }
 .main { overflow-x: clip; }
+
+/* signed-in user under the sidebar */
+.me { margin: 8px 12px 0; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+.me b { color: var(--ink); font-size: 13px; }
+.import-panel .drop { padding: 22px; }
+.import-panel .drop span { max-width: 560px; }
+/* team accounts */
+.role-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+.role-legend b { color: var(--ink); }
+.user-list { display: grid; gap: 12px; }
+.user-card { border-radius: 20px; padding: 16px 18px; display: grid; gap: 12px; }
+.user-card.off { opacity: .6; }
+.role-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-check { display: inline-flex; letter-spacing: 0; }
+.chip-check input { position: absolute; opacity: 0; pointer-events: none; }
+.chip-check span { padding: 7px 12px; border-radius: 99px; font-size: 13px; font-weight: 700; color: var(--ink-2); background: var(--panel-2); border: 1px solid var(--line); cursor: pointer; transition: background .2s, color .2s; }
+.chip-check input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
+.chip-check input:focus-visible + span { outline: 2px solid rgba(47, 127, 211, .5); }
+.user-actions { display: flex; align-items: end; gap: 12px; justify-content: flex-end; }
+.user-actions .check { padding-bottom: 10px; }
