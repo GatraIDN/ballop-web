@@ -1,4 +1,4 @@
-// BALLOP local server: static files from public/ + the API in lib/api.js.
+// BALLOP local server (not named server.js on purpose: Vercel would deploy that as the whole app): static files from public/ + the API in lib/api.js.
 // On Vercel the same API runs as api/[...path].js and Vercel serves public/ itself.
 const http = require('http');
 const fs = require('fs');

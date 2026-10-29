@@ -4,7 +4,7 @@
   "private": true,
   "description": "BALLOP shoe catalog landing page + admin dashboard (zero dependencies)",
   "scripts": {
-    "start": "node server.js"
+    "start": "node serve.js"
   },
   "engines": {
     "node": ">=18"

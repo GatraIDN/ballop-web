@@ -72,7 +72,7 @@ batas stok rendah), ganti password, backup & restore semua data.
 
 | Path | Fungsi |
 |---|---|
-| `server.js` | server + API (`/api/<koleksi>`, `/api/content`, `/api/settings`, login, upload, backup) |
+| `serve.js` | server + API (`/api/<koleksi>`, `/api/content`, `/api/settings`, login, upload, backup) |
 | `data/*.json` | semua data (produk, event, galeri, posts, sales, stock, ads, expenses, content, settings) |
 | `public/index.html` `content.js` `site.js` `site.css` | landing |
 | `public/app.js` `style.css` | katalog rak LED + halaman SKU, token tema bersama |
