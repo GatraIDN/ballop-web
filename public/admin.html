@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BALLOP Admin</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#f3f4f7">
+  <link rel="icon" href="/img/ballop-mark-dark.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <!-- login -->
+  <section class="login" id="login">
+    <form class="login-card glass" id="loginForm">
+      <img src="/img/ballop-logo-dark.png" alt="BALLOP">
+      <h1>Admin Dashboard</h1>
+      <label>Password<input type="password" id="password" autocomplete="current-password" required></label>
+      <button class="btn primary" type="submit">Masuk</button>
+      <p class="err" id="loginErr"></p>
+    </form>
+  </section>
+
+  <!-- app -->
+  <div class="app" id="app" hidden>
+    <aside class="side glass" id="side">
+      <div class="side-top">
+        <img class="side-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
+        <button class="icon side-close" id="sideClose" type="button" aria-label="Tutup menu">✕</button>
+      </div>
+      <nav class="side-nav">
+        <p class="nav-group">Bisnis</p>
+        <button class="nav on" data-view="dashboard" type="button"><i>◔</i>Ringkasan</button>
+        <button class="nav" data-view="sales" type="button"><i>◈</i>Penjualan</button>
+        <button class="nav" data-view="stock" type="button"><i>▤</i>Stok</button>
+        <button class="nav" data-view="ads" type="button"><i>◎</i>Iklan</button>
+        <button class="nav" data-view="expenses" type="button"><i>⊖</i>Biaya</button>
+        <p class="nav-group">Website</p>
+        <button class="nav" data-view="products" type="button"><i>◫</i>Produk</button>
+        <button class="nav" data-view="events" type="button"><i>✦</i>Event</button>
+        <button class="nav" data-view="gallery" type="button"><i>▦</i>Galeri</button>
+        <button class="nav" data-view="posts" type="button"><i>✎</i>Jurnal</button>
+        <button class="nav" data-view="content" type="button"><i>¶</i>Konten halaman</button>
+        <p class="nav-group">Sistem</p>
+        <button class="nav" data-view="settings" type="button"><i>⚙</i>Pengaturan</button>
+        <a class="nav" href="/" target="_blank" rel="noopener"><i>↗</i>Lihat website</a>
+      </nav>
+      <button class="nav logout" id="logout" type="button"><i>⎋</i>Keluar</button>
+    </aside>
+
+    <main class="main">
+      <header class="mobile-bar glass">
+        <button class="icon" id="sideOpen" type="button" aria-label="Menu">☰</button>
+        <img src="/img/ballop-wordmark-dark.png" alt="BALLOP">
+        <span id="mobileTitle">Ringkasan</span>
+      </header>
+
+      <!-- ===== dashboard ===== -->
+      <section class="view" id="view-dashboard"></section>
+      <!-- ===== ledgers (rendered by admin-biz.js) ===== -->
+      <section class="view" id="view-sales" hidden></section>
+      <section class="view" id="view-stock" hidden></section>
+      <section class="view" id="view-ads" hidden></section>
+      <section class="view" id="view-expenses" hidden></section>
+
+      <!-- ===== products ===== -->
+      <section class="view" id="view-products" hidden>
+        <header class="bar">
+          <div>
+            <h1>Produk</h1>
+            <p class="muted" id="count"></p>
+          </div>
+          <input class="search" id="search" type="search" placeholder="Cari nama / seri / SKU…">
+          <button class="btn primary" id="addProduct" type="button">+ Produk baru</button>
+        </header>
+        <p class="muted small">Seret baris untuk mengurutkan katalog. Semua perubahan langsung tersimpan.</p>
+        <ul class="list" id="list"></ul>
+      </section>
+
+      <!-- ===== events ===== -->
+      <section class="view" id="view-events" hidden>
+        <header class="bar">
+          <div>
+            <h1>Event</h1>
+            <p class="muted" id="evCount"></p>
+          </div>
+          <button class="btn primary" id="addEvent" type="button">+ Posting event</button>
+        </header>
+        <p class="muted small">Event diurutkan otomatis dari tanggal terbaru. Event paling baru tampil besar di halaman depan.</p>
+        <ul class="list" id="evList"></ul>
+      </section>
+
+      <!-- ===== gallery ===== -->
+      <section class="view" id="view-gallery" hidden>
+        <header class="bar">
+          <div>
+            <h1>Galeri</h1>
+            <p class="muted" id="galCount"></p>
+          </div>
+          <label class="btn primary" for="galFiles">+ Upload foto</label>
+          <input type="file" id="galFiles" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" multiple hidden>
+        </header>
+        <p class="muted small">Seret foto untuk mengurutkan. “Besar” = foto tampil 2×2. Hubungkan ke event supaya bisa difilter per event.</p>
+        <div class="gal-drop" id="galDrop">Seret foto ke sini untuk upload</div>
+        <ul class="gal-grid" id="galGrid"></ul>
+      </section>
+
+      <!-- ===== posts + content (rendered by admin-content.js) ===== -->
+      <section class="view" id="view-posts" hidden></section>
+      <section class="view" id="view-content" hidden></section>
+
+      <!-- ===== settings ===== -->
+      <section class="view" id="view-settings" hidden>
+        <header class="bar"><div><h1>Pengaturan</h1><p class="muted">Toko, sosial media, target, keamanan, dan backup.</p></div></header>
+        <div class="settings-grid">
+          <form class="card solid form" id="settingsForm">
+            <h2>Toko & kontak</h2>
+            <div class="row">
+              <label>Nama brand<input name="brand" maxlength="40"></label>
+              <label>Mata uang<input name="currency" maxlength="6"></label>
+            </div>
+            <label>Nomor WhatsApp (format 628…)<input name="whatsapp" inputmode="numeric" placeholder="6281234567890"></label>
+            <div class="row">
+              <label>Instagram (tanpa @)<input name="instagram" placeholder="ballopofficial.id"></label>
+              <label>TikTok (tanpa @)<input name="tiktok"></label>
+            </div>
+            <label>Link toko Shopee<input name="shopee" type="url" placeholder="https://shopee.co.id/..."></label>
+            <label>Link TikTok Shop<input name="tiktokShop" type="url" placeholder="https://..."></label>
+            <label>Link toko Tokopedia<input name="tokopedia" type="url" placeholder="https://www.tokopedia.com/..."></label>
+            <label>Email<input name="email" type="email"></label>
+            <h2>Target & stok</h2>
+            <div class="row">
+              <label>Target omzet per bulan<input name="monthlyTarget" type="number" min="0" step="100000"></label>
+              <label>Batas stok rendah (pasang)<input name="lowStock" type="number" min="0"></label>
+            </div>
+            <p class="muted small">Buy Now membuka link beli produk, atau chat WhatsApp kalau link kosong. Shopee/Tokopedia kosong = tombol mencari “BALLOP”.</p>
+            <button class="btn primary" type="submit">Simpan pengaturan</button>
+          </form>
+          <div class="settings-side">
+            <form class="card solid form" id="pwForm">
+              <h2>Ganti password</h2>
+              <label>Password sekarang<input type="password" name="current" autocomplete="current-password" required></label>
+              <label>Password baru (min. 8 karakter)<input type="password" name="next" autocomplete="new-password" minlength="8" required></label>
+              <label>Ulangi password baru<input type="password" name="again" autocomplete="new-password" minlength="8" required></label>
+              <button class="btn primary" type="submit">Ganti password</button>
+            </form>
+            <div class="card solid form">
+              <h2>Backup data</h2>
+              <p class="muted small">Unduh semua data (produk, penjualan, stok, iklan, konten, artikel) jadi satu file. Foto tidak ikut, salin folder <code>public/uploads</code> terpisah.</p>
+              <button class="btn" id="backupBtn" type="button">⬇ Unduh backup</button>
+              <label class="btn" for="restoreFile">⬆ Pulihkan dari backup</label>
+              <input type="file" id="restoreFile" accept="application/json,.json" hidden>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+
+  <!-- product editor -->
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <form id="editor">
+      <header class="drawer-head">
+        <h2 id="editorTitle">Edit produk</h2>
+        <button class="icon" type="button" id="closeDrawer" aria-label="Tutup">✕</button>
+      </header>
+      <div class="preview" id="preview">
+        <div class="pv-stripes"><i></i><i></i><i></i></div>
+        <img id="pvImg" alt="">
+        <span class="pv-led"></span>
+      </div>
+      <div class="form">
+        <div class="row">
+          <label>Nama<input name="name" required maxlength="80"></label>
+          <label>Seri / warna<input name="series" maxlength="80"></label>
+        </div>
+        <div class="row">
+          <label>Kode SKU<input name="sku" maxlength="40" placeholder="PP-01"></label>
+          <label>Kategori<input name="category" maxlength="40" list="cats"></label>
+        </div>
+        <datalist id="cats"></datalist>
+        <div class="row three">
+          <label>Harga jual<input name="price" type="number" min="0" step="1000"></label>
+          <label>Harga coret<input name="oldPrice" type="number" min="0" step="1000"></label>
+          <label>HPP / modal per pasang<input name="cost" type="number" min="0" step="1000"></label>
+        </div>
+        <div class="row">
+          <label>Batas stok rendah (0 = pakai default)<input name="lowStock" type="number" min="0"></label>
+          <label class="check"><input type="checkbox" name="visible"> Tampil di katalog</label>
+        </div>
+        <div class="row three">
+          <label>Warna stripe<input name="color" type="color"></label>
+          <label>Warna LED<input name="accent" type="color"></label>
+          <label>Geser hue foto <output id="hueOut">0°</output><input name="hue" type="range" min="-180" max="180" step="1"></label>
+        </div>
+        <label>Deskripsi<textarea name="description" rows="4" maxlength="1200"></textarea></label>
+        <label>Ukuran (pisah koma)<input name="sizes" placeholder="39, 40, 41, 42"></label>
+        <label>Fitur (pisah koma)<input name="features" placeholder="Comfort, Court Grip"></label>
+        <label>Link beli (Shopee / TikTok / web, opsional)<input name="buyUrl" type="url" placeholder="https://"></label>
+        <div class="images-head"><span>Foto <small class="muted">— foto pertama tampil di rak. Pakai PNG transparan biar menyatu.</small></span></div>
+        <ul class="images" id="images"></ul>
+        <label class="drop" id="drop">
+          <input type="file" id="files" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" multiple hidden>
+          <b>Upload foto</b><span>klik atau seret file ke sini</span>
+        </label>
+      </div>
+      <footer class="drawer-foot">
+        <button class="btn danger" type="button" id="deleteProduct">Hapus</button>
+        <span class="spacer"></span>
+        <button class="btn" type="button" id="cancelEdit">Batal</button>
+        <button class="btn primary" type="submit">Simpan</button>
+      </footer>
+    </form>
+  </aside>
+
+  <!-- event editor -->
+  <aside class="drawer" id="evDrawer" aria-hidden="true">
+    <form id="evEditor">
+      <header class="drawer-head">
+        <h2 id="evTitle">Posting event</h2>
+        <button class="icon" type="button" data-ev-close aria-label="Tutup">✕</button>
+      </header>
+      <div class="form">
+        <label>Judul event<input name="title" required maxlength="120"></label>
+        <div class="row">
+          <label>Tanggal<input name="date" type="date" required></label>
+          <label>Jam<input name="time" maxlength="40" placeholder="12:30 – 16:30 WIB"></label>
+        </div>
+        <div class="row">
+          <label>Tempat<input name="venue" maxlength="120"></label>
+          <label>Kota<input name="city" maxlength="60"></label>
+        </div>
+        <label>Alamat<input name="address" maxlength="240"></label>
+        <label>Ringkasan (tampil di kartu)<textarea name="summary" rows="2" maxlength="240"></textarea></label>
+        <label>Cerita lengkap<textarea name="description" rows="6" maxlength="4000"></textarea></label>
+        <label>Highlight (satu per baris)<textarea name="highlights" rows="4" placeholder="Total hadiah Rp4,5 juta"></textarea></label>
+        <label>Link (pendaftaran / info, opsional)<input name="link" type="url" placeholder="https://"></label>
+        <label class="check"><input type="checkbox" name="visible"> Tampil di website</label>
+        <div class="images-head"><span>Foto event <small class="muted">— foto pertama jadi cover. Seret untuk urutkan.</small></span></div>
+        <ul class="images" id="evImages"></ul>
+        <label class="drop" id="evDrop">
+          <input type="file" id="evFiles" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" multiple hidden>
+          <b>Upload foto event</b><span>klik atau seret file ke sini</span>
+        </label>
+        <label class="check"><input type="checkbox" name="toGallery" checked> Foto baru juga masuk Galeri</label>
+      </div>
+      <footer class="drawer-foot">
+        <button class="btn danger" type="button" id="deleteEvent">Hapus</button>
+        <span class="spacer"></span>
+        <button class="btn" type="button" data-ev-close>Batal</button>
+        <button class="btn primary" type="submit">Simpan</button>
+      </footer>
+    </form>
+  </aside>
+
+  <!-- generic record editor (sales, stock, ads, expenses) -->
+  <aside class="drawer" id="recDrawer" aria-hidden="true">
+    <form id="recEditor">
+      <header class="drawer-head">
+        <h2 id="recTitle">Catat</h2>
+        <button class="icon" type="button" data-rec-close aria-label="Tutup">✕</button>
+      </header>
+      <div class="form" id="recFields"></div>
+      <footer class="drawer-foot">
+        <button class="btn danger" type="button" id="recDelete">Hapus</button>
+        <span class="spacer"></span>
+        <button class="btn" type="button" id="recAgain">Simpan & tambah lagi</button>
+        <button class="btn primary" type="submit">Simpan</button>
+      </footer>
+    </form>
+  </aside>
+
+  <!-- blog post editor (full screen) -->
+  <div class="post-editor" id="postEditor" hidden>
+    <form id="postForm">
+      <header class="pe-head glass">
+        <button class="icon" type="button" data-post-close aria-label="Tutup">✕</button>
+        <h2 id="peTitle">Artikel baru</h2>
+        <label class="check"><input type="checkbox" name="published"> Terbit</label>
+        <label class="check"><input type="checkbox" name="featured"> Unggulan</label>
+        <span class="spacer"></span>
+        <button class="btn danger" type="button" id="postDelete">Hapus</button>
+        <button class="btn primary" type="submit">Simpan</button>
+      </header>
+      <div class="pe-body">
+        <div class="pe-left form">
+          <label>Judul<input name="title" required maxlength="160"></label>
+          <div class="row three">
+            <label>Slug (URL)<input name="slug" maxlength="80" placeholder="otomatis dari judul"></label>
+            <label>Tanggal<input name="date" type="date"></label>
+            <label>Penulis<input name="author" maxlength="60"></label>
+          </div>
+          <label>Tag (pisah koma)<input name="tags" placeholder="Tips, Padel"></label>
+          <label>Ringkasan<textarea name="excerpt" rows="2" maxlength="320"></textarea></label>
+          <div class="pe-cover">
+            <div class="pe-cover-img" id="peCover"></div>
+            <div>
+              <label class="btn" for="peCoverFile">Upload cover</label>
+              <input type="file" id="peCoverFile" accept="image/png,image/jpeg,image/webp,image/avif" hidden>
+              <button class="btn" type="button" id="peCoverClear">Hapus cover</button>
+            </div>
+          </div>
+          <div class="md-tools" id="mdTools">
+            <button type="button" data-md="h2" title="Judul bagian">H2</button>
+            <button type="button" data-md="h3" title="Sub judul">H3</button>
+            <button type="button" data-md="b" title="Tebal"><b>B</b></button>
+            <button type="button" data-md="i" title="Miring"><i>I</i></button>
+            <button type="button" data-md="ul" title="Daftar">• List</button>
+            <button type="button" data-md="ol" title="Daftar bernomor">1. List</button>
+            <button type="button" data-md="q" title="Kutipan">❝</button>
+            <button type="button" data-md="link" title="Link">Link</button>
+            <label for="peImgFile" title="Sisipkan foto">Foto</label>
+            <input type="file" id="peImgFile" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden>
+            <button type="button" data-md="yt" title="Video YouTube">YouTube</button>
+            <button type="button" data-md="hr" title="Garis">—</button>
+          </div>
+          <textarea name="body" id="peBody" rows="18" placeholder="Tulis artikel di sini…"></textarea>
+          <p class="muted small" id="peStats"></p>
+        </div>
+        <div class="pe-right">
+          <p class="muted small">Pratinjau</p>
+          <article class="pe-preview b-body" id="pePreview"></article>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/md.js"></script>
+  <script src="/admin.js"></script>
+  <script src="/admin-biz.js"></script>
+  <script src="/admin-content.js"></script>
+</body>
+</html>

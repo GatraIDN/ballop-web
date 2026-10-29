@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BALLOP Indonesia — Gallop Lightly</title>
+  <meta name="description" content="BALLOP, brand sepatu & sportswear dari Korea, kini hadir di Indonesia.">
+  <meta name="theme-color" content="#f5f6f8">
+  <meta property="og:title" content="BALLOP Indonesia — Gallop Lightly">
+  <meta property="og:image" content="/img/padel-pulse-1.png">
+  <link rel="icon" href="/img/ballop-mark-dark.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body>
+  <!-- the big hero logo; it glides into the header slot while you scroll -->
+  <a class="morph-logo" id="morphLogo" href="#top" aria-label="BALLOP, ke atas">
+    <img class="ml-mark" src="/img/ballop-mark-dark.png" alt="">
+    <img class="ml-word" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
+  </a>
+
+  <header class="top" id="top-bar">
+    <span class="brand-slot" id="brandSlot" aria-hidden="true"></span>
+    <nav class="links" aria-label="Navigasi">
+      <a href="#story" data-t="nav.story">Story</a>
+      <a href="#koleksi" data-t="nav.koleksi">Koleksi</a>
+      <a href="#teknologi" data-t="nav.teknologi">Teknologi</a>
+      <a href="#event" data-t="nav.event">Event</a>
+      <a href="#galeri" data-t="nav.galeri">Galeri</a>
+      <a href="#jurnal" data-t="nav.blog">Jurnal</a>
+      <a href="#toko" data-t="nav.toko">Toko</a>
+    </nav>
+    <button class="cart" id="cart" type="button" aria-label="Keranjang">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="20" r="1.4" fill="currentColor"/><circle cx="17" cy="20" r="1.4" fill="currentColor"/></svg>
+      <span id="cartCount">0</span>
+    </button>
+    <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false"><i></i><i></i></button>
+  </header>
+
+  <nav class="menu" id="menu" aria-label="Menu mobile">
+    <a href="#story" data-t="nav.story">Story</a>
+    <a href="#koleksi" data-t="nav.koleksi">Koleksi</a>
+    <a href="#teknologi" data-t="nav.teknologi">Teknologi</a>
+    <a href="#event" data-t="nav.event">Event</a>
+    <a href="#galeri" data-t="nav.galeri">Galeri</a>
+    <a href="#jurnal" data-t="nav.blog">Jurnal</a>
+    <a href="#toko" data-t="nav.toko">Toko</a>
+  </nav>
+
+  <main id="site">
+    <!-- ================= HERO ================= -->
+    <section class="hero" id="top" data-live>
+      <div class="hero-bg" aria-hidden="true">
+        <div class="court"></div>
+        <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+        <svg class="streaks" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+          <path d="M-50 520 C 250 360, 520 300, 1250 250" />
+          <path d="M-50 600 C 300 470, 600 420, 1250 380" />
+          <path d="M-50 680 C 350 580, 700 540, 1250 520" />
+        </svg>
+      </div>
+      <div class="hero-logo-space" id="heroLogo" aria-hidden="true"></div>
+      <div class="hero-shoe" id="heroShoe" aria-hidden="true">
+        <div class="tilt"><img src="/img/padel-pulse-3.png" alt="" data-src="hero.image"></div>
+        <div class="shoe-shadow"></div>
+      </div>
+      <div class="hero-copy">
+        <p class="pill glass"><span class="dot"></span><span data-t="hero.pill">FROM KOREA · NOW IN INDONESIA</span></p>
+        <h1 data-t="hero.title">ALWAYS LIGHT AND FREE.</h1>
+        <p class="lead" data-t="hero.lead">Sepatu dan sportswear yang terasa seperti kulit kedua. Sekarang dengan sepatu padel, khusus untuk lapangan Indonesia.</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="#koleksi" data-t="hero.cta1">Lihat koleksi</a>
+          <a class="btn ghost-btn" href="#event" data-t="hero.cta2">Event terbaru</a>
+        </div>
+      </div>
+      <a class="scroll-cue" href="#story" aria-label="Scroll ke bawah"><span></span></a>
+    </section>
+
+    <div class="marquee" aria-hidden="true"><div class="track" id="marquee"></div></div>
+
+    <!-- ================= STORY ================= -->
+    <section class="story" id="story" data-live>
+      <div class="wrap">
+        <div class="story-head">
+          <p class="eyebrow" data-reveal data-t="story.eyebrow">01 / BRAND STORY</p>
+          <h2 class="merge" id="merge" aria-label="BAREFOOT + GALLOP = BALLOP"></h2>
+        </div>
+        <div class="story-body">
+          <p data-reveal data-md="story.p1"></p>
+          <p data-reveal data-md="story.p2"></p>
+        </div>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="timeline" id="timeline">
+        <div class="tl-line"><i></i></div>
+        <ol class="tl-track" id="tlTrack"></ol>
+      </div>
+    </section>
+
+    <!-- ================= CATALOG (showroom) ================= -->
+    <section class="showroom" id="koleksi" data-live>
+      <div class="intro">
+        <p class="eyebrow" data-reveal data-t="catalog.eyebrow">02 / KOLEKSI</p>
+        <h2 class="sec-title" data-reveal data-t="catalog.title">PILIH WARNAMU.</h2>
+        <p class="hint" data-reveal data-t="catalog.hint">Arahkan kursor ke sepatu, klik untuk lihat detail.</p>
+        <nav class="filters" id="filters" aria-label="Kategori"></nav>
+      </div>
+      <div class="shelves" id="shelves" aria-label="Katalog sepatu"></div>
+    </section>
+
+    <!-- ================= TECH ================= -->
+    <section class="tech" id="teknologi" data-live>
+      <div class="blob b1" aria-hidden="true"></div><div class="blob b2" aria-hidden="true"></div>
+      <div class="wrap">
+        <p class="eyebrow" data-reveal data-t="tech.eyebrow">03 / TEKNOLOGI</p>
+        <h2 class="sec-title" data-reveal data-t="tech.title">DIBUAT UNTUK
+LAPANGAN PADEL.</h2>
+        <div class="tech-grid">
+          <div class="tech-stage" id="techStage" data-reveal="scale">
+            <div class="scan" aria-hidden="true"></div>
+            <img src="/img/padel-pulse-3.png" alt="" data-src="tech.image">
+          </div>
+          <ul class="tech-list" id="techList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EVENTS ================= -->
+    <section class="events" id="event" data-live>
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <p class="eyebrow" data-reveal data-t="events.eyebrow">04 / EVENT</p>
+            <h2 class="sec-title" data-reveal data-t="events.title">MAIN BARENG
+BALLOP.</h2>
+          </div>
+          <p class="sec-sub" data-reveal data-t="events.sub"></p>
+        </div>
+        <div class="event-list" id="eventList"></div>
+      </div>
+    </section>
+
+    <!-- ================= GALLERY ================= -->
+    <section class="gallery" id="galeri" data-live>
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <p class="eyebrow" data-reveal data-t="gallery.eyebrow">05 / GALERI</p>
+            <h2 class="sec-title" data-reveal data-t="gallery.title">MOMEN DI
+LAPANGAN.</h2>
+          </div>
+          <nav class="chips" id="galleryChips" aria-label="Filter galeri" data-reveal></nav>
+        </div>
+        <div class="masonry" id="masonry"></div>
+      </div>
+    </section>
+
+    <!-- ================= BLOG ================= -->
+    <section class="journal" id="jurnal" data-live>
+      <div class="wrap">
+        <div class="sec-head">
+          <div>
+            <p class="eyebrow" data-reveal data-t="blog.eyebrow">06 / JURNAL</p>
+            <h2 class="sec-title" data-reveal data-t="blog.title">CERITA &amp;
+TIPS PADEL.</h2>
+          </div>
+          <div class="sec-side" data-reveal>
+            <p class="sec-sub" data-t="blog.sub"></p>
+            <a class="btn ghost-btn" href="/blog"><span data-t="blog.more">Semua artikel</span> →</a>
+          </div>
+        </div>
+        <div class="post-grid" id="postGrid"></div>
+      </div>
+    </section>
+
+    <!-- ================= STORES / CTA ================= -->
+    <section class="cta" id="toko" data-live>
+      <div class="cta-giant" aria-hidden="true"><div class="track"><span data-t="cta.giant">GALLOP LIGHTLY · </span><span data-t="cta.giant">GALLOP LIGHTLY · </span></div></div>
+      <div class="orbit" aria-hidden="true">
+        <img src="/img/padel-pulse-1.png" alt="" class="o1">
+        <img src="/img/padel-pulse-5.png" alt="" class="o2">
+      </div>
+      <div class="wrap cta-inner">
+        <p class="eyebrow" data-reveal data-t="cta.eyebrow">07 / BELI DI MANA</p>
+        <h2 class="sec-title" data-reveal data-t="cta.title">SIAP
+GALLOP?</h2>
+        <p class="sec-sub" data-reveal data-t="cta.sub"></p>
+        <div class="store-links" id="storeLinks" data-reveal></div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <img src="/img/ballop-logo-dark.png" alt="BALLOP">
+      <p data-t="footer.line">Gallop lightly, BALLOP! · Brand dari Korea Selatan</p>
+      <p class="small">© <span id="year"></span> <span data-t="footer.copyright">BALLOP Indonesia</span></p>
+    </footer>
+  </main>
+
+  <!-- ================= SKU view (catalog detail) ================= -->
+  <section class="sku" id="sku" aria-hidden="true" aria-label="Detail produk">
+    <div class="sku-bg"></div>
+    <div class="ghost" id="ghost" aria-hidden="true"></div>
+    <div class="stripes" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <button class="back glass" id="back" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span data-t="sku.back">KATALOG</span>
+    </button>
+
+    <div class="sku-grid">
+      <div class="info glass" id="info">
+        <p class="eyebrow r" id="skuSeries"></p>
+        <h2 class="r" id="skuName"></h2>
+        <p class="price r"><b id="skuPrice"></b><s id="skuOld"></s></p>
+        <p class="desc r" id="skuDesc"></p>
+        <div class="sizes r" id="skuSizes" role="radiogroup" aria-label="Ukuran"></div>
+        <div class="actions r">
+          <button class="btn primary" id="addCart" type="button"><span data-t="sku.addCart">Add to Cart</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L20 8H6.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="btn ghost-btn" id="buyNow" type="button" data-t="sku.buyNow">Buy Now</button>
+        </div>
+        <ul class="features r" id="skuFeatures"></ul>
+      </div>
+
+      <div class="stage" id="stage">
+        <img class="hero-img" id="heroImg" alt="">
+        <div class="floor" aria-hidden="true"></div>
+        <div class="angles glass" id="angles" aria-label="Sudut foto"></div>
+      </div>
+
+      <div class="picker glass" id="picker" aria-label="Pilih warna / SKU"></div>
+    </div>
+  </section>
+
+  <!-- ================= event detail ================= -->
+  <div class="modal" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="emTitle" hidden>
+    <div class="modal-scrim" data-close></div>
+    <article class="modal-card">
+      <button class="modal-x glass" type="button" data-close aria-label="Tutup">✕</button>
+      <div class="em-cover" id="emCover"></div>
+      <div class="em-body">
+        <p class="eyebrow" id="emWhen"></p>
+        <h3 id="emTitle"></h3>
+        <p class="em-venue" id="emVenue"></p>
+        <p class="em-desc" id="emDesc"></p>
+        <ul class="em-hl" id="emHighlights"></ul>
+        <div class="em-photos" id="emPhotos"></div>
+        <a class="btn primary" id="emLink" target="_blank" rel="noopener" data-t="events.info">Info event</a>
+      </div>
+    </article>
+  </div>
+
+  <!-- ================= lightbox ================= -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Foto" hidden>
+    <button class="lb-x glass" type="button" data-close aria-label="Tutup">✕</button>
+    <button class="lb-nav prev glass" type="button" aria-label="Sebelumnya">‹</button>
+    <figure><img id="lbImg" alt=""><figcaption id="lbCap"></figcaption></figure>
+    <button class="lb-nav next glass" type="button" aria-label="Berikutnya">›</button>
+    <p class="lb-count" id="lbCount"></p>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/content.js"></script>
+  <script src="/app.js"></script>
+  <script src="/site.js"></script>
+</body>
+</html>

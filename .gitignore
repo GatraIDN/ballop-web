@@ -1,0 +1,6 @@
+# business data + password hash stay local; online they live in Supabase
+data/
+public/uploads/
+node_modules/
+.vercel/
+.env*

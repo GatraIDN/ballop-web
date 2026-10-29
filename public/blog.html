@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Jurnal — BALLOP Indonesia</title>
+  <meta name="description" content="Cerita, tips, dan kabar terbaru dari BALLOP Indonesia.">
+  <meta name="theme-color" content="#f5f6f8">
+  <link rel="icon" href="/img/ballop-mark-dark.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/blog.css">
+</head>
+<body data-page="blog">
+  <header class="top scrolled blog-top">
+    <a class="blog-brand" href="/" aria-label="BALLOP, halaman depan"><img src="/img/ballop-logo-dark.png" alt="BALLOP"></a>
+    <nav class="links" aria-label="Navigasi">
+      <a href="/#koleksi" data-t="nav.koleksi">Koleksi</a>
+      <a href="/#event" data-t="nav.event">Event</a>
+      <a href="/blog" class="on" data-t="nav.blog">Jurnal</a>
+      <a href="/#toko" data-t="nav.toko">Toko</a>
+    </nav>
+    <a class="btn ghost-btn small-btn" href="/">← BALLOP</a>
+  </header>
+
+  <main class="blog" id="blog">
+    <!-- list -->
+    <section class="b-list" id="listView" hidden>
+      <div class="b-hero">
+        <div class="blob b1" aria-hidden="true"></div><div class="blob b2" aria-hidden="true"></div>
+        <p class="eyebrow" data-t="blog.eyebrow">JURNAL</p>
+        <h1 class="sec-title" data-t="blog.pageTitle">JURNAL BALLOP.</h1>
+        <p class="sec-sub" data-t="blog.pageSub">Cerita, tips, dan kabar terbaru dari BALLOP Indonesia.</p>
+        <div class="b-tools">
+          <input class="b-search glass" id="search" type="search" placeholder="Cari artikel…" aria-label="Cari artikel">
+          <nav class="chips" id="tags" aria-label="Topik"></nav>
+        </div>
+      </div>
+      <div class="b-grid" id="grid"></div>
+    </section>
+
+    <!-- article -->
+    <article class="b-post" id="postView" hidden>
+      <a class="b-back glass" href="/blog" id="backLink">← <span data-t="blog.back">Semua artikel</span></a>
+      <header class="b-head">
+        <p class="pc-meta" id="pMeta"></p>
+        <h1 id="pTitle"></h1>
+        <p class="b-ex" id="pEx"></p>
+        <p class="b-by" id="pBy"></p>
+      </header>
+      <div class="b-cover" id="pCover"></div>
+      <div class="b-body" id="pBody"></div>
+      <div class="b-share">
+        <span data-t="blog.share">Bagikan</span>
+        <a class="btn ghost-btn small-btn" id="shareWa" target="_blank" rel="noopener">WhatsApp</a>
+        <button class="btn ghost-btn small-btn" id="shareCopy" type="button">Salin link</button>
+      </div>
+      <section class="b-related">
+        <h2 data-t="blog.related">Artikel lainnya</h2>
+        <div class="b-grid" id="related"></div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="foot">
+    <img src="/img/ballop-logo-dark.png" alt="BALLOP">
+    <p data-t="footer.line">Gallop lightly, BALLOP! · Brand dari Korea Selatan</p>
+    <p class="small">© <span id="year"></span> <span data-t="footer.copyright">BALLOP Indonesia</span></p>
+  </footer>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/content.js"></script>
+  <script src="/md.js"></script>
+  <script src="/blog.js"></script>
+</body>
+</html>

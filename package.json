@@ -1,0 +1,12 @@
+{
+  "name": "ballop-catalog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BALLOP shoe catalog landing page + admin dashboard (zero dependencies)",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
