@@ -46,7 +46,8 @@
   const CONTENT = { menunggu: 'Menunggu', brief: 'Brief dikirim', draft: 'Draft', revisi: 'Revisi', posted: 'Sudah posting', tidak: 'Tidak posting' };
   const CASH_CATS = ['Penjualan offline', 'Pencairan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
 
-  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'offline', 'stock3pl', 'kol', 'cashflow'];
+  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'offline', 'stock3pl', 'kol', 'cashflow', 'contents', 'contentplans'];
+  const extraViews = {}; // views added by other admin modules (admin-konten.js)
   const data = Object.fromEntries(COLLS.map((c) => [c, []]));
   let loaded = false;
 
@@ -837,6 +838,7 @@
   function rerender(name) {
     const views = { stock: renderStock, stock3pl: renderStock3pl, offline: renderOffline, kol: renderKol, cashflow: renderFinance, sales: renderSales, ads: renderAds };
     if (views[name]) views[name]();
+    else if (LEDGERS[name]?.ownView) refresh();
     else renderLedger(name, `#view-${name}`);
   }
 
@@ -914,6 +916,7 @@
     const fieldHtml = (fd) => {
       const id = `rf-${fd.k}`;
       if (fd.type === 'select') return `<label for="${id}">${fd.label}<select id="${id}" name="${fd.k}"></select></label>`;
+      if (fd.type === 'area') return `<label for="${id}">${fd.label}<textarea id="${id}" name="${fd.k}" rows="${fd.rows || 3}" maxlength="2000"></textarea></label>`;
       const attrs = fd.type === 'number' ? `type="number" step="${fd.step || 1}" ${fd.allowNeg ? '' : `min="${fd.min ?? 0}"`}` : fd.type === 'date' ? `type="date"${fd.optional ? '' : ' required'}` : `type="text" maxlength="200"${fd.list ? ` list="${id}-list"` : ''}`;
       const dl = fd.list ? `<datalist id="${id}-list">${fd.list().map((v) => `<option value="${esc(v)}">`).join('')}</datalist>` : '';
       return `<label for="${id}">${fd.label}<input id="${id}" name="${fd.k}" ${attrs}>${dl}</label>`;
@@ -1354,7 +1357,8 @@
       offline: renderOffline, stock3pl: renderStock3pl, kol: renderKol, finance: renderFinance,
       expenses: () => renderLedger('expenses', '#view-expenses'),
     };
-    if (views[current] && !$(`#view-${current}`).hidden) views[current]();
+    const fn = views[current] || extraViews[current];
+    if (fn && !$(`#view-${current}`).hidden) fn();
   }
   document.addEventListener('admin:ready', async () => {
     setRange('30d');
@@ -1370,4 +1374,12 @@
   document.addEventListener('admin:products', () => { if (loaded) refresh(); });
   let rt = 0;
   addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (current === 'dashboard' && loaded) renderDashboard(); }, 200); });
+
+  // shared with other admin modules
+  window.Biz = {
+    data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge,
+    fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv,
+    get loaded() { return loaded; },
+    registerView(name, fn) { extraViews[name] = fn; },
+  };
 })();

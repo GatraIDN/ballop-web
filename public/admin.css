@@ -422,3 +422,35 @@ table.data tfoot td { font-weight: 900; background: var(--panel-2); border-top: 
 .chip-check input:focus-visible + span { outline: 2px solid rgba(47, 127, 211, .5); }
 .user-actions { display: flex; align-items: end; gap: 12px; justify-content: flex-end; }
 .user-actions .check { padding-bottom: 10px; }
+
+/* ---------- content workspace ---------- */
+.plan-list { display: grid; gap: 8px; }
+.plan-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--panel-2); }
+.plan-ic { width: 38px; height: 46px; border-radius: 8px; display: grid; place-items: center; font-size: 10px; font-weight: 900; color: #fff; background: #e34948; flex-shrink: 0; }
+.plan-meta { display: grid; gap: 2px; margin-right: auto; min-width: 180px; }
+.plan-target { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.plan-target input:not([type=checkbox]):not([type=range]):not([type=color]) { width: 72px; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--line-2); background: #fff; }
+.pdf-frame { width: 100%; height: 70vh; border: 0; border-radius: 14px; box-shadow: var(--shadow-sm); background: #fff; }
+.data.extract input, .data.extract select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line-2); font-size: 13px; background: #fff; }
+.k-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 8px; }
+.k-col { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 18px; background: rgba(255, 255, 255, .55); border: 1px solid var(--line); min-height: 220px; transition: box-shadow .2s, background .2s; }
+.k-col.over { background: rgba(47, 127, 211, .08); box-shadow: 0 0 0 2px var(--brand); }
+.k-col header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; padding: 2px 4px; }
+.k-drop { display: grid; gap: 8px; align-content: start; flex: 1; }
+.k-card { display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; cursor: grab; font-size: 13px; transition: transform .2s, box-shadow .2s; }
+.k-card:hover { transform: translateY(-2px); }
+.k-card.dragging { opacity: .4; }
+.k-card.late { box-shadow: inset 3px 0 0 var(--danger), var(--shadow-sm); }
+.k-card b { font-size: 13px; line-height: 1.35; }
+.k-plat { font-size: 10px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--pc); }
+.k-add { font-size: 12px; font-weight: 700; color: var(--muted); padding: 6px; border-radius: 10px; }
+.k-add:hover { background: #fff; color: var(--ink); }
+.k-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border-radius: 18px; overflow: hidden; }
+.k-wd { background: var(--panel-2); font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 8px; text-align: center; }
+.k-day { min-width: 0; background: #fff; min-height: 104px; padding: 6px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+.k-day.empty { background: var(--panel-2); cursor: default; }
+.k-day.now { box-shadow: inset 0 0 0 2px var(--brand); }
+.k-dn { font-size: 12px; font-weight: 700; color: var(--muted); }
+.k-chip { text-align: left; font-size: 11px; padding: 3px 6px; border-radius: 6px; background: color-mix(in srgb, var(--pc) 14%, #fff); border-left: 3px solid var(--pc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.k-chip.done { font-weight: 900; color: var(--ink); }
+@media (max-width: 640px) { .k-day { min-height: 64px; } .k-chip { font-size: 0; padding: 0; height: 6px; } }
