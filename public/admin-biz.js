@@ -5,6 +5,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const money = (n) => window.A.money(Math.round(n || 0));
   const num = (n) => Math.round(n || 0).toLocaleString('id-ID');
+  const dash = (n) => (n ? num(n) : '–'); // counts an ad platform may not report
   const pct = (n) => (Number.isFinite(n) ? `${(n * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–');
   const ratio = (n) => (Number.isFinite(n) && n > 0 ? `${n.toLocaleString('id-ID', { maximumFractionDigits: 2 })}×` : '–');
   const compact = (n) => {
@@ -35,6 +36,7 @@
     google: { label: 'Google Ads', color: '#1baf7a' },
     other: { label: 'Lainnya', color: '#8a8f99' },
   };
+  const isGmvMax = (c) => /gmv\s*max/i.test(c || '');
   const ADS_CAMPAIGNS = ['Product Ads Shopee', 'Shop Ads Shopee', 'Banner Ads Shopee', 'CPAS Shopee', 'GMV Max Tiktok', 'Manual Campaign Tiktok', 'Live Ads Tiktok', 'Meta Ads'];
   const STATUS = { completed: 'Selesai', returned: 'Retur', cancelled: 'Batal' };
   const EXP_CATS = ['Gaji', 'Packaging', 'Ongkir', 'Sewa', 'Event', 'Konten / KOL', 'Operasional', 'Lainnya'];
@@ -164,7 +166,7 @@
     const m = {
       gross: 0, discount: 0, revenue: 0, fees: 0, shipping: 0, cogs: 0, units: 0, orders: 0, unknownCost: 0,
       returns: 0, returnValue: 0, cancelled: 0, adSpend: 0, adRevenue: 0, expenses: 0, payout: 0,
-      adImpressions: 0, adClicks: 0, adOrders: 0, adSpendClicked: 0,
+      adImpressions: 0, adClicks: 0, adOrders: 0, adSpendClicked: 0, adSpendOrdered: 0,
       byCh: {}, byAd: {}, byCamp: {}, byProduct: {}, byExp: {},
     };
     const orderKeys = new Set();
@@ -206,6 +208,7 @@
       g.spend += a.spend; g.impressions += a.impressions; g.clicks += a.clicks; g.orders += a.orders; g.revenue += a.revenue;
       m.adImpressions += a.impressions; m.adClicks += a.clicks; m.adOrders += a.orders;
       if (a.clicks) m.adSpendClicked += a.spend; // CPC only over rows that report clicks
+      if (a.orders) m.adSpendOrdered += a.spend; // likewise cost per order
     });
     m.adRoas = m.adSpend ? m.adRevenue / m.adSpend : NaN;
     exp.forEach((x) => { m.expenses += x.amount; m.byExp[x.category] = (m.byExp[x.category] || 0) + x.amount; });
@@ -363,16 +366,16 @@
       const camps = Object.entries(m.byCamp).sort((a, b) => b[1].spend - a[1].spend);
       return `
       <div class="kpis">
-        <div class="kpi solid hero"><div class="k-label">Biaya iklan</div><div class="k-value">${money(m.adSpend)}</div>${delta(m.adSpend, p.adSpend, false, true)}</div>
-        <div class="kpi solid"><div class="k-label">Revenue atribusi (klaim platform)</div><div class="k-value">${money(m.adRevenue)}</div>${delta(m.adRevenue, p.adRevenue)}</div>
-        <div class="kpi solid"><div class="k-label">ROAS atribusi</div><div class="k-value">${ratio(m.adRoas)}</div>${delta(m.adRoas, p.adRoas)}</div>
-        <div class="kpi solid"><div class="k-label">ROAS real (omzet selesai ÷ iklan)</div><div class="k-value">${ratio(m.roas)}</div>${delta(m.roas, p.roas)}</div>
-        <div class="kpi solid"><div class="k-label">Impresi · klik</div><div class="k-value">${compact(m.adImpressions)} · ${compact(m.adClicks)}</div>${delta(m.adClicks, p.adClicks)}</div>
-        <div class="kpi solid"><div class="k-label">CTR · CPC</div><div class="k-value">${pct(m.adImpressions ? m.adClicks / m.adImpressions : NaN)} · ${m.adClicks ? compact(m.adSpendClicked / m.adClicks) : '–'}</div><div class="k-delta">dari iklan yang ada data kliknya</div></div>
-        <div class="kpi solid"><div class="k-label">Order atribusi · CPA</div><div class="k-value">${num(m.adOrders)} · ${m.adOrders ? compact(m.adSpend / m.adOrders) : '–'}</div>${delta(m.adOrders, p.adOrders)}</div>
-        <div class="kpi solid"><div class="k-label">Iklan ÷ omzet real</div><div class="k-value">${m.revenue ? pct(m.adSpend / m.revenue) : '–'}</div><div class="k-delta">porsi biaya iklan</div></div>
+        <div class="kpi solid hero"><div class="k-label">Biaya iklan</div><div class="k-value">${money(m.adSpend)}</div></div>
+        <div class="kpi solid"><div class="k-label">Revenue atribusi (klaim platform)</div><div class="k-value">${money(m.adRevenue)}</div></div>
+        <div class="kpi solid"><div class="k-label">ROAS atribusi</div><div class="k-value">${ratio(m.adRoas)}</div></div>
+        <div class="kpi solid"><div class="k-label">ROAS real (omzet selesai ÷ iklan)</div><div class="k-value">${ratio(m.roas)}</div></div>
+        <div class="kpi solid"><div class="k-label">Order atribusi</div><div class="k-value">${m.adOrders ? num(m.adOrders) : '–'}</div></div>
+        <div class="kpi solid"><div class="k-label">Cost per order</div><div class="k-value">${m.adOrders ? money(m.adSpendOrdered / m.adOrders) : '–'}</div></div>
+        <div class="kpi solid"><div class="k-label">CTR · CPC</div><div class="k-value">${m.adImpressions ? pct(m.adClicks / m.adImpressions) : '–'} · ${m.adClicks ? compact(m.adSpendClicked / m.adClicks) : '–'}</div></div>
+        <div class="kpi solid"><div class="k-label">Iklan ÷ omzet real</div><div class="k-value">${m.revenue ? pct(m.adSpend / m.revenue) : '–'}</div></div>
       </div>
-      <p class="muted small">Revenue & order atribusi = angka dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur). Omzet real ada di tab Penjualan real.</p>
+      <p class="muted small">Revenue & order atribusi = angka dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur). Omzet real ada di tab Penjualan real. Cost per order, CTR & CPC hanya dihitung dari iklan yang mengisi data itu (GMV Max tidak punya impresi/klik). “–” = tidak ada data.</p>
       <section class="panel solid">
         <div class="panel-head"><h2>Biaya iklan per channel</h2>${legend(adSeries)}</div>
         <div class="chart" id="chAds"></div>
@@ -380,16 +383,16 @@
       <section class="panel solid">
         <div class="panel-head"><h2>Per campaign</h2></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Campaign</th><th class="num">Spend</th><th class="num">Impresi</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Order</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th></tr></thead>
-          <tbody>${camps.map(([n, x]) => `<tr><td><span class="ch"><i style="background:${ADS_CH[x.channel]?.color || '#8a8f99'}"></i>${esc(n)}</span></td><td class="num">${money(x.spend)}</td><td class="num">${num(x.impressions)}</td><td class="num">${num(x.clicks)}</td><td class="num">${pct(x.impressions ? x.clicks / x.impressions : NaN)}</td><td class="num">${x.clicks ? money(x.spend / x.clicks) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.revenue)}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
+          <thead><tr><th>Campaign</th><th class="num">Spend</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th><th class="num">Order</th><th class="num">Cost / order</th><th class="num">Impresi</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th></tr></thead>
+          <tbody>${camps.map(([n, x]) => `<tr><td><span class="ch"><i style="background:${ADS_CH[x.channel]?.color || '#8a8f99'}"></i>${esc(n)}</span></td><td class="num">${money(x.spend)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td><td class="num">${x.orders ? money(x.spend / x.orders) : '–'}</td><td class="num">${dash(x.impressions)}</td><td class="num">${dash(x.clicks)}</td><td class="num">${x.impressions ? pct(x.clicks / x.impressions) : '–'}</td><td class="num">${x.clicks ? money(x.spend / x.clicks) : '–'}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
         </table></div>
       </section>
       <div class="grid-2">
         <section class="panel solid">
           <div class="panel-head"><h2>Iklan per channel</h2></div>
           <div class="table-wrap"><table class="data">
-            <thead><tr><th>Channel</th><th class="num">Spend</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Order</th><th class="num">ROAS</th></tr></thead>
-            <tbody>${Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).map(([k, c]) => { const x = m.byAd[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.spend)}</td><td class="num">${num(x.clicks)}</td><td class="num">${pct(x.impressions ? x.clicks / x.impressions : NaN)}</td><td class="num">${x.clicks ? money(x.spend / x.clicks) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${ratio(x.revenue / x.spend)}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
+            <thead><tr><th>Channel</th><th class="num">Spend</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th><th class="num">Order</th><th class="num">Klik</th></tr></thead>
+            <tbody>${Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).map(([k, c]) => { const x = m.byAd[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.spend)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.revenue / x.spend)}</td><td class="num">${dash(x.orders)}</td><td class="num">${dash(x.clicks)}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
           </table></div>
         </section>
         <section class="panel solid">
@@ -605,15 +608,22 @@
         { k: 'date', label: 'Tanggal', type: 'date', half: 1 },
         { k: 'channel', label: 'Channel', type: 'select', options: () => Object.entries(ADS_CH).map(([k, c]) => [k, c.label]), half: 1 },
         { k: 'campaign', label: 'Nama campaign', type: 'select', options: (f, row) => [...new Set([...ADS_CAMPAIGNS, row?.campaign].filter(Boolean))].map((c) => [c, c]) },
-        { k: 'spend', label: 'Spending', type: 'number', step: 1000, half: 1 },
+        { k: 'spend', label: 'Spending (cost)', type: 'number', step: 1000, half: 1 },
+        { k: 'orders', label: 'Order (atribusi / SKU order)', type: 'number', half: 1 },
+        { k: 'revenue', label: 'Revenue (atribusi / gross revenue)', type: 'number', step: 1000 },
         { k: 'impressions', label: 'Impresi', type: 'number', half: 1 },
         { k: 'clicks', label: 'Klik', type: 'number', half: 1 },
-        { k: 'orders', label: 'Order (atribusi)', type: 'number', half: 1 },
-        { k: 'revenue', label: 'Revenue (atribusi)', type: 'number', step: 1000 },
         { k: 'note', label: 'Catatan' },
       ],
+      // GMV Max only reports cost, orders and revenue: hide impressions/clicks for it
+      sync: (f) => {
+        const gmv = isGmvMax(f.campaign.value);
+        f.impressions.closest('.row').hidden = gmv;
+        if (gmv) { f.impressions.value = ''; f.clicks.value = ''; if (f.channel.value !== 'tiktok' && ADS_CH.tiktok) f.channel.value = 'tiktok'; }
+      },
       summary: (f) => {
-        const sp = Number(f.spend.value) || 0, cl = Number(f.clicks.value) || 0, im = Number(f.impressions.value) || 0, rv = Number(f.revenue.value) || 0;
+        const sp = Number(f.spend.value) || 0, cl = Number(f.clicks.value) || 0, im = Number(f.impressions.value) || 0, rv = Number(f.revenue.value) || 0, od = Number(f.orders.value) || 0;
+        if (isGmvMax(f.campaign.value)) return `Cost per order ${od ? money(sp / od) : '–'} · ROI ${ratio(sp ? rv / sp : NaN)}`;
         return `CTR ${pct(im ? cl / im : NaN)} · CPC ${cl ? money(sp / cl) : '–'} · ROAS ${ratio(sp ? rv / sp : NaN)}`;
       },
       columns: [
@@ -1002,7 +1012,7 @@
         }
       }
     });
-    const upd = () => { if (cfg.summary) $('#recSummary').textContent = cfg.summary(f); };
+    const upd = () => { cfg.sync?.(f); if (cfg.summary) $('#recSummary').textContent = cfg.summary(f); };
     $('#recFields').oninput = upd;
     $('#recFields').onchange = (e) => { cfg.onChange?.(f, e.target.name); upd(); };
     upd();
