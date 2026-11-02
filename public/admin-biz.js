@@ -388,7 +388,7 @@
         <div class="chart" id="chAds"></div>
       </section>
       ${chs.map(([k, c]) => `
-      <h2 class="ads-h"><i style="background:${c.color}"></i>Performa ${esc(c.label.replace(/ Ads$/, ''))}</h2>
+      <h2 class="ads-h"><i style="background:${c.color}"></i>Performa Iklan ${esc(c.label.replace(/ Ads$/, ''))}</h2>
       ${adKpis(m.byAd[k])}
       <section class="panel solid">
         <div class="panel-head"><h2>Campaign ${esc(c.label)}</h2></div>
@@ -398,8 +398,9 @@
     };
 
     v.innerHTML = `
-      <header class="bar">
-        <div><h1>Ringkasan</h1><p class="muted">${fmtDate(from)} – ${fmtDate(to)} · ${len} hari</p></div>
+      <header class="dash-head glass">
+        <img class="dh-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
+        <div class="dh-title"><h1>Dashboard Report</h1><p>${dashTab === "ads" ? "Performa iklan" : "Penjualan real"} · ${fmtDate(from)} – ${fmtDate(to)} · ${len} hari</p></div>
         <button class="btn" id="expReport" type="button">⬇ Export laporan</button>
       </header>
       <div class="toolbar">

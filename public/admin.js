@@ -125,6 +125,11 @@
   $$('.nav[data-view]').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
   $('#sideOpen').addEventListener('click', () => document.body.classList.add('side-open'));
   $('#sideClose').addEventListener('click', () => document.body.classList.remove('side-open'));
+  // desktop: hide / show the sidebar, remembered per browser
+  const setSideHidden = (on) => { document.body.classList.toggle('side-hidden', on); try { localStorage.setItem('ballopSideHidden', on ? '1' : ''); } catch {} dispatchEvent(new Event('resize')); };
+  try { if (localStorage.getItem('ballopSideHidden')) document.body.classList.add('side-hidden'); } catch {}
+  $('#sideHide').addEventListener('click', () => setSideHidden(true));
+  $('#sideShow').addEventListener('click', () => setSideHidden(false));
 
   // ---------- product list ----------
   $('#search').addEventListener('input', renderList);
