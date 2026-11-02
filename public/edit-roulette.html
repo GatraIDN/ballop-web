@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atur Roulette BALLOP</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#f3f4f7">
+  <link rel="icon" href="/img/ballop-mark-dark.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #f3f4f7; --card: #fff; --ink: #141a2b; --mute: #6a7593; --line: #e3e7f0; --blue: #1c3f94; --red: #d4343a; --green: #15936b; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; font: 15px/1.5 'Noto Sans KR', system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
+    header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+    header img { height: 30px; }
+    header h1 { font-size: 20px; margin: 0; flex: 1; }
+    a.btn, button { font: inherit; font-weight: 700; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 10px; padding: 9px 16px; cursor: pointer; text-decoration: none; }
+    .primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .danger { color: var(--red); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-bottom: 18px; }
+    .card h2 { font-size: 16px; margin: 0 0 4px; }
+    .card > p { margin: 0 0 16px; color: var(--mute); font-size: 13.5px; }
+    label { display: block; font-size: 12.5px; font-weight: 700; color: var(--mute); }
+    input { font: inherit; width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+    input[type=color] { padding: 2px; height: 38px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .toggle { display: flex; align-items: center; gap: 10px; margin-top: 14px; color: var(--ink); font-size: 14px; }
+    .toggle input { width: auto; margin: 0; }
+    .tbl { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 860px; }
+    th { text-align: left; font-size: 12px; color: var(--mute); font-weight: 700; padding: 6px; border-bottom: 1px solid var(--line); }
+    td { padding: 6px; vertical-align: middle; border-bottom: 1px solid var(--line); }
+    td input { margin: 0; }
+    td.n input { width: 84px; }
+    .pct { font-weight: 900; white-space: nowrap; }
+    .row-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .stat { border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+    .stat b { display: block; font-size: 22px; }
+    .stat span { color: var(--mute); font-size: 12.5px; }
+    .log { max-height: 320px; overflow: auto; font-size: 13.5px; }
+    .log div { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+    .log time { color: var(--mute); min-width: 70px; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .preview { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+    .preview canvas { width: 220px; height: 220px; border-radius: 50%; box-shadow: 0 0 0 6px #f2c14b; }
+    .hint { color: var(--mute); font-size: 13px; }
+    .err { color: var(--red); min-height: 1.2em; }
+    #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(80px); background: #141a2b; color: #fff; padding: 10px 18px; border-radius: 10px; transition: transform .25s; }
+    #toast.show { transform: translateX(-50%); }
+    #toast.bad { background: var(--red); }
+    .login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+    .login form { width: min(360px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 28px; text-align: center; }
+    .login img { height: 36px; margin-bottom: 8px; }
+    .login label { text-align: left; margin-top: 12px; }
+    .login button { width: 100%; margin-top: 18px; }
+    @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <section class="login" id="login" hidden>
+    <form id="loginForm">
+      <img src="/img/ballop-logo-dark.png" alt="BALLOP">
+      <h2>Atur Roulette</h2>
+      <label>Username<input id="username" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+      <label>Password<input type="password" id="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit">Masuk</button>
+      <p class="err" id="loginErr"></p>
+    </form>
+  </section>
+
+  <div class="wrap" id="app" hidden>
+    <header>
+      <img src="/img/ballop-logo-dark.png" alt="BALLOP">
+      <h1>Atur Roulette</h1>
+      <a class="btn" href="/roulette" target="_blank">Buka /roulette ↗</a>
+      <button class="primary" id="save" type="button">Simpan</button>
+    </header>
+
+    <div class="card">
+      <h2>Tampilan</h2>
+      <p>Judul dan teks di halaman roulette.</p>
+      <div class="grid2">
+        <label>Judul<input id="title" maxlength="60"></label>
+        <label>Subjudul<input id="subtitle" maxlength="120"></label>
+      </div>
+      <label class="toggle"><input type="checkbox" id="active"> Roulette dibuka (kalau dimatikan, tombol SPIN tidak bisa dipakai)</label>
+    </div>
+
+    <div class="card">
+      <h2>Hadiah & peluang</h2>
+      <p><b>Kotak di roda</b> cuma tampilan (berapa kali hadiah muncul di roda). Yang menentukan menang adalah <b>Bobot</b>. Bobot tidak harus berjumlah 100, dihitung otomatis jadi persen.
+        <b>Maks/hari</b> 0 = tanpa batas. <b>Min. spin</b> = hadiah baru bisa keluar setelah sekian kali putar di hari itu.</p>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Warna</th><th>Nama hadiah (di popup)</th><th>Teks di roda</th><th>Kotak di roda</th><th>Bobot</th><th>Maks/hari</th><th>Min. spin</th><th>Peluang</th><th></th></tr></thead>
+          <tbody id="prizes"></tbody>
+        </table>
+      </div>
+      <div class="row-actions">
+        <button id="add" type="button">+ Tambah hadiah</button>
+        <span class="hint" id="sum"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pratinjau roda</h2>
+      <div class="preview">
+        <canvas id="wheel" width="600" height="600"></canvas>
+        <div class="hint" id="previewNote"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Hari ini</h2>
+      <p>Dihitung per hari (WIB). Batas harian otomatis reset jam 00.00.</p>
+      <div class="stats" id="stats"></div>
+      <div class="row-actions">
+        <button id="refresh" type="button">Refresh</button>
+        <button class="danger" id="reset" type="button">Reset hitungan hari ini</button>
+      </div>
+      <h2 style="margin-top:20px">Riwayat spin</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+  <div id="toast"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let token = ''; try { token = sessionStorage.getItem('ballop-admin') || ''; } catch {}
+  let cfg = null, state = null;
+
+  function toast(text, bad = false) {
+    const t = $('#toast'); t.textContent = text; t.classList.toggle('bad', bad); t.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  async function api(path, opts = {}) {
+    const res = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } });
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) { showLogin(body.error); throw new Error(body.error || 'Login dulu'); }
+    if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+    return body;
+  }
+  function showLogin(msg) { $('#app').hidden = true; $('#login').hidden = false; $('#loginErr').textContent = msg && msg !== 'Login dulu' ? msg : ''; }
+
+  // ----- prizes table -----
+  const fmtPct = (v) => (v === 0 ? '0%' : v < 1 ? `${v.toFixed(2).replace('.', ',')}%` : `${v.toFixed(1).replace('.', ',')}%`);
+  function renderPrizes() {
+    $('#prizes').innerHTML = cfg.prizes.map((p, i) => `<tr data-i="${i}">
+      <td><input type="color" data-k="color" value="${esc(p.color)}"></td>
+      <td><input data-k="name" value="${esc(p.name)}" maxlength="60"></td>
+      <td><input data-k="short" value="${esc(p.short)}" maxlength="20"></td>
+      <td class="n"><input type="number" data-k="slices" min="1" max="12" value="${p.slices}"></td>
+      <td class="n"><input type="number" data-k="weight" min="0" step="any" value="${p.weight}"></td>
+      <td class="n"><input type="number" data-k="dailyLimit" min="0" value="${p.dailyLimit}"></td>
+      <td class="n"><input type="number" data-k="minSpins" min="0" value="${p.minSpins}"></td>
+      <td class="pct" data-pct></td>
+      <td><button class="danger" data-del type="button" title="Hapus">✕</button></td>
+    </tr>`).join('');
+    updatePct();
+  }
+  function updatePct() {
+    const sum = cfg.prizes.reduce((a, p) => a + (Number(p.weight) || 0), 0);
+    document.querySelectorAll('#prizes tr').forEach((tr) => {
+      const p = cfg.prizes[tr.dataset.i];
+      tr.querySelector('[data-pct]').textContent = sum ? fmtPct(((Number(p.weight) || 0) / sum) * 100) : '–';
+    });
+    const slices = cfg.prizes.reduce((a, p) => a + (Number(p.slices) || 0), 0);
+    $('#sum').textContent = `Total kotak di roda: ${slices}. Peluang di atas adalah peluang dasar; hadiah yang sudah habis kuota hari ini atau belum lewat min. spin tidak ikut diundi.`;
+    drawPreview();
+  }
+  $('#prizes').addEventListener('input', (e) => {
+    const k = e.target.dataset.k; if (!k) return;
+    const p = cfg.prizes[e.target.closest('tr').dataset.i];
+    p[k] = e.target.type === 'number' ? Number(e.target.value) : e.target.value;
+    updatePct();
+  });
+  $('#prizes').addEventListener('click', (e) => {
+    if (!e.target.closest('[data-del]')) return;
+    if (cfg.prizes.length <= 1) return toast('Minimal 1 hadiah', true);
+    cfg.prizes.splice(e.target.closest('tr').dataset.i, 1); renderPrizes();
+  });
+  $('#add').addEventListener('click', () => {
+    cfg.prizes.push({ id: Math.random().toString(36).slice(2, 10), name: 'Hadiah baru', short: 'Hadiah', color: '#6b4fd8', slices: 1, weight: 1, dailyLimit: 0, minSpins: 0 });
+    renderPrizes();
+  });
+
+  // ----- preview: same slice order as /roulette -----
+  function layout(prizes) {
+    const items = [];
+    prizes.forEach((p) => { for (let k = 0; k < Math.max(1, p.slices || 1); k++) items.push({ p, key: (k + 0.5) / Math.max(1, p.slices || 1) }); });
+    items.sort((a, b) => a.key - b.key || b.p.slices - a.p.slices);
+    for (let i = 1; i < items.length; i++) if (items[i].p === items[i - 1].p) {
+      const j = items.findIndex((x, n) => n > i && x.p !== items[i].p);
+      if (j > 0) [items[i], items[j]] = [items[j], items[i]];
+    }
+    return items.map((x) => x.p);
+  }
+  function drawPreview() {
+    const c = $('#wheel'), x = c.getContext('2d'), W = c.width, R = W / 2, sl = layout(cfg.prizes), seg = (Math.PI * 2) / sl.length;
+    x.clearRect(0, 0, W, W);
+    sl.forEach((p, i) => {
+      const a0 = -Math.PI / 2 + i * seg;
+      x.beginPath(); x.moveTo(R, R); x.arc(R, R, R, a0, a0 + seg); x.closePath();
+      x.fillStyle = p.color; x.fill(); x.strokeStyle = '#fff'; x.lineWidth = 4; x.stroke();
+      x.save(); x.translate(R, R); x.rotate(a0 + seg / 2); x.fillStyle = '#fff'; x.textAlign = 'right'; x.textBaseline = 'middle';
+      x.font = `900 ${Math.min(30, seg * R * 0.4)}px 'Noto Sans KR', sans-serif`; x.fillText(p.short, R * 0.9, 0, R * 0.65); x.restore();
+    });
+    const each = (360 / sl.length).toFixed(1).replace('.', ',');
+    $('#previewNote').innerHTML = `${sl.length} kotak, masing-masing ${each}°.<br>Biar hadiah besar tetap kelihatan di roda, kasih minimal 1 kotak.<br>Roda di /roulette berhenti tepat di kotak hadiah yang dimenangkan.`;
+  }
+
+  // ----- today -----
+  function renderState(odds) {
+    const byId = Object.fromEntries(cfg.prizes.map((p) => [p.id, p]));
+    $('#stats').innerHTML = `<div class="stat"><b>${state.spins}</b><span>Total spin hari ini</span></div>` + cfg.prizes.map((p) => {
+      const won = state.wins[p.id] || 0, o = odds.find((x) => x.id === p.id);
+      const lim = p.dailyLimit ? ` / ${p.dailyLimit}` : '';
+      return `<div class="stat"><b><span class="dot" style="background:${esc(p.color)}"></span>${won}${lim}</b><span>${esc(p.short)} · peluang spin berikutnya ${fmtPct(o ? o.pct : 0)}</span></div>`;
+    }).join('');
+    $('#log').innerHTML = state.log.length ? state.log.map((l) => {
+      const p = byId[l.id], d = new Date(l.at);
+      return `<div><time>${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</time><span><span class="dot" style="background:${esc(p ? p.color : '#999')}"></span>${esc(l.name)}</span></div>`;
+    }).join('') : '<p class="hint">Belum ada spin.</p>';
+  }
+
+  async function load() {
+    const body = await api('/api/roulette/admin');
+    cfg = body.config; state = body.state;
+    $('#login').hidden = true; $('#app').hidden = false;
+    $('#title').value = cfg.title; $('#subtitle').value = cfg.subtitle || ''; $('#active').checked = cfg.active !== false;
+    renderPrizes(); renderState(body.odds);
+  }
+  async function refresh() {
+    const body = await api('/api/roulette/admin');
+    state = body.state; renderState(body.odds);
+  }
+
+  $('#save').addEventListener('click', async () => {
+    cfg.title = $('#title').value; cfg.subtitle = $('#subtitle').value; cfg.active = $('#active').checked;
+    try { cfg = await api('/api/roulette', { method: 'PUT', body: JSON.stringify(cfg) }); renderPrizes(); await refresh(); toast('Tersimpan'); }
+    catch (e) { toast(e.message, true); }
+  });
+  $('#refresh').addEventListener('click', () => refresh().catch((e) => toast(e.message, true)));
+  $('#reset').addEventListener('click', async () => {
+    if (!confirm('Reset hitungan spin & pemenang hari ini? Riwayat juga dihapus.')) return;
+    try { await api('/api/roulette/reset', { method: 'POST' }); await refresh(); toast('Hitungan direset'); } catch (e) { toast(e.message, true); }
+  });
+
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault(); $('#loginErr').textContent = '';
+    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('#username').value, password: $('#password').value }) });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { $('#loginErr').textContent = body.error || 'Gagal login'; return; }
+    token = body.token; try { sessionStorage.setItem('ballop-admin', token); } catch {}
+    load().catch((err) => { $('#loginErr').textContent = err.message; });
+  });
+
+  if (token) load().catch(() => {}); else showLogin();
+})();
+</script>
+</body>
+</html>

@@ -20,6 +20,7 @@ function serveStatic(req, res, url) {
   if (p === '/') p = '/index.html';
   else if (p === '/admin' || p === '/admin/') p = '/admin.html';
   else if (p === '/blog' || p.startsWith('/blog/')) p = '/blog.html';
+  else if (p === '/roulette' || p === '/edit-roulette') p += '.html';
   const f = path.normalize(path.join(PUB, p));
   if (!f.startsWith(PUB)) return send(res, 403, 'Forbidden', 'text/plain');
   fs.stat(f, (err, st) => {

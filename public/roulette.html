@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BALLOP Spin & Win</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0b1530">
+  <link rel="icon" href="/img/ballop-mark-white.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0b1530; --ink: #fff; --gold: #f5c542; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: 'Noto Sans KR', system-ui, sans-serif; color: var(--ink); overflow: hidden;
+      background: radial-gradient(1200px 700px at 50% 45%, #1d3a86 0%, #0f1f4d 45%, var(--bg) 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.4vh;
+      padding: 3vh 16px; -webkit-tap-highlight-color: transparent; user-select: none;
+    }
+    body::before { /* soft light rays */
+      content: ''; position: fixed; inset: -50%; z-index: -1; opacity: .08;
+      background: repeating-conic-gradient(from 0deg, #fff 0 6deg, transparent 6deg 18deg);
+      animation: rays 60s linear infinite;
+    }
+    @keyframes rays { to { transform: rotate(360deg); } }
+    header { text-align: center; }
+    header img { height: clamp(34px, 6vh, 64px); display: block; margin: 0 auto 1.2vh; }
+    h1 { margin: 0; font-size: clamp(24px, 4.6vh, 52px); font-weight: 900; letter-spacing: -.01em; }
+    header p { margin: .6vh 0 0; font-size: clamp(14px, 2.1vh, 22px); opacity: .8; }
+    .stage { position: relative; width: min(86vw, 62vh); aspect-ratio: 1; }
+    .ring {
+      position: absolute; inset: 0; border-radius: 50%; padding: 3.2%;
+      background: conic-gradient(from 0deg, #f8d974, #c98a12, #f8d974, #c98a12, #f8d974);
+      box-shadow: 0 30px 80px rgba(0,0,0,.55), inset 0 0 0 3px rgba(255,255,255,.35);
+    }
+    .bulbs { position: absolute; inset: 0; }
+    .bulbs i { position: absolute; width: 2.2%; height: 2.2%; margin: -1.1%; border-radius: 50%; background: #fff7d6; box-shadow: 0 0 10px #ffe58a; animation: blink 1s steps(1) infinite; }
+    .bulbs i:nth-child(odd) { animation-delay: .5s; }
+    body.spinning .bulbs i { animation-duration: .25s; }
+    @keyframes blink { 50% { opacity: .25; } }
+    canvas { width: 100%; height: 100%; display: block; border-radius: 50%; will-change: transform; }
+    .pointer {
+      position: absolute; left: 50%; top: -3.5%; width: 11%; aspect-ratio: .8; transform: translateX(-50%); z-index: 3;
+      filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));
+    }
+    .pointer.tick { animation: tick .12s ease-out; }
+    @keyframes tick { 40% { transform: translateX(-50%) rotate(-14deg); } }
+    .hub {
+      position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 2;
+      border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, #e8ecf6 60%, #b9c2d8);
+      box-shadow: 0 6px 20px rgba(0,0,0,.4), inset 0 0 0 4px #f5c542; display: grid; place-items: center;
+    }
+    .hub img { width: 62%; }
+    .spin {
+      font: 900 clamp(20px, 3.4vh, 34px)/1 'Noto Sans KR', sans-serif; letter-spacing: .08em; color: #3a2500; cursor: pointer;
+      border: 0; border-radius: 999px; padding: 2vh 9vh; background: linear-gradient(180deg, #ffe27a, #f2b01c);
+      box-shadow: 0 8px 0 #b37a06, 0 18px 30px rgba(0,0,0,.45); transition: transform .1s, box-shadow .1s, opacity .2s;
+    }
+    .spin:active { transform: translateY(6px); box-shadow: 0 2px 0 #b37a06, 0 8px 16px rgba(0,0,0,.4); }
+    .spin:disabled { opacity: .55; cursor: default; }
+    .note { min-height: 1.4em; margin: 0; font-size: 15px; opacity: .8; text-align: center; }
+    /* result */
+    .result {
+      position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px;
+      background: rgba(5,10,28,.72); backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .3s;
+    }
+    .result.show { opacity: 1; pointer-events: auto; }
+    .card {
+      width: min(520px, 100%); text-align: center; border-radius: 28px; padding: 40px 28px 30px; color: #0b1530;
+      background: linear-gradient(180deg, #fff, #eef2fb); box-shadow: 0 30px 90px rgba(0,0,0,.5);
+      transform: scale(.7); transition: transform .45s cubic-bezier(.2,1.6,.4,1);
+    }
+    .result.show .card { transform: scale(1); }
+    .card img { height: 34px; }
+    .card small { display: block; margin-top: 22px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #6a7593; }
+    .card h2 { margin: 10px 0 6px; font-size: clamp(28px, 6vw, 44px); font-weight: 900; line-height: 1.1; }
+    .card .chip { display: inline-block; width: 64px; height: 6px; border-radius: 6px; margin: 8px 0 22px; }
+    .card button { font: 700 18px 'Noto Sans KR', sans-serif; border: 0; border-radius: 999px; padding: 14px 34px; color: #fff; background: #1c3f94; cursor: pointer; }
+    #confetti { position: fixed; inset: 0; z-index: 11; pointer-events: none; }
+    .closed { font-size: 18px; text-align: center; opacity: .9; }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="/img/ballop-logo-white.png" alt="BALLOP">
+    <h1 id="title">Spin & Win BALLOP</h1>
+    <p id="subtitle"></p>
+  </header>
+  <div class="stage">
+    <div class="ring"><canvas id="wheel" width="1000" height="1000"></canvas></div>
+    <div class="bulbs" id="bulbs"></div>
+    <svg class="pointer" id="pointer" viewBox="0 0 40 50" aria-hidden="true"><path d="M20 50 L2 12 A20 20 0 0 1 38 12 Z" fill="#e0383e" stroke="#fff" stroke-width="3"/><circle cx="20" cy="15" r="6" fill="#fff"/></svg>
+    <div class="hub"><img src="/img/ballop-mark-dark.png" alt=""></div>
+  </div>
+  <button class="spin" id="spin" type="button">SPIN</button>
+  <p class="note" id="note"></p>
+
+  <div class="result" id="result">
+    <div class="card">
+      <img src="/img/ballop-logo-dark.png" alt="BALLOP">
+      <small>Selamat! Kamu dapat</small>
+      <h2 id="prize"></h2>
+      <span class="chip" id="chip"></span><br>
+      <button id="again" type="button">Lanjut</button>
+    </div>
+  </div>
+  <canvas id="confetti"></canvas>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const wheel = $('#wheel'), ctx = wheel.getContext('2d');
+  let cfg = null, slices = [], rot = 0, busy = false;
+
+  // spread each prize's slices evenly around the wheel so the same prize never sits side by side
+  function layout(prizes) {
+    const items = [];
+    prizes.forEach((p) => { for (let k = 0; k < p.slices; k++) items.push({ p, key: (k + 0.5) / p.slices }); });
+    items.sort((a, b) => a.key - b.key || b.p.slices - a.p.slices);
+    for (let i = 1; i < items.length; i++) { // nudge neighbours apart
+      if (items[i].p === items[i - 1].p) {
+        const j = items.findIndex((x, n) => n > i && x.p !== items[i].p);
+        if (j > 0) [items[i], items[j]] = [items[j], items[i]];
+      }
+    }
+    return items.map((x) => x.p);
+  }
+
+  const light = (hex) => { const n = parseInt(hex.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 150; };
+
+  function draw() {
+    const W = wheel.width, R = W / 2, n = slices.length, seg = (Math.PI * 2) / n;
+    ctx.clearRect(0, 0, W, W);
+    slices.forEach((p, i) => {
+      const a0 = -Math.PI / 2 + i * seg, a1 = a0 + seg;
+      ctx.beginPath(); ctx.moveTo(R, R); ctx.arc(R, R, R, a0, a1); ctx.closePath();
+      ctx.fillStyle = p.color; ctx.fill();
+      const g = ctx.createRadialGradient(R, R, R * 0.2, R, R, R);
+      g.addColorStop(0, 'rgba(255,255,255,.18)'); g.addColorStop(1, 'rgba(0,0,0,.18)');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 5; ctx.stroke();
+      // label along the radius
+      ctx.save(); ctx.translate(R, R); ctx.rotate(a0 + seg / 2);
+      ctx.fillStyle = light(p.color) ? '#1a1a1a' : '#fff'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      const maxW = R * 0.62, words = p.short.split(' ');
+      let size = Math.min(54, seg * R * 0.42);
+      ctx.font = `900 ${size}px 'Noto Sans KR', sans-serif`;
+      const lines = words.length > 1 && ctx.measureText(p.short).width > maxW ? [words.slice(0, Math.ceil(words.length / 2)).join(' '), words.slice(Math.ceil(words.length / 2)).join(' ')] : [p.short];
+      while (size > 18 && Math.max(...lines.map((l) => ctx.measureText(l).width)) > maxW) { size -= 2; ctx.font = `900 ${size}px 'Noto Sans KR', sans-serif`; }
+      ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = 6;
+      lines.forEach((l, k) => ctx.fillText(l, R * 0.9, (k - (lines.length - 1) / 2) * size * 1.05));
+      ctx.restore();
+    });
+  }
+
+  function bulbs() {
+    const b = $('#bulbs'); b.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2, el = document.createElement('i');
+      el.style.left = `${50 + Math.cos(a) * 48.4}%`; el.style.top = `${50 + Math.sin(a) * 48.4}%`;
+      b.appendChild(el);
+    }
+  }
+
+  // tick sound + pointer flick each time a slice boundary passes the pointer
+  let audio;
+  function tick() {
+    $('#pointer').classList.remove('tick'); void $('#pointer').offsetWidth; $('#pointer').classList.add('tick');
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = 1400; g.gain.setValueAtTime(0.08, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.05);
+      o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.05);
+    } catch {}
+  }
+  function fanfare() {
+    try {
+      [523, 659, 784, 1046].forEach((f, i) => {
+        const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + i * 0.12;
+        o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(0.15, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+        o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 0.5);
+      });
+    } catch {}
+  }
+
+  function animate(to, ms) {
+    return new Promise((done) => {
+      const from = rot, seg = 360 / slices.length, t0 = performance.now();
+      let lastSlice = Math.floor(from / seg);
+      const ease = (t) => 1 - Math.pow(1 - t, 4);
+      (function frame(now) {
+        const t = Math.min(1, (now - t0) / ms);
+        rot = from + (to - from) * ease(t);
+        wheel.style.transform = `rotate(${rot}deg)`;
+        const s = Math.floor(rot / seg);
+        if (s !== lastSlice) { lastSlice = s; tick(); }
+        if (t < 1) requestAnimationFrame(frame); else done();
+      })(t0);
+    });
+  }
+
+  async function spin() {
+    if (busy || !cfg) return;
+    busy = true; $('#spin').disabled = true; $('#note').textContent = ''; document.body.classList.add('spinning');
+    try {
+      const res = await fetch('/api/roulette/spin', { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Gagal memutar, coba lagi');
+      const idx = slices.map((p, i) => (p.id === body.prize.id ? i : -1)).filter((i) => i >= 0);
+      const i = idx[Math.floor(Math.random() * idx.length)], seg = 360 / slices.length;
+      const jitter = (Math.random() - 0.5) * seg * 0.7;
+      const target = -((i + 0.5) * seg + jitter);
+      const base = rot - (((rot - target) % 360) + 360) % 360; // nearest target angle behind the current one
+      await animate(base + 360 * (7 + Math.floor(Math.random() * 3)), 7000);
+      show(slices[i]);
+    } catch (e) {
+      $('#note').textContent = e.message;
+      busy = false; $('#spin').disabled = false;
+    }
+    document.body.classList.remove('spinning');
+  }
+
+  function show(p) {
+    $('#prize').textContent = p.name; $('#chip').style.background = p.color;
+    $('#result').classList.add('show'); fanfare(); confetti();
+  }
+  function close() { $('#result').classList.remove('show'); busy = false; $('#spin').disabled = !cfg.active; }
+
+  function confetti() {
+    const c = $('#confetti'), x = c.getContext('2d');
+    c.width = innerWidth; c.height = innerHeight;
+    const colors = ['#f5c542', '#e0383e', '#1c3f94', '#15936b', '#fff', '#f2a516'];
+    const bits = Array.from({ length: 180 }, () => ({
+      x: c.width / 2, y: c.height * 0.45, vx: (Math.random() - 0.5) * 22, vy: -Math.random() * 22 - 6,
+      r: Math.random() * 6 + 4, c: colors[Math.floor(Math.random() * colors.length)], a: Math.random() * 6, va: (Math.random() - 0.5) * 0.4,
+    }));
+    const t0 = performance.now();
+    (function frame(now) {
+      x.clearRect(0, 0, c.width, c.height);
+      bits.forEach((b) => {
+        b.vy += 0.55; b.vx *= 0.99; b.x += b.vx; b.y += b.vy; b.a += b.va;
+        x.save(); x.translate(b.x, b.y); x.rotate(b.a); x.fillStyle = b.c; x.fillRect(-b.r, -b.r / 2, b.r * 2, b.r); x.restore();
+      });
+      if (now - t0 < 3500) requestAnimationFrame(frame); else x.clearRect(0, 0, c.width, c.height);
+    })(t0);
+  }
+
+  async function load() {
+    const res = await fetch('/api/roulette', { cache: 'no-store' });
+    cfg = await res.json();
+    $('#title').textContent = cfg.title; $('#subtitle').textContent = cfg.subtitle || '';
+    document.title = cfg.title;
+    slices = layout(cfg.prizes);
+    await document.fonts.ready; draw();
+    $('#spin').disabled = !cfg.active;
+    $('#note').textContent = cfg.active ? '' : 'Roulette sedang ditutup';
+  }
+
+  bulbs();
+  $('#spin').addEventListener('click', spin);
+  $('#again').addEventListener('click', close);
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' && e.code !== 'Enter') return;
+    e.preventDefault();
+    $('#result').classList.contains('show') ? close() : spin();
+  });
+  load().catch(() => { $('#note').textContent = 'Gagal memuat roulette, refresh halaman'; });
+})();
+</script>
+</body>
+</html>
