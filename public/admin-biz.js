@@ -371,13 +371,13 @@
           <div class="kpi solid"><div class="k-label">Order atribusi</div><div class="k-value">${dash(x.orders)}</div></div>
           <div class="kpi solid"><div class="k-label">Cost per order</div><div class="k-value">${x.orders ? money(x.spendOrdered / x.orders) : '–'}</div></div>
           <div class="kpi solid"><div class="k-label">AOV iklan (revenue ÷ order)</div><div class="k-value">${x.orders ? money(x.revenueOrdered / x.orders) : '–'}</div></div>
-          <div class="kpi solid"><div class="k-label">CVR (order ÷ klik)</div><div class="k-value">${x.clicks ? pct(x.clickOrders / x.clicks) : '–'}</div></div>
+          <div class="kpi solid"><div class="k-label">Impresi</div><div class="k-value">${dash(x.impressions)}</div></div>
           <div class="kpi solid"><div class="k-label">CTR · CPC</div><div class="k-value">${x.impressions ? pct(x.impClicks / x.impressions) : '–'} · ${x.clicks ? compact(x.spendClicked / x.clicks) : '–'}</div></div>
         </div>`;
     const campTable = (rows) => `
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Campaign</th><th class="num">Spend</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th><th class="num">Order</th><th class="num">Cost / order</th><th class="num">CVR</th><th class="num">CTR</th><th class="num">CPC</th></tr></thead>
-          <tbody>${rows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${money(x.spend)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td><td class="num">${x.orders ? money(x.spend / x.orders) : '–'}</td><td class="num">${x.clicks ? pct(x.clickOrders / x.clicks) : '–'}</td><td class="num">${x.impressions ? pct(x.impClicks / x.impressions) : '–'}</td><td class="num">${x.clicks ? money(x.spendClicked / x.clicks) : '–'}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>Campaign</th><th class="num">Spend</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th><th class="num">Order</th><th class="num">Cost / order</th><th class="num">Impresi</th><th class="num">CTR</th><th class="num">CPC</th></tr></thead>
+          <tbody>${rows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${money(x.spend)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td><td class="num">${x.orders ? money(x.spend / x.orders) : '–'}</td><td class="num">${dash(x.impressions)}</td><td class="num">${x.impressions ? pct(x.impClicks / x.impressions) : '–'}</td><td class="num">${x.clicks ? money(x.spendClicked / x.clicks) : '–'}</td></tr>`).join('')}</tbody>
         </table></div>`;
     const adsDashboard = () => {
       const chs = Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).sort((a, b) => m.byAd[b[0]].spend - m.byAd[a[0]].spend);
@@ -396,7 +396,7 @@
         <div class="panel-head"><h2>Campaign ${esc(c.label)}</h2></div>
         ${campTable(Object.values(m.byCamp).filter((x) => x.channel === k).sort((a, b) => b.spend - a.spend))}
       </section>`).join('')}
-      <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di tab Penjualan real. CVR, CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
+      <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di tab Penjualan real. CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
     };
 
     v.innerHTML = `
