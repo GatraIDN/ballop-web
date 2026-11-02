@@ -65,13 +65,15 @@
   const fmtDate = (s) => { const d = parse(s); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
 
   const RANGES = [
-    ['7d', '7 hari'], ['30d', '30 hari'], ['90d', '90 hari'], ['mtd', 'Bulan ini'], ['lastm', 'Bulan lalu'], ['ytd', 'Tahun ini'], ['all', 'Semua'],
+    ['today', 'Hari ini'], ['yday', 'Kemarin'], ['7d', '7 hari'], ['30d', '30 hari'], ['90d', '90 hari'], ['mtd', 'Bulan ini'], ['lastm', 'Bulan lalu'], ['ytd', 'Tahun ini'], ['all', 'Semua'],
   ];
   let range = { key: '30d', from: '', to: '' };
   function resolveRange(key) {
     const t = today();
     const d = parse(t);
     switch (key) {
+      case 'today': return { from: t, to: t };
+      case 'yday': return { from: addDays(t, -1), to: addDays(t, -1) };
       case '7d': return { from: addDays(t, -6), to: t };
       case '30d': return { from: addDays(t, -29), to: t };
       case '90d': return { from: addDays(t, -89), to: t };
@@ -400,7 +402,7 @@
     v.innerHTML = `
       <header class="dash-head glass">
         <img class="dh-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
-        <div class="dh-title"><h1>Dashboard Report</h1><p>${dashTab === "ads" ? "Performa iklan" : "Penjualan real"} · ${fmtDate(from)} – ${fmtDate(to)} · ${len} hari</p></div>
+        <div class="dh-title"><h1>Dashboard Report</h1><p>${dashTab === "ads" ? "Performa iklan" : "Penjualan real"} · ${from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)} · ${len} hari`}</p></div>
         <button class="btn" id="expReport" type="button">⬇ Export laporan</button>
       </header>
       <div class="toolbar">
