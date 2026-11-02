@@ -499,15 +499,18 @@
   const longDate = (s) => { const d = parse(s); return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`; };
   const periodWord = () => ({ mtd: 'bulan ini', lastm: 'bulan lalu', today: 'hari ini', yday: 'kemarin', ytd: 'tahun ini' }[range.key]
     || (range.from === range.to ? `tanggal ${longDate(range.from)}` : `periode ${longDate(range.from)} – ${longDate(range.to)}`));
-  // "1500000" or "1.500.000" -> "Rp 1.500.000"; anything else is kept as typed
-  const saldoText = (v) => { const n = Number(String(v).replace(/[^0-9]/g, '')); return /^[\s\d.,rpRP]*$/.test(v) && n ? money(n) : v; };
+  // the report uses comma thousands (Rp 2,576,481) and a dot for decimals, unlike the rest of the admin
+  const repMoney = (n) => `Rp ${Math.round(n || 0).toLocaleString('en-US')}`;
+  const repRatio = (n) => (Number.isFinite(n) && n > 0 ? `${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}×` : '–');
+  // "1500000" or "1.500.000" -> "Rp 1,500,000"; anything else is kept as typed
+  const saldoText = (v) => { const n = Number(String(v).replace(/[^0-9]/g, '')); return /^[\s\d.,rpRP]*$/.test(v) && n ? repMoney(n) : v; };
   function reportText(m) {
     const r = repGet(), p = periodWord();
     return [
       `Selamat pagi mister, berikut ini daily report untuk Ballop E-Commerce per tanggal ${longDate(range.to)} :`, '',
-      `1. Total pengeluaran iklan selama ${p} : ${money(m.adSpend)}`,
-      `2. Total GMV yang dihasilkan selama ${p} : ${money(m.adRevenue)}`,
-      `3. Roas yang dihasilkan selama ${p} : ${ratio(m.adRoas)}`,
+      `1. Total pengeluaran iklan selama ${p} : ${repMoney(m.adSpend)}`,
+      `2. Total GMV yang dihasilkan selama ${p} : ${repMoney(m.adRevenue)}`,
+      `3. Roas yang dihasilkan selama ${p} : ${repRatio(m.adRoas)}`,
       ...SALDO.map(([k, l], i) => `${i + 4}. ${l} : ${saldoText(r[k] || '') || '-'}`),
       '', '', r.footer ?? FOOTER,
     ].join('\n');
