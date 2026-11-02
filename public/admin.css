@@ -459,3 +459,5 @@ table.data tfoot td { font-weight: 900; background: var(--panel-2); border-top: 
 .dash-tabs { margin: 2px 0 14px; }
 #view-dashboard > .panel { margin-top: 14px; }
 #view-dashboard > p.small { margin: 10px 2px 0; }
+.ads-h { display: flex; align-items: center; gap: 8px; font-size: 18px; margin: 26px 2px 10px; }
+.ads-h i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
