@@ -35,6 +35,7 @@
     google: { label: 'Google Ads', color: '#1baf7a' },
     other: { label: 'Lainnya', color: '#8a8f99' },
   };
+  const ADS_CAMPAIGNS = ['Product Ads Shopee', 'Shop Ads Shopee', 'Banner Ads Shopee', 'CPAS Shopee', 'GMV Max Tiktok', 'Manual Campaign Tiktok', 'Live Ads Tiktok', 'Meta Ads'];
   const STATUS = { completed: 'Selesai', returned: 'Retur', cancelled: 'Batal' };
   const EXP_CATS = ['Gaji', 'Packaging', 'Ongkir', 'Sewa', 'Event', 'Konten / KOL', 'Operasional', 'Lainnya'];
   const DEMO = '[DEMO]';
@@ -550,7 +551,7 @@
       fields: [
         { k: 'date', label: 'Tanggal', type: 'date', half: 1 },
         { k: 'channel', label: 'Channel', type: 'select', options: () => Object.entries(ADS_CH).map(([k, c]) => [k, c.label]), half: 1 },
-        { k: 'campaign', label: 'Nama campaign' },
+        { k: 'campaign', label: 'Nama campaign', type: 'select', options: (f, row) => [...new Set([...ADS_CAMPAIGNS, row?.campaign].filter(Boolean))].map((c) => [c, c]) },
         { k: 'spend', label: 'Spending', type: 'number', step: 1000, half: 1 },
         { k: 'impressions', label: 'Impresi', type: 'number', half: 1 },
         { k: 'clicks', label: 'Klik', type: 'number', half: 1 },
@@ -917,7 +918,7 @@
       const id = `rf-${fd.k}`;
       if (fd.type === 'select') return `<label for="${id}">${fd.label}<select id="${id}" name="${fd.k}"></select></label>`;
       if (fd.type === 'area') return `<label for="${id}">${fd.label}<textarea id="${id}" name="${fd.k}" rows="${fd.rows || 3}" maxlength="2000"></textarea></label>`;
-      const attrs = fd.type === 'number' ? `type="number" step="${fd.step || 1}" ${fd.allowNeg ? '' : `min="${fd.min ?? 0}"`}` : fd.type === 'date' ? `type="date"${fd.optional ? '' : ' required'}` : `type="text" maxlength="200"${fd.list ? ` list="${id}-list"` : ''}`;
+      const attrs = fd.type === 'number' ? `type="number" step="${fd.step > 1 ? 'any' : fd.step || 1}"${fd.allowNeg ? '' : `min="${fd.min ?? 0}"`}` : fd.type === 'date' ? `type="date"${fd.optional ? '' : ' required'}` : `type="text" maxlength="200"${fd.list ? ` list="${id}-list"` : ''}`;
       const dl = fd.list ? `<datalist id="${id}-list">${fd.list().map((v) => `<option value="${esc(v)}">`).join('')}</datalist>` : '';
       return `<label for="${id}">${fd.label}<input id="${id}" name="${fd.k}" ${attrs}>${dl}</label>`;
     };
@@ -930,7 +931,7 @@
     $('#recFields').innerHTML = html.join('');
     const f = form.elements;
     // order matters: product before size
-    cfg.fields.forEach((fd) => { if (fd.type === 'select') fillSelect(f[fd.k], fd.options(f)); });
+    cfg.fields.forEach((fd) => { if (fd.type === 'select') fillSelect(f[fd.k], fd.options(f, row)); });
     const last = lstate[name] || {};
     cfg.fields.forEach((fd) => {
       const el = f[fd.k];
