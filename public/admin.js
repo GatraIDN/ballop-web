@@ -85,6 +85,7 @@
       while (n && !n.classList.contains('nav-group')) { if (n.matches('.nav[data-view]') && !n.hidden) any = true; n = n.nextElementSibling; }
       g.hidden = !any;
     });
+    document.body.classList.toggle('read-only', !!me.readOnly);
     const u = me.user;
     $('#meBox').innerHTML = `<b></b><span>${u.roles.join(' · ')}</span>`;
     $('#meBox b').textContent = u.name;

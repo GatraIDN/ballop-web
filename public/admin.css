@@ -482,3 +482,14 @@ table.data tfoot td { font-weight: 900; background: var(--panel-2); border-top: 
   body.side-hidden .main { padding-left: 68px; }
 }
 @media (max-width: 960px) { .side-hide { display: none; } }
+
+/* akun viewer: semua tombol ubah disembunyikan (server juga menolak perubahan) */
+body.read-only .app .btn.primary, body.read-only .app .btn.danger, body.read-only .app .btn.blue,
+body.read-only .app label.btn:has(input[type="file"]), body.read-only .app [data-act="add"], body.read-only .app [data-act="import"],
+body.read-only .drawer .btn.primary, body.read-only .drawer .btn.danger, body.read-only #recAgain, body.read-only .toggle { display: none !important; }
+body.read-only .drawer input, body.read-only .drawer select, body.read-only .drawer textarea { pointer-events: none; }
+
+/* teks daily report */
+.report-panel { margin-top: 14px; }
+.report-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.6; background: rgba(0,0,0,.035); border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+.report-copy { width: 100%; justify-content: center; }

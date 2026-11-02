@@ -11,6 +11,7 @@
     creative: ['Creative', 'KOL seeding, jurnal, event, galeri, konten website, produk'],
     marketing: ['Marketing', 'Iklan, KOL seeding'],
     finance: ['Finance', 'Keuangan, biaya, penjualan (lihat), ringkasan'],
+    viewer: ['Viewer', 'Hanya lihat semua data bisnis, tidak bisa mengubah apa pun'],
   };
   let users = [];
   let draft = []; // editable copy

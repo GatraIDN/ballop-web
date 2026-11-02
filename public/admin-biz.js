@@ -469,7 +469,8 @@
       <section class="panel solid">
         <div class="panel-head"><h2>Stok menipis</h2><button class="btn sm" type="button" data-go="stock">Kelola stok</button></div>
         <div class="alert-list">${alerts.slice(0, 8).map((a) => `<div><span>${esc(a.name)}${a.size ? ` · ${esc(a.size)}` : ''}</span><span class="badge ${a.left <= 0 ? 'bad' : 'warn'}">${a.left <= 0 ? 'HABIS' : `sisa ${a.left}`}</span></div>`).join('') || '<p class="muted">Semua stok aman.</p>'}</div>
-      </section>`}`;
+      </section>`}
+      ${reportPanel()}`;
 
     const chartEl = (id) => document.getElementById(id);
     if (chartEl('chSales')) stackedBars(chartEl('chSales'), bks, salesSeries.length ? salesSeries : [{ key: '_', label: 'Omzet', color: '#2a78d6' }],
@@ -486,6 +487,53 @@
     $('#demoFill')?.addEventListener('click', fillDemo);
     $('#demoClear')?.addEventListener('click', clearDemo);
     $('#expReport').addEventListener('click', () => exportReport(m));
+    bindReport(m);
+  }
+
+  // ---------- daily report text (WhatsApp) ----------
+  // ad saldo and the closing line are typed by hand and remembered in this browser only (never in the code)
+  const SALDO = [['shopee', 'Sisa saldo iklan shopee'], ['tiktok', 'Sisa saldo iklan tiktok'], ['cpas', 'Sisa saldo iklan CPAS shopee']];
+  const FOOTER = 'Semua data tersebut bisa diakses dan dilihat melalui : https://ballop.web.id/admin menggunakan user name : ballop dan password : ';
+  const repGet = () => { try { return JSON.parse(localStorage.getItem('ballopReport') || '{}'); } catch { return {}; } };
+  const MONTHS_LONG = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const longDate = (s) => { const d = parse(s); return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`; };
+  const periodWord = () => ({ mtd: 'bulan ini', lastm: 'bulan lalu', today: 'hari ini', yday: 'kemarin', ytd: 'tahun ini' }[range.key]
+    || (range.from === range.to ? `tanggal ${longDate(range.from)}` : `periode ${longDate(range.from)} – ${longDate(range.to)}`));
+  // "1500000" or "1.500.000" -> "Rp 1.500.000"; anything else is kept as typed
+  const saldoText = (v) => { const n = Number(String(v).replace(/[^0-9]/g, '')); return /^[\s\d.,rpRP]*$/.test(v) && n ? money(n) : v; };
+  function reportText(m) {
+    const r = repGet(), p = periodWord();
+    return [
+      `Selamat pagi mister, berikut ini daily report untuk Ballop E-Commerce per tanggal ${longDate(range.to)} :`, '',
+      `1. Total pengeluaran iklan selama ${p} : ${money(m.adSpend)}`,
+      `2. Total GMV yang dihasilkan selama ${p} : ${money(m.adRevenue)}`,
+      `3. Roas yang dihasilkan selama ${p} : ${ratio(m.adRoas)}`,
+      ...SALDO.map(([k, l], i) => `${i + 4}. ${l} : ${saldoText(r[k] || '') || '-'}`),
+      '', '', r.footer ?? FOOTER,
+    ].join('\n');
+  }
+  function reportPanel() {
+    const r = repGet();
+    return `
+      <section class="panel solid report-panel">
+        <div class="panel-head"><h2>Teks daily report</h2><span class="muted small">angka iklan dari periode yang dipilih; saldo & kalimat penutup diisi manual (tersimpan di browser ini)</span></div>
+        <div class="row three">${SALDO.map(([k, l]) => `<label>${l}<input type="text" inputmode="numeric" data-rep="${k}" value="${esc(r[k] || '')}" placeholder="mis. 1500000"></label>`).join('')}</div>
+        <label>Kalimat penutup<textarea data-rep="footer" rows="2">${esc(r.footer ?? FOOTER)}</textarea></label>
+        <pre class="report-text" id="reportText"></pre>
+        <button class="btn report-copy" id="reportCopy" type="button">⧉ Copy teks report</button>
+      </section>`;
+  }
+  function bindReport(m) {
+    const show = () => { $('#reportText').textContent = reportText(m); };
+    show();
+    $$('[data-rep]').forEach((el) => el.addEventListener('input', () => {
+      const r = repGet(); r[el.dataset.rep] = el.value;
+      try { localStorage.setItem('ballopReport', JSON.stringify(r)); } catch {}
+      show();
+    }));
+    $('#reportCopy').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(reportText(m)); toast('Teks report disalin'); } catch { toast('Tidak bisa menyalin', true); }
+    });
   }
 
   function exportReport(m) {
