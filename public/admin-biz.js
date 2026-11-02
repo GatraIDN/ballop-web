@@ -314,6 +314,78 @@
   }
   const legend = (series) => `<div class="legend">${series.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join('')}</div>`;
 
+  // ---------- month calendars (omzet / ad GMV / ad spend per day) ----------
+  // shown month follows the end of the selected range; ‹ › moves it without touching the range
+  let calShift = 0;
+  const calMonth = () => { const d = parse(range.to); return new Date(d.getFullYear(), d.getMonth() + calShift, 1); };
+  const calMoney = (n) => (n >= 1e6 ? `Rp${(n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 2 })}jt` : n >= 1e3 ? `Rp${Math.round(n / 1e3)}rb` : `Rp${Math.round(n)}`);
+  const niceStep = (n) => { if (!n) return 0; const p = Math.pow(10, Math.floor(Math.log10(n))); return Math.max(1, Math.round(n / p)) * p; };
+  // days: { 'YYYY-MM-DD': { v, n } }  ->  v = amount, n = count shown under it
+  function calendar({ title, days, unit, tiers, sideSub, extra }) {
+    const first = calMonth(), y = first.getFullYear(), mo = first.getMonth();
+    const len = new Date(y, mo + 1, 0).getDate();
+    const key = (d) => iso(new Date(y, mo, d));
+    let total = 0, count = 0, best = null, active = 0;
+    for (let d = 1; d <= len; d++) {
+      const x = days[key(d)];
+      if (!x) continue;
+      total += x.v; count += x.n || 0; if (x.v) active++;
+      if (!best || x.v > best.v) best = { d, ...x };
+    }
+    const elapsed = iso(new Date(y, mo + 1, 0)) <= today() ? len : Math.max(1, parse(today()).getDate());
+    const avg = total / (first > parse(today()) ? 1 : elapsed);
+    // fixed thresholds when given (omzet), otherwise relative to this month's daily average
+    const [hi, mid] = tiers || [niceStep(avg * 1.5), niceStep(avg * 0.75)];
+    const tier = (v) => (!v ? 'zero' : v >= hi ? 'hi' : v >= mid ? 'mid' : 'lo');
+    const lead = (first.getDay() + 6) % 7; // Monday first
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<div class="cal-cell empty"></div>');
+    for (let d = 1; d <= len; d++) {
+      const x = days[key(d)] || { v: 0, n: 0 };
+      cells.push(`<div class="cal-cell ${tier(x.v)}"><b>${d}</b>${x.v ? `<strong>${calMoney(x.v)}</strong>${x.n ? `<small>${num(x.n)} ${unit}</small>` : ''}` : ''}${extra && x.v ? `<small>${extra(x)}</small>` : ''}</div>`);
+    }
+    const weeks = [[1, 7], [8, 14], [15, 21], [22, 28], [29, len]].filter(([a]) => a <= len)
+      .map(([a, b]) => { let s = 0; for (let d = a; d <= b; d++) s += days[key(d)]?.v || 0; return [a === 29 ? '29–akhir' : `${a}–${b}`, s]; });
+    const mlabel = `${MONTHS_LONG[mo]} ${y}`;
+    return `
+      <section class="panel solid cal-panel">
+        <div class="panel-head"><h2>${esc(title)} · ${mlabel}</h2>
+          <span class="cal-nav"><button class="btn sm" type="button" data-cal="-1" aria-label="Bulan sebelumnya">‹</button><button class="btn sm" type="button" data-cal="1" aria-label="Bulan berikutnya">›</button></span></div>
+        <div class="cal-wrap">
+          <div>
+            <div class="cal-grid cal-head">${['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'].map((h) => `<span>${h}</span>`).join('')}</div>
+            <div class="cal-grid">${cells.join('')}</div>
+            <div class="cal-legend"><span><i class="hi"></i>min. ${calMoney(hi)}</span><span><i class="mid"></i>${calMoney(mid)} – ${calMoney(hi)}</span><span><i class="lo"></i>&lt; ${calMoney(mid)}</span></div>
+          </div>
+          <div class="cal-side">
+            <div class="cal-card"><span>Total ${esc(title.toLowerCase())}</span><b>${money(total)}</b><small>${count ? `${num(count)} ${unit}` : `${active} hari ada data`}</small></div>
+            <div class="cal-card"><span>Rata-rata per hari</span><b>${money(avg)}</b><small>${sideSub || `dari ${elapsed} hari`}</small></div>
+            <div class="cal-card"><span>Hari terbaik</span><b>${best && best.v ? `${best.d} ${MONTHS[mo]} · ${calMoney(best.v)}` : '–'}</b><small>${best && best.n ? `${num(best.n)} ${unit}` : ''}</small></div>
+            <table class="cal-weeks"><thead><tr><th>Minggu</th><th>${esc(title.split(' ')[0])}</th></tr></thead><tbody>${weeks.map(([l, s]) => `<tr><td>${l}</td><td>${s ? calMoney(s) : '–'}</td></tr>`).join('')}</tbody></table>
+          </div>
+        </div>
+      </section>`;
+  }
+  // per-day maps for the calendar month
+  function calDays() {
+    const first = calMonth();
+    const from = iso(first), to = iso(new Date(first.getFullYear(), first.getMonth() + 1, 0));
+    const sales = {}, gmv = {}, spend = {};
+    const orders = {};
+    saleLines(from, to).filter((r) => r.state === 'completed').forEach((r) => {
+      const x = sales[r.date] = sales[r.date] || { v: 0, n: 0 };
+      x.v += r.net; (orders[r.date] = orders[r.date] || new Set()).add(r.orderKey);
+    });
+    Object.entries(orders).forEach(([d, s]) => { sales[d].n = s.size; });
+    data.ads.filter((a) => a.date >= from && a.date <= to).forEach((a) => {
+      const g = gmv[a.date] = gmv[a.date] || { v: 0, n: 0, spend: 0 };
+      g.v += a.revenue; g.n += a.orders; g.spend += a.spend;
+      const s = spend[a.date] = spend[a.date] || { v: 0, n: 0, rev: 0 };
+      s.v += a.spend; s.rev += a.revenue;
+    });
+    return { sales, gmv, spend };
+  }
+
   // ---------- dashboard ----------
   function delta(cur, prev, invert = false, neutral = false) {
     if (!prev || !Number.isFinite(prev) || !Number.isFinite(cur)) return '<div class="k-delta">— vs periode lalu</div>';
@@ -379,12 +451,15 @@
           <thead><tr><th>Campaign</th><th class="num">Spend</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th><th class="num">Order</th><th class="num">Cost / order</th><th class="num">Impresi</th><th class="num">CTR</th><th class="num">CPC</th></tr></thead>
           <tbody>${rows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${money(x.spend)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td><td class="num">${x.orders ? money(x.spend / x.orders) : '–'}</td><td class="num">${dash(x.impressions)}</td><td class="num">${x.impressions ? pct(x.impClicks / x.impressions) : '–'}</td><td class="num">${x.clicks ? money(x.spendClicked / x.clicks) : '–'}</td></tr>`).join('')}</tbody>
         </table></div>`;
+    const cd = calDays();
     const adsDashboard = () => {
       const chs = Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).sort((a, b) => m.byAd[b[0]].spend - m.byAd[a[0]].spend);
       if (!chs.length) return '<p class="muted">Belum ada data iklan di periode ini.</p>';
       return `
       <h2 class="ads-h">Semua channel</h2>
       ${adKpis(m.adTot, true)}
+      ${calendar({ title: 'GMV iklan (atribusi)', days: cd.gmv, unit: 'order' })}
+      ${calendar({ title: 'Spending iklan', days: cd.spend, unit: '', extra: (x) => `ROAS ${ratio(x.v ? x.rev / x.v : NaN)}` })}
       <section class="panel solid">
         <div class="panel-head"><h2>Biaya iklan per channel</h2>${legend(adSeries)}</div>
         <div class="chart" id="chAds"></div>
@@ -444,6 +519,7 @@
           <tbody>${Object.entries(SALES_CH).filter(([k]) => m.byState[k]).map(([k, c]) => { const x = m.byCh[k] || { revenue: 0, units: 0, fees: 0 }, s = m.byState[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.revenue)}</td><td class="num">${num(x.units)}</td><td class="num">${num(s.all)}</td><td class="num">${num(s.completed)}</td><td class="num">${num(s.cancelled)}</td><td class="num">${num(s.returned)}</td><td class="num">${pct(s.all ? (s.cancelled + s.returned) / s.all : NaN)}</td><td class="num">${money(s.cancelValue)}</td><td class="num">${money(x.fees)}</td></tr>`; }).join('') || '<tr><td colspan="10" class="muted">Belum ada penjualan di periode ini.</td></tr>'}</tbody>
         </table></div>
       </section>
+      ${calendar({ title: 'Omzet paid', days: cd.sales, unit: 'order', tiers: [8e6, 4e6] })}
       <div class="grid-3">
         <section class="panel solid">
           <div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">omzet · unit</span></div>
@@ -477,9 +553,10 @@
       (b, key) => sumBy(m.salesRows, b, (r) => r.channel === key, (r) => r.net), money);
     if (chartEl('chAds')) stackedBars(chartEl('chAds'), bks, adSeries.length ? adSeries : [{ key: '_', label: 'Iklan', color: '#6250d6' }],
       (b, key) => sumBy(m.adRows, b, (r) => r.channel === key, (r) => r.spend), money);
+    $$('[data-cal]', v).forEach((b) => b.addEventListener('click', () => { calShift += Number(b.dataset.cal); renderDashboard(); }));
     $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { dashTab = b.dataset.tab; try { localStorage.setItem('ballopDashTab', dashTab); } catch {} renderDashboard(); }));
 
-    $$('[data-r]', v).forEach((b) => b.addEventListener('click', () => { setRange(b.dataset.r); renderDashboard(); }));
+    $$('[data-r]', v).forEach((b) => b.addEventListener('click', () => { setRange(b.dataset.r); calShift = 0; renderDashboard(); }));
     const custom = () => { const f = $('#rFrom').value, t2 = $('#rTo').value; if (f && t2 && f <= t2) { setRange('custom', f, t2); renderDashboard(); } };
     $('#rFrom').addEventListener('change', custom);
     $('#rTo').addEventListener('change', custom);

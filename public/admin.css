@@ -497,3 +497,41 @@ body.read-only .drawer input, body.read-only .drawer select, body.read-only .dra
 .login-note { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
 .login-note b { color: var(--ink); }
 .login-card .err:empty { display: none; }
+
+/* kalender bulanan (omzet / GMV iklan / spending) */
+.cal-panel { margin-top: 14px; --cal-hi: #1b2550; --cal-mid: #2f6fdb; --cal-lo: #e8f0fc; }
+.cal-nav { display: flex; gap: 6px; }
+.cal-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; align-items: start; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.cal-head { margin-bottom: 6px; }
+.cal-head span { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--muted); }
+.cal-cell { min-height: 74px; border-radius: 8px; padding: 7px 8px; display: flex; flex-direction: column; gap: 2px; min-width: 0; background: rgba(0,0,0,.025); color: var(--ink); }
+.cal-cell.empty { background: none; }
+.cal-cell b { font-size: 11px; }
+.cal-cell strong { font-size: 14px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-cell small { font-size: 10.5px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-cell.lo { background: var(--cal-lo); }
+.cal-cell.mid { background: var(--cal-mid); color: #fff; }
+.cal-cell.hi { background: var(--cal-hi); color: #fff; }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 12px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.cal-legend span { display: flex; align-items: center; gap: 6px; }
+.cal-legend i { width: 22px; height: 14px; border-radius: 4px; display: inline-block; }
+.cal-legend i.hi { background: var(--cal-hi); } .cal-legend i.mid { background: var(--cal-mid); } .cal-legend i.lo { background: var(--cal-lo); }
+.cal-side { display: grid; gap: 10px; }
+.cal-card { border-top: 4px solid var(--cal-mid); border-radius: 10px; padding: 10px 12px; background: rgba(0,0,0,.025); display: grid; gap: 2px; }
+.cal-card span { font-size: 12px; color: var(--muted); font-weight: 700; }
+.cal-card b { font-size: 18px; color: var(--cal-hi); }
+.cal-card small { font-size: 11px; color: var(--muted); }
+.cal-weeks { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cal-weeks th { background: var(--cal-hi); color: #fff; text-align: left; padding: 6px 8px; }
+.cal-weeks th:last-child, .cal-weeks td:last-child { text-align: right; }
+.cal-weeks td { padding: 6px 8px; border-bottom: 1px solid rgba(0,0,0,.06); }
+@media (max-width: 1100px) { .cal-wrap { grid-template-columns: 1fr; } .cal-side { grid-template-columns: repeat(3, minmax(0, 1fr)); } .cal-weeks { grid-column: 1 / -1; } }
+@media (max-width: 640px) {
+  .cal-grid { gap: 3px; }
+  .cal-cell { min-height: 52px; padding: 4px; border-radius: 6px; }
+  .cal-cell strong { font-size: 10px; }
+  .cal-cell small { display: none; }
+  .cal-side { grid-template-columns: 1fr; }
+}
+body.read-only .nav[data-view="account"] { display: none !important; }
