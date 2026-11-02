@@ -206,7 +206,7 @@
     if (busy || !cfg) return;
     busy = true; $('#spin').disabled = true; $('#note').textContent = ''; document.body.classList.add('spinning');
     try {
-      const res = await fetch('/api/roulette/spin', { method: 'POST' });
+      const res = await fetch('/api/roulette?a=spin', { method: 'POST' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'Gagal memutar, coba lagi');
       const idx = slices.map((p, i) => (p.id === body.prize.id ? i : -1)).filter((i) => i >= 0);

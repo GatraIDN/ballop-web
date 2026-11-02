@@ -232,14 +232,14 @@
   }
 
   async function load() {
-    const body = await api('/api/roulette/admin');
+    const body = await api('/api/roulette?a=admin');
     cfg = body.config; state = body.state;
     $('#login').hidden = true; $('#app').hidden = false;
     $('#title').value = cfg.title; $('#subtitle').value = cfg.subtitle || ''; $('#active').checked = cfg.active !== false;
     renderPrizes(); renderState(body.odds);
   }
   async function refresh() {
-    const body = await api('/api/roulette/admin');
+    const body = await api('/api/roulette?a=admin');
     state = body.state; renderState(body.odds);
   }
 
@@ -251,7 +251,7 @@
   $('#refresh').addEventListener('click', () => refresh().catch((e) => toast(e.message, true)));
   $('#reset').addEventListener('click', async () => {
     if (!confirm('Reset hitungan spin & pemenang hari ini? Riwayat juga dihapus.')) return;
-    try { await api('/api/roulette/reset', { method: 'POST' }); await refresh(); toast('Hitungan direset'); } catch (e) { toast(e.message, true); }
+    try { await api('/api/roulette?a=reset', { method: 'POST' }); await refresh(); toast('Hitungan direset'); } catch (e) { toast(e.message, true); }
   });
 
   $('#loginForm').addEventListener('submit', async (e) => {
