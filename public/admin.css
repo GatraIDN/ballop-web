@@ -454,3 +454,8 @@ table.data tfoot td { font-weight: 900; background: var(--panel-2); border-top: 
 .k-chip { text-align: left; font-size: 11px; padding: 3px 6px; border-radius: 6px; background: color-mix(in srgb, var(--pc) 14%, #fff); border-left: 3px solid var(--pc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
 .k-chip.done { font-weight: 900; color: var(--ink); }
 @media (max-width: 640px) { .k-day { min-height: 64px; } .k-chip { font-size: 0; padding: 0; height: 6px; } }
+
+/* Ringkasan: tabs penjualan real / performa iklan */
+.dash-tabs { margin: 2px 0 14px; }
+#view-dashboard > .panel { margin-top: 14px; }
+#view-dashboard > p.small { margin: 10px 2px 0; }

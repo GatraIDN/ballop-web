@@ -164,7 +164,8 @@
     const m = {
       gross: 0, discount: 0, revenue: 0, fees: 0, shipping: 0, cogs: 0, units: 0, orders: 0, unknownCost: 0,
       returns: 0, returnValue: 0, cancelled: 0, adSpend: 0, adRevenue: 0, expenses: 0, payout: 0,
-      byCh: {}, byAd: {}, byProduct: {}, byExp: {},
+      adImpressions: 0, adClicks: 0, adOrders: 0, adSpendClicked: 0,
+      byCh: {}, byAd: {}, byCamp: {}, byProduct: {}, byExp: {},
     };
     const orderKeys = new Set();
     done.forEach((r) => {
@@ -178,6 +179,21 @@
     });
     lines.filter((r) => r.state === 'returned').forEach((r) => { m.returns += r.qty; m.returnValue += r.net; });
     m.cancelled = new Set(lines.filter((r) => r.state === 'cancelled').map((r) => r.orderKey)).size;
+    // every order that came in, by final state, so cancels/returns can be tracked per channel
+    m.cancelValue = 0; m.allOrders = 0; m.returnOrders = 0;
+    m.byState = {};
+    const seen = new Map();
+    lines.forEach((r) => {
+      if (r.state === 'cancelled') m.cancelValue += r.net;
+      const s = m.byState[r.channel] = m.byState[r.channel] || { all: new Set(), completed: new Set(), cancelled: new Set(), returned: new Set(), cancelValue: 0, returnValue: 0 };
+      s.all.add(r.orderKey); s[r.state]?.add(r.orderKey);
+      if (r.state === 'cancelled') s.cancelValue += r.net;
+      if (r.state === 'returned') s.returnValue += r.net;
+      seen.set(r.orderKey, r.state);
+    });
+    m.allOrders = seen.size;
+    m.returnOrders = new Set(lines.filter((r) => r.state === 'returned').map((r) => r.orderKey)).size;
+    Object.values(m.byState).forEach((s) => { ['all', 'completed', 'cancelled', 'returned'].forEach((k) => { s[k] = s[k].size; }); });
     data.settlements.forEach((s) => { const d = s.releaseDate || s.date; if (d >= from && d <= to) m.payout += s.payout; });
     m.orders = orderKeys.size;
     Object.values(m.byCh).forEach((c) => { c.orders = c.orders.size; });
@@ -185,7 +201,13 @@
       m.adSpend += a.spend; m.adRevenue += a.revenue;
       const c = m.byAd[a.channel] = m.byAd[a.channel] || { spend: 0, impressions: 0, clicks: 0, orders: 0, revenue: 0 };
       c.spend += a.spend; c.impressions += a.impressions; c.clicks += a.clicks; c.orders += a.orders; c.revenue += a.revenue;
+      const ck = a.campaign || '(tanpa nama)';
+      const g = m.byCamp[ck] = m.byCamp[ck] || { channel: a.channel, spend: 0, impressions: 0, clicks: 0, orders: 0, revenue: 0 };
+      g.spend += a.spend; g.impressions += a.impressions; g.clicks += a.clicks; g.orders += a.orders; g.revenue += a.revenue;
+      m.adImpressions += a.impressions; m.adClicks += a.clicks; m.adOrders += a.orders;
+      if (a.clicks) m.adSpendClicked += a.spend; // CPC only over rows that report clicks
     });
+    m.adRoas = m.adSpend ? m.adRevenue / m.adSpend : NaN;
     exp.forEach((x) => { m.expenses += x.amount; m.byExp[x.category] = (m.byExp[x.category] || 0) + x.amount; });
     m.grossProfit = m.revenue - m.fees - m.shipping - m.cogs;
     m.netProfit = m.grossProfit - m.adSpend - m.expenses;
@@ -290,6 +312,8 @@
     return `<div class="k-delta ${d === 0 || neutral ? '' : good ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${pct(Math.abs(d))} vs periode lalu</div>`;
   }
 
+  let dashTab = 'sales';
+  try { if (localStorage.getItem('ballopDashTab') === 'ads') dashTab = 'ads'; } catch {}
   function renderDashboard() {
     const v = $('#view-dashboard');
     if (!loaded) { v.innerHTML = '<p class="muted">Memuat…</p>'; return; }
@@ -334,6 +358,50 @@
       { label: 'Meta (atribusi)', rev: m.byAd.meta?.revenue || 0, spend: m.byAd.meta?.spend || 0, color: ADS_CH.meta.color },
     ];
 
+    // ads numbers are platform attribution, not real sales: kept on their own tab, next to the real ROAS
+    const adsDashboard = () => {
+      const camps = Object.entries(m.byCamp).sort((a, b) => b[1].spend - a[1].spend);
+      return `
+      <div class="kpis">
+        <div class="kpi solid hero"><div class="k-label">Biaya iklan</div><div class="k-value">${money(m.adSpend)}</div>${delta(m.adSpend, p.adSpend, false, true)}</div>
+        <div class="kpi solid"><div class="k-label">Revenue atribusi (klaim platform)</div><div class="k-value">${money(m.adRevenue)}</div>${delta(m.adRevenue, p.adRevenue)}</div>
+        <div class="kpi solid"><div class="k-label">ROAS atribusi</div><div class="k-value">${ratio(m.adRoas)}</div>${delta(m.adRoas, p.adRoas)}</div>
+        <div class="kpi solid"><div class="k-label">ROAS real (omzet selesai ÷ iklan)</div><div class="k-value">${ratio(m.roas)}</div>${delta(m.roas, p.roas)}</div>
+        <div class="kpi solid"><div class="k-label">Impresi · klik</div><div class="k-value">${compact(m.adImpressions)} · ${compact(m.adClicks)}</div>${delta(m.adClicks, p.adClicks)}</div>
+        <div class="kpi solid"><div class="k-label">CTR · CPC</div><div class="k-value">${pct(m.adImpressions ? m.adClicks / m.adImpressions : NaN)} · ${m.adClicks ? compact(m.adSpendClicked / m.adClicks) : '–'}</div><div class="k-delta">dari iklan yang ada data kliknya</div></div>
+        <div class="kpi solid"><div class="k-label">Order atribusi · CPA</div><div class="k-value">${num(m.adOrders)} · ${m.adOrders ? compact(m.adSpend / m.adOrders) : '–'}</div>${delta(m.adOrders, p.adOrders)}</div>
+        <div class="kpi solid"><div class="k-label">Iklan ÷ omzet real</div><div class="k-value">${m.revenue ? pct(m.adSpend / m.revenue) : '–'}</div><div class="k-delta">porsi biaya iklan</div></div>
+      </div>
+      <p class="muted small">Revenue & order atribusi = angka dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur). Omzet real ada di tab Penjualan real.</p>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Biaya iklan per channel</h2>${legend(adSeries)}</div>
+        <div class="chart" id="chAds"></div>
+      </section>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Per campaign</h2></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Campaign</th><th class="num">Spend</th><th class="num">Impresi</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Order</th><th class="num">Revenue atribusi</th><th class="num">ROAS</th></tr></thead>
+          <tbody>${camps.map(([n, x]) => `<tr><td><span class="ch"><i style="background:${ADS_CH[x.channel]?.color || '#8a8f99'}"></i>${esc(n)}</span></td><td class="num">${money(x.spend)}</td><td class="num">${num(x.impressions)}</td><td class="num">${num(x.clicks)}</td><td class="num">${pct(x.impressions ? x.clicks / x.impressions : NaN)}</td><td class="num">${x.clicks ? money(x.spend / x.clicks) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.revenue)}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
+        </table></div>
+      </section>
+      <div class="grid-2">
+        <section class="panel solid">
+          <div class="panel-head"><h2>Iklan per channel</h2></div>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Channel</th><th class="num">Spend</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Order</th><th class="num">ROAS</th></tr></thead>
+            <tbody>${Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).map(([k, c]) => { const x = m.byAd[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.spend)}</td><td class="num">${num(x.clicks)}</td><td class="num">${pct(x.impressions ? x.clicks / x.impressions : NaN)}</td><td class="num">${x.clicks ? money(x.spend / x.clicks) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${ratio(x.revenue / x.spend)}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
+          </table></div>
+        </section>
+        <section class="panel solid">
+          <div class="panel-head"><h2>ROAS real per marketplace</h2><span class="muted small">omzet selesai ÷ iklan channel</span></div>
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Channel</th><th class="num">Omzet real</th><th class="num">Iklan</th><th class="num">ROAS real</th><th class="num">Iklan / omzet</th></tr></thead>
+            <tbody>${mp.map((x) => `<tr><td><span class="ch"><i style="background:${x.color}"></i>${x.label}</span></td><td class="num">${money(x.rev)}</td><td class="num">${money(x.spend)}</td><td class="num">${ratio(x.rev / x.spend)}</td><td class="num">${x.rev ? pct(x.spend / x.rev) : '–'}</td></tr>`).join('')}</tbody>
+          </table></div>
+        </section>
+      </div>`;
+    };
+
     v.innerHTML = `
       <header class="bar">
         <div><h1>Ringkasan</h1><p class="muted">${fmtDate(from)} – ${fmtDate(to)} · ${len} hari</p></div>
@@ -345,13 +413,20 @@
       </div>
       ${!hasData ? `<div class="demo-note glass"><b>Belum ada data penjualan / iklan.</b> Catat di menu Penjualan & Iklan, atau coba dengan data contoh dulu. <button class="btn sm blue" id="demoFill" type="button">Isi data contoh</button></div>` : ''}
       ${hasDemo ? `<div class="demo-note glass"><span class="badge warn">Data contoh</span> Angka di bawah memakai data contoh. <button class="btn sm danger" id="demoClear" type="button">Hapus data contoh</button></div>` : ''}
+      <div class="seg glass dash-tabs">
+        <button type="button" data-tab="sales" class="${dashTab === 'sales' ? 'on' : ''}">Penjualan real</button>
+        <button type="button" data-tab="ads" class="${dashTab === 'ads' ? 'on' : ''}">Performa iklan</button>
+      </div>
+      ${dashTab === 'ads' ? adsDashboard(m, p) : `
       <div class="kpis">
-        <div class="kpi solid hero"><div class="k-label">Omzet bersih</div><div class="k-value">${money(m.revenue)}</div>${delta(m.revenue, p.revenue)}</div>
+        <div class="kpi solid hero"><div class="k-label">Omzet bersih (pesanan selesai)</div><div class="k-value">${money(m.revenue)}</div>${delta(m.revenue, p.revenue)}</div>
         <div class="kpi solid"><div class="k-label">Laba bersih</div><div class="k-value">${money(m.netProfit)}</div>${delta(m.netProfit, p.netProfit)}</div>
         <div class="kpi solid"><div class="k-label">Unit terjual</div><div class="k-value">${num(m.units)} pasang</div>${delta(m.units, p.units)}</div>
-        <div class="kpi solid"><div class="k-label">Pesanan · AOV</div><div class="k-value">${num(m.orders)} · ${compact(m.aov)}</div>${delta(m.orders, p.orders)}</div>
-        <div class="kpi solid"><div class="k-label">Biaya iklan</div><div class="k-value">${money(m.adSpend)}</div>${delta(m.adSpend, p.adSpend, false, true)}</div>
-        <div class="kpi solid"><div class="k-label">ROAS total (omzet ÷ iklan)</div><div class="k-value">${ratio(m.roas)}</div>${delta(m.roas, p.roas)}</div>
+        <div class="kpi solid"><div class="k-label">Pesanan selesai · AOV</div><div class="k-value">${num(m.orders)} · ${compact(m.aov)}</div>${delta(m.orders, p.orders)}</div>
+        <div class="kpi solid"><div class="k-label">Pesanan masuk (semua status)</div><div class="k-value">${num(m.allOrders)}</div>${delta(m.allOrders, p.allOrders)}</div>
+        <div class="kpi solid"><div class="k-label">Batal · nilai</div><div class="k-value">${num(m.cancelled)} · ${compact(m.cancelValue)}</div>${delta(m.cancelled, p.cancelled, true)}</div>
+        <div class="kpi solid"><div class="k-label">Retur · nilai</div><div class="k-value">${num(m.returnOrders)} · ${compact(m.returnValue)}</div>${delta(m.returnOrders, p.returnOrders, true)}</div>
+        <div class="kpi solid"><div class="k-label">Tingkat batal + retur</div><div class="k-value">${pct(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN)}</div>${delta(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN, p.allOrders ? (p.cancelled + p.returnOrders) / p.allOrders : NaN, true)}</div>
         <div class="kpi solid"><div class="k-label">Dana cair marketplace</div><div class="k-value">${money(m.payout)}</div>${delta(m.payout, p.payout)}</div>
         <div class="kpi solid"><div class="k-label">Margin bersih</div><div class="k-value">${pct(m.margin)}</div>${delta(m.margin, p.margin)}</div>
       </div>
@@ -360,32 +435,17 @@
           <span>${target ? `${pct(mRev / target)} · proyeksi akhir bulan ${money(projected)}` : ''}</span></div>
         <div class="track" title="Garis = posisi hari ini dalam bulan"><i style="width:${target ? Math.min(100, (mRev / target) * 100) : 0}%"></i><em style="left:${(td.getDate() / mDays) * 100}%"></em></div>
       </div>
-      <div class="grid-2">
-        <section class="panel solid">
-          <div class="panel-head"><h2>Omzet per channel</h2>${legend(salesSeries)}</div>
-          <div class="chart" id="chSales"></div>
-        </section>
-        <section class="panel solid">
-          <div class="panel-head"><h2>Biaya iklan per channel</h2>${legend(adSeries)}</div>
-          <div class="chart" id="chAds"></div>
-        </section>
-      </div>
-      <div class="grid-2">
-        <section class="panel solid">
-          <div class="panel-head"><h2>Penjualan per channel</h2></div>
-          <div class="table-wrap"><table class="data">
-            <thead><tr><th>Channel</th><th class="num">Omzet</th><th class="num">Unit</th><th class="num">Pesanan</th><th class="num">Fee</th><th class="num">Porsi</th></tr></thead>
-            <tbody>${Object.entries(SALES_CH).filter(([k]) => m.byCh[k]).map(([k, c]) => { const x = m.byCh[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.revenue)}</td><td class="num">${num(x.units)}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.fees)}</td><td class="num">${pct(x.revenue / m.revenue)}</td></tr>`; }).join('') || '<tr><td colspan="6" class="muted">Belum ada penjualan di periode ini.</td></tr>'}</tbody>
-          </table></div>
-        </section>
-        <section class="panel solid">
-          <div class="panel-head"><h2>Iklan per channel</h2></div>
-          <div class="table-wrap"><table class="data">
-            <thead><tr><th>Channel</th><th class="num">Spend</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th><th class="num">Order</th><th class="num">ROAS</th></tr></thead>
-            <tbody>${Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).map(([k, c]) => { const x = m.byAd[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.spend)}</td><td class="num">${num(x.clicks)}</td><td class="num">${pct(x.impressions ? x.clicks / x.impressions : NaN)}</td><td class="num">${x.clicks ? money(x.spend / x.clicks) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${ratio(x.revenue / x.spend)}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Belum ada data iklan di periode ini.</td></tr>'}</tbody>
-          </table></div>
-        </section>
-      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Omzet per channel</h2>${legend(salesSeries)}</div>
+        <div class="chart" id="chSales"></div>
+      </section>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Penjualan per channel</h2><span class="muted small">pesanan masuk → selesai, batal, retur</span></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Channel</th><th class="num">Omzet</th><th class="num">Unit</th><th class="num">Masuk</th><th class="num">Selesai</th><th class="num">Batal</th><th class="num">Retur</th><th class="num">% batal+retur</th><th class="num">Nilai batal</th><th class="num">Fee</th></tr></thead>
+          <tbody>${Object.entries(SALES_CH).filter(([k]) => m.byState[k]).map(([k, c]) => { const x = m.byCh[k] || { revenue: 0, units: 0, fees: 0 }, s = m.byState[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.revenue)}</td><td class="num">${num(x.units)}</td><td class="num">${num(s.all)}</td><td class="num">${num(s.completed)}</td><td class="num">${num(s.cancelled)}</td><td class="num">${num(s.returned)}</td><td class="num">${pct(s.all ? (s.cancelled + s.returned) / s.all : NaN)}</td><td class="num">${money(s.cancelValue)}</td><td class="num">${money(x.fees)}</td></tr>`; }).join('') || '<tr><td colspan="10" class="muted">Belum ada penjualan di periode ini.</td></tr>'}</tbody>
+        </table></div>
+      </section>
       <div class="grid-3">
         <section class="panel solid">
           <div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">omzet · unit</span></div>
@@ -408,24 +468,17 @@
           ${m.returns ? `<p class="muted small">Retur: ${num(m.returns)} pasang (${money(m.returnValue)}), tidak dihitung di omzet.</p>` : ''}${m.cancelled ? `<p class="muted small">${num(m.cancelled)} pesanan batal tidak dihitung.</p>` : ''}${m.unknownCost ? `<p class="muted small">HPP ${num(m.unknownCost)} pasang memakai estimasi ${pct(cogsRate())} dari omzet (atur di Pengaturan, atau isi HPP per produk).</p>` : ''}
         </section>
       </div>
-      <div class="grid-2">
-        <section class="panel solid">
-          <div class="panel-head"><h2>ROAS per marketplace</h2><span class="muted small">omzet channel ÷ iklan channel</span></div>
-          <div class="table-wrap"><table class="data">
-            <thead><tr><th>Channel</th><th class="num">Omzet</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Iklan / omzet</th></tr></thead>
-            <tbody>${mp.map((x) => `<tr><td><span class="ch"><i style="background:${x.color}"></i>${x.label}</span></td><td class="num">${money(x.rev)}</td><td class="num">${money(x.spend)}</td><td class="num">${ratio(x.rev / x.spend)}</td><td class="num">${x.rev ? pct(x.spend / x.rev) : '–'}</td></tr>`).join('')}</tbody>
-          </table></div>
-        </section>
-        <section class="panel solid">
-          <div class="panel-head"><h2>Stok menipis</h2><button class="btn sm" type="button" data-go="stock">Kelola stok</button></div>
-          <div class="alert-list">${alerts.slice(0, 8).map((a) => `<div><span>${esc(a.name)}${a.size ? ` · ${esc(a.size)}` : ''}</span><span class="badge ${a.left <= 0 ? 'bad' : 'warn'}">${a.left <= 0 ? 'HABIS' : `sisa ${a.left}`}</span></div>`).join('') || '<p class="muted">Semua stok aman.</p>'}</div>
-        </section>
-      </div>`;
+      <section class="panel solid">
+        <div class="panel-head"><h2>Stok menipis</h2><button class="btn sm" type="button" data-go="stock">Kelola stok</button></div>
+        <div class="alert-list">${alerts.slice(0, 8).map((a) => `<div><span>${esc(a.name)}${a.size ? ` · ${esc(a.size)}` : ''}</span><span class="badge ${a.left <= 0 ? 'bad' : 'warn'}">${a.left <= 0 ? 'HABIS' : `sisa ${a.left}`}</span></div>`).join('') || '<p class="muted">Semua stok aman.</p>'}</div>
+      </section>`}`;
 
-    stackedBars($('#chSales'), bks, salesSeries.length ? salesSeries : [{ key: '_', label: 'Omzet', color: '#2a78d6' }],
+    const chartEl = (id) => document.getElementById(id);
+    if (chartEl('chSales')) stackedBars(chartEl('chSales'), bks, salesSeries.length ? salesSeries : [{ key: '_', label: 'Omzet', color: '#2a78d6' }],
       (b, key) => sumBy(m.salesRows, b, (r) => r.channel === key, (r) => r.net), money);
-    stackedBars($('#chAds'), bks, adSeries.length ? adSeries : [{ key: '_', label: 'Iklan', color: '#6250d6' }],
+    if (chartEl('chAds')) stackedBars(chartEl('chAds'), bks, adSeries.length ? adSeries : [{ key: '_', label: 'Iklan', color: '#6250d6' }],
       (b, key) => sumBy(m.adRows, b, (r) => r.channel === key, (r) => r.spend), money);
+    $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { dashTab = b.dataset.tab; try { localStorage.setItem('ballopDashTab', dashTab); } catch {} renderDashboard(); }));
 
     $$('[data-r]', v).forEach((b) => b.addEventListener('click', () => { setRange(b.dataset.r); renderDashboard(); }));
     const custom = () => { const f = $('#rFrom').value, t2 = $('#rTo').value; if (f && t2 && f <= t2) { setRange('custom', f, t2); renderDashboard(); } };
