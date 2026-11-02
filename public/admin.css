@@ -493,3 +493,7 @@ body.read-only .drawer input, body.read-only .drawer select, body.read-only .dra
 .report-panel { margin-top: 14px; }
 .report-text { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 13px; line-height: 1.6; background: rgba(0,0,0,.035); border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
 .report-copy { width: 100%; justify-content: center; }
+
+.login-note { margin: 4px 0 0; text-align: center; font-size: 13px; color: var(--muted); }
+.login-note b { color: var(--ink); }
+.login-card .err:empty { display: none; }
