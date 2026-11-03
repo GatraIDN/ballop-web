@@ -700,7 +700,8 @@ th.d-shopee { color: #eb6834; } th.d-tiktok { color: #2a78d6; } th.d-ret { color
 .dc-legend i.todo { background: #fff8e6; border: 1px solid #f3e0ad; }
 .raw-card footer { display: flex; gap: 8px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
 .raw-card footer .spacer { flex: 1; }
-.d-day { width: min(520px, 100%); }
+.d-day { width: min(620px, 100%); }
+.raw-card footer { flex-wrap: wrap; }
 .d-note { display: grid; gap: 4px; padding: 14px 16px; border-radius: 14px; background: #fff8e6; margin-top: 12px; }
 .d-note b { color: var(--warn); }
 .d-note.ok { background: #e7f6ee; }
@@ -763,3 +764,41 @@ th.d-b2b { color: #6250d6; }
 .d-note.quiet { background: #eef2f8; }
 .d-note.quiet b { color: #4a6283; }
 @media (max-width: 640px) { .dc-quiet { display: none; } .dc.quiet::after { content: '–'; color: #4a6283; font-weight: 900; } }
+
+/* ---------- pengguna & akses ---------- */
+.u-cards { grid-template-columns: repeat(3, 1fr); }
+.u-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.u-card { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow-sm); text-align: left; cursor: pointer; font: inherit; transition: transform .2s var(--ease), box-shadow .2s var(--ease); min-width: 0; }
+.u-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.u-card.off { opacity: .6; }
+.u-ava { flex-shrink: 0; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-weight: 900; font-size: 15px; color: #fff; background: linear-gradient(150deg, var(--c), color-mix(in srgb, var(--c) 65%, #000)); }
+.u-ava.lg { width: 52px; height: 52px; font-size: 17px; }
+.u-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.u-main b { font-size: 15px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-main small { font-size: 12px; color: var(--muted); font-weight: 600; }
+.u-roles { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.u-role { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 99px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, #fff); white-space: nowrap; }
+.u-pop { width: min(640px, 100%); }
+.u-pop > header { gap: 12px; }
+.u-pass { display: flex; gap: 6px; }
+.u-pass input { flex: 1; }
+.u-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.u-pick { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer; transition: background .15s, border-color .15s; }
+.u-pick input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--c); flex-shrink: 0; }
+.u-pick span { display: grid; gap: 2px; }
+.u-pick b { font-size: 13px; }
+.u-pick small { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.u-pick.on { border-color: var(--c); background: color-mix(in srgb, var(--c) 8%, #fff); }
+.u-switch { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--soft, #f4f5f7); cursor: pointer; }
+.u-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.u-switch i { flex-shrink: 0; width: 42px; height: 24px; border-radius: 99px; background: #c9ced6; position: relative; transition: background .2s; }
+.u-switch i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); transition: transform .2s var(--ease); }
+.u-switch input:checked + i { background: var(--good); }
+.u-switch input:checked + i::after { transform: translateX(18px); }
+.u-switch span { display: grid; gap: 2px; }
+.u-switch b { font-size: 13px; }
+.u-switch small { font-size: 11px; color: var(--muted); }
+.u-rolelist { display: grid; gap: 10px; margin: 8px 0 14px; }
+.u-rolelist div { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
+.u-rolelist .u-role { min-width: 110px; text-align: center; }
+@media (max-width: 640px) { .u-picks { grid-template-columns: 1fr; } .u-cards { grid-template-columns: 1fr 1fr; } }

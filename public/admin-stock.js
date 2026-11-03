@@ -263,7 +263,7 @@
         <div class="d-note quiet"><b>Tidak ada penjualan / barang keluar</b><span>Ditandai oleh ${esc(x0.by || '–')}${x0.at ? ` · ${esc(x0.at)}` : ''} · END QTY tetap ${num(endAfter(d))} pcs</span></div>` : `
         <div class="d-note"><b>Belum ada input untuk tanggal ini</b><span>OPENING QTY = END QTY hari sebelumnya: ${num(endAfter(B.addDays(d, -1)))} pcs</span></div>`}
       </div>
-      <footer>${canEdit() && x0 ? '<button class="btn sm danger" type="button" data-del>🗑 Hapus input</button>' : ''}${canEdit() && !x0 ? '<button class="btn sm" type="button" data-none>Tidak ada penjualan / barang keluar</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? `<button class="btn sm primary" type="button" data-open>${x ? '✎ Edit input' : '+ Input data tanggal ini'}</button>` : ''}</footer>`);
+      <footer>${canEdit() && x0 ? '<button class="btn sm danger" type="button" data-del>🗑 Hapus input</button>' : ''}${canEdit() && !x0 ? '<button class="btn sm" type="button" data-none>Tidak ada barang keluar</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? `<button class="btn sm primary" type="button" data-open>${x ? '✎ Edit input' : '+ Input data'}</button>` : ''}</footer>`);
     box.addEventListener('click', (e) => {
       if (e.target === box || e.target.closest('[data-close]')) box.remove();
       if (e.target.closest('[data-open]')) { box.remove(); inputPopup(d); }
