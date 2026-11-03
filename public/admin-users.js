@@ -6,6 +6,7 @@
   const ROLE_INFO = {
     admin: ['Admin', 'Semua menu, pengguna, pengaturan'],
     ecommerce: ['E-commerce', 'Penjualan online & manual, import marketplace, iklan, produk, stok 3PL'],
+    cs: ['Customer service', 'Daily report CS Shopee & TikTok, submit flash sale Shopee'],
     offline: ['Offline', 'Penjualan offline (toko, distributor, event)'],
     gudang: ['Gudang', 'Stok 3PL, barang masuk & keluar, produk'],
     creative: ['Creative', 'KOL seeding, jurnal, event, galeri, konten website, produk'],
