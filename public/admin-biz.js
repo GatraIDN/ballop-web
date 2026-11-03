@@ -49,7 +49,7 @@
   const CONTENT = { menunggu: 'Menunggu', brief: 'Brief dikirim', draft: 'Draft', revisi: 'Revisi', posted: 'Sudah posting', tidak: 'Tidak posting' };
   const CASH_CATS = ['Penjualan offline', 'Pencairan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
 
-  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'offline', 'stock3pl', 'kol', 'cashflow', 'contents', 'contentplans'];
+  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'live', 'offline', 'stock3pl', 'kol', 'cashflow', 'contents', 'contentplans'];
   const extraViews = {}; // views added by other admin modules (admin-konten.js)
   const data = Object.fromEntries(COLLS.map((c) => [c, []]));
   let loaded = false;
@@ -140,40 +140,16 @@
       qty: r.qty, gross: r.qty * r.price, discount: r.discount, net: r.qty * r.price - r.discount, fee: 0, shipping: 0,
       cost: unitCost(r.productId) ? r.qty * unitCost(r.productId) : (r.qty * r.price - r.discount) * cogsRate(), state: r.status,
     }));
-    // marketplace fees come from the settlement export, charged once per order
-    const fees = new Map();
-    data.settlements.forEach((s) => { const k = `${s.channel}:${s.orderId}`; fees.set(k, (fees.get(k) || 0) + Math.abs(s.fees || 0)); });
-    const charged = new Set();
+    // marketplace orders only; fees and payouts belong to the income section (computeIncome)
     data.orders.filter(inR).forEach((o) => {
       const p = productBySku(o.sku);
       const ok = `${o.channel}:${o.orderId}`;
-      const fee = !charged.has(ok) ? (fees.get(ok) || 0) : 0;
-      charged.add(ok);
+      const fee = 0;
       const state = o.state === 'pending' ? 'completed' : o.state; // paid & in process counts as sold
       lines.push({
         date: o.date, channel: o.channel, orderKey: ok, pkey: p ? p.id : `n:${o.productName}${o.variation ? ` (${o.variation.replace(/,\s*[^,]*$/, '')})` : ''}`,
         qty: o.qty, gross: o.gross, discount: o.sellerDiscount, net: o.net, fee, shipping: 0,
         cost: p && unitCost(p.id) ? o.qty * unitCost(p.id) : o.net * cogsRate(), estCost: !(p && unitCost(p.id)), state,
-      });
-    });
-    // income exports without a matching order export: the income row is a finished order (1 unit per product line)
-    const ordered = new Set(data.orders.map((o) => `${o.channel}:${o.orderId}`));
-    data.settlements.filter((s) => inR(s) && s.type !== 'Penyesuaian' && s.productPrice > 0 && !ordered.has(`${s.channel}:${s.orderId}`)).forEach((s) => {
-      const ok = `${s.channel}:${s.orderId}`;
-      const items = (s.items || []).filter((x) => x.price > 0);
-      const parts = items.length ? items : [{ name: '(produk tanpa nama)', price: s.productPrice }];
-      const total = parts.reduce((t, x) => t + x.price, 0) || 1;
-      const refund = Math.abs(s.refund || 0);
-      const state = refund >= s.productPrice ? 'returned' : 'completed';
-      parts.forEach((x, i) => {
-        const share = x.price / total;
-        const disc = Math.abs(s.sellerDiscount || 0) * share;
-        const net = x.price - disc - (state === 'completed' ? refund * share : 0);
-        lines.push({
-          date: s.date, channel: s.channel, orderKey: ok, pkey: `n:${x.name.split(/\s+[–|-]\s+/)[0]}`,
-          qty: 1, gross: x.price, discount: disc, net, fee: i ? 0 : Math.abs(s.fees || 0), shipping: i ? 0 : Math.max(0, -(s.shipping || 0)),
-          cost: net * cogsRate(), estCost: true, state,
-        });
       });
     });
     return lines;
@@ -248,6 +224,39 @@
     m.salesRows = done;
     m.adRows = ads;
     return m;
+  }
+
+  // income = finished orders whose money reached the wallet, dated by release date; never mixed with orders
+  const payDay = (s) => s.releaseDate || s.date || '';
+  function computeIncome(from, to) {
+    const MI = window.MarketImport;
+    const rows = data.settlements.filter((s) => payDay(s) >= from && payDay(s) <= to);
+    const t = { rows, payout: 0, price: 0, fees: 0, orders: 0, groups: {}, byCh: {} };
+    rows.forEach((s) => {
+      const c = t.byCh[s.channel] = t.byCh[s.channel] || { payout: 0, price: 0, fees: 0, orders: 0 };
+      t.payout += s.payout; c.payout += s.payout;
+      if (s.type !== 'Penyesuaian') { t.price += s.productPrice || 0; c.price += s.productPrice || 0; t.orders++; c.orders++; }
+      const detail = s.detail && Object.keys(s.detail).length ? s.detail : { 'Biaya marketplace': -Math.abs(s.fees || 0), ...(s.shipping ? { Ongkir: s.shipping } : {}) };
+      Object.entries(detail).forEach(([k, v]) => {
+        const g = s.type === 'Penyesuaian' ? 'Penyesuaian' : MI.feeGroup(k);
+        t.groups[g] = (t.groups[g] || 0) + v;
+        if (!MI.NOT_FEES.includes(g)) { t.fees += v; c.fees += v; }
+      });
+    });
+    t.cogs = t.price * cogsRate();
+    return t;
+  }
+  function computeLive(from, to) {
+    const rows = (data.live || []).filter((l) => l.date >= from && l.date <= to);
+    const t = { rows, sessions: rows.length, minutes: 0, gmv: 0, orders: 0, items: 0, views: 0, impressions: 0, pImp: 0, pClicks: 0, followers: 0, likes: 0, comments: 0, shares: 0, watch: 0 };
+    rows.forEach((l) => {
+      t.minutes += l.minutes; t.gmv += l.gmv; t.orders += l.orders; t.items += l.items; t.views += l.views; t.impressions += l.impressions;
+      t.pImp += l.productImpressions; t.pClicks += l.productClicks; t.followers += l.followers; t.likes += l.likes; t.comments += l.comments; t.shares += l.shares;
+      t.watch += l.avgWatch * l.views;
+    });
+    t.gmvHour = t.minutes ? t.gmv / (t.minutes / 60) : 0;
+    t.avgWatch = t.views ? t.watch / t.views : 0;
+    return t;
   }
 
   // group a date range into day / week / month buckets
@@ -414,8 +423,8 @@
     return `<div class="k-delta ${d === 0 || neutral ? '' : good ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${pct(Math.abs(d))} vs periode lalu</div>`;
   }
 
-  let dashTab = 'sales';
-  try { if (localStorage.getItem('ballopDashTab') === 'ads') dashTab = 'ads'; } catch {}
+  let dashTab = 'order';
+  try { dashTab = localStorage.getItem('ballopDashTab') || 'order'; } catch {}
   function renderDashboard() {
     const v = $('#view-dashboard');
     if (!loaded) { v.innerHTML = '<p class="muted">Memuat…</p>'; return; }
@@ -423,7 +432,7 @@
     const len = daysBetween(from, to);
     const m = compute(from, to);
     const p = compute(addDays(from, -len), addDays(from, -1));
-    const hasData = data.sales.length || data.ads.length || data.orders.length || data.offline.length;
+    const hasData = data.sales.length || data.ads.length || data.orders.length || data.offline.length || data.settlements.length || data.live.length;
     const hasDemo = [...data.sales, ...data.ads, ...data.stock, ...data.expenses].some((r) => (r.note || '').startsWith(DEMO));
 
     // monthly target (current month, independent of the selected range)
@@ -491,37 +500,39 @@
         <div class="panel-head"><h2>Campaign ${esc(c.label)}</h2></div>
         ${campTable(Object.values(m.byCamp).filter((x) => x.channel === k).sort((a, b) => b.spend - a.spend))}
       </section>`).join('')}
-      <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di tab Penjualan real. CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
+      <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di section Order, uang cair di Income. CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
     };
 
-    v.innerHTML = `
-      <header class="dash-head glass">
-        <img class="dh-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
-        <div class="dh-title"><h1>Dashboard Report</h1><p>${dashTab === "ads" ? "Performa iklan" : "Penjualan real"} · ${from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)} · ${len} hari`}</p></div>
-        <button class="btn" id="expReport" type="button">⬇ Export laporan</button>
-      </header>
-      <div class="toolbar">
-        <div class="seg glass">${RANGES.map(([k, l]) => `<button type="button" data-r="${k}" class="${range.key === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-        <span class="range-custom">dari <input type="date" id="rFrom" value="${from}"> s/d <input type="date" id="rTo" value="${to}"></span>
-      </div>
-      ${!hasData ? `<div class="demo-note glass"><b>Belum ada data penjualan / iklan.</b> Catat di menu Penjualan & Iklan, atau coba dengan data contoh dulu. <button class="btn sm blue" id="demoFill" type="button">Isi data contoh</button></div>` : ''}
-      ${hasDemo ? `<div class="demo-note glass"><span class="badge warn">Data contoh</span> Angka di bawah memakai data contoh. <button class="btn sm danger" id="demoClear" type="button">Hapus data contoh</button></div>` : ''}
-      <div class="seg glass dash-tabs">
-        <button type="button" data-tab="sales" class="${dashTab === 'sales' ? 'on' : ''}">Penjualan real</button>
-        <button type="button" data-tab="ads" class="${dashTab === 'ads' ? 'on' : ''}">Performa iklan</button>
-      </div>
-      ${dashTab === 'ads' ? adsDashboard(m, p) : `
+    // four separate sources: orders (what came in), income (money that reached the wallet), ads, LIVE
+    const inc = computeIncome(from, to), incP = computeIncome(addDays(from, -len), addDays(from, -1));
+    const live = computeLive(from, to), liveP = computeLive(addDays(from, -len), addDays(from, -1));
+    const hours = (min) => `${Math.floor(min / 60)}j ${String(min % 60).padStart(2, '0')}m`;
+    const SECTIONS = {
+      order: { label: 'Order', sub: 'pesanan masuk dari export order', color: '#2a78d6', icon: '◈',
+        value: money(m.revenue), meta: `${num(m.orders)} pesanan · ${num(m.units)} pasang`, d: delta(m.revenue, p.revenue) },
+      income: { label: 'Income', sub: 'dana cair ke saldo, setelah fee', color: '#0e8a4f', icon: '₪',
+        value: money(inc.payout), meta: `${num(inc.orders)} pesanan cair · fee ${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'}`, d: delta(inc.payout, incP.payout) },
+      ads: { label: 'Iklan', sub: 'spending & atribusi platform iklan', color: '#e8552b', icon: '◎',
+        value: money(m.adSpend), meta: `ROAS ${ratio(m.adRoas)} · GMV ${compact(m.adRevenue)}`, d: delta(m.adSpend, p.adSpend, true, true) },
+      live: { label: 'Live', sub: 'TikTok LIVE (GMV atribusi)', color: '#6250d6', icon: '●',
+        value: money(live.gmv), meta: `${num(live.sessions)} sesi · ${hours(live.minutes)} · ${num(live.orders)} order`, d: delta(live.gmv, liveP.gmv) },
+    };
+    if (!SECTIONS[dashTab]) dashTab = 'order';
+    const sec = SECTIONS[dashTab];
+    const secHead = (title, note, go) => `<div class="sec-head" style="--sec:${sec.color}"><div><h2>${title}</h2><p>${note}</p></div>${go ? `<button class="btn sm" type="button" data-go="${go[0]}">${go[1]} →</button>` : ''}</div>`;
+    const kpi = (label, value, d = '', hero = false) => `<div class="kpi solid${hero ? ' hero' : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div>${d}</div>`;
+
+    const orderTab = () => `
+      ${secHead('Order', 'Semua pesanan yang masuk dari export order marketplace, offline & manual. Tanggal = tanggal pesanan dibuat. Belum dipotong fee — lihat Income untuk uang yang benar-benar cair.', ['online', 'Penjualan online'])}
       <div class="kpis">
-        <div class="kpi solid hero"><div class="k-label">Omzet bersih (pesanan selesai)</div><div class="k-value">${money(m.revenue)}</div>${delta(m.revenue, p.revenue)}</div>
-        <div class="kpi solid"><div class="k-label">Laba bersih</div><div class="k-value">${money(m.netProfit)}</div>${delta(m.netProfit, p.netProfit)}</div>
-        <div class="kpi solid"><div class="k-label">Unit terjual</div><div class="k-value">${num(m.units)} pasang</div>${delta(m.units, p.units)}</div>
-        <div class="kpi solid"><div class="k-label">Pesanan selesai · AOV</div><div class="k-value">${num(m.orders)} · ${compact(m.aov)}</div>${delta(m.orders, p.orders)}</div>
-        <div class="kpi solid"><div class="k-label">Pesanan masuk (semua status)</div><div class="k-value">${num(m.allOrders)}</div>${delta(m.allOrders, p.allOrders)}</div>
-        <div class="kpi solid"><div class="k-label">Batal · nilai</div><div class="k-value">${num(m.cancelled)} · ${compact(m.cancelValue)}</div>${delta(m.cancelled, p.cancelled, true)}</div>
-        <div class="kpi solid"><div class="k-label">Retur · nilai</div><div class="k-value">${num(m.returnOrders)} · ${compact(m.returnValue)}</div>${delta(m.returnOrders, p.returnOrders, true)}</div>
-        <div class="kpi solid"><div class="k-label">Tingkat batal + retur</div><div class="k-value">${pct(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN)}</div>${delta(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN, p.allOrders ? (p.cancelled + p.returnOrders) / p.allOrders : NaN, true)}</div>
-        <div class="kpi solid"><div class="k-label">Dana cair marketplace</div><div class="k-value">${money(m.payout)}</div>${delta(m.payout, p.payout)}</div>
-        <div class="kpi solid"><div class="k-label">Margin bersih</div><div class="k-value">${pct(m.margin)}</div>${delta(m.margin, p.margin)}</div>
+        ${kpi('Omzet pesanan (selesai + diproses)', money(m.revenue), delta(m.revenue, p.revenue), true)}
+        ${kpi('Pesanan · AOV', `${num(m.orders)} · ${compact(m.aov)}`, delta(m.orders, p.orders))}
+        ${kpi('Unit terjual', `${num(m.units)} pasang`, delta(m.units, p.units))}
+        ${kpi('Pesanan masuk (semua status)', num(m.allOrders), delta(m.allOrders, p.allOrders))}
+        ${kpi('Batal · nilai', `${num(m.cancelled)} · ${compact(m.cancelValue)}`, delta(m.cancelled, p.cancelled, true))}
+        ${kpi('Retur · nilai', `${num(m.returnOrders)} · ${compact(m.returnValue)}`, delta(m.returnOrders, p.returnOrders, true))}
+        ${kpi('Tingkat batal + retur', pct(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN), delta(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN, p.allOrders ? (p.cancelled + p.returnOrders) / p.allOrders : NaN, true))}
+        ${kpi('Diskon penjual (dari harga coret)', money(m.discount), delta(m.discount, p.discount, true, true))}
       </div>
       <div class="target solid">
         <div class="target-top"><b>Target ${MONTHS[td.getMonth()]} ${td.getFullYear()}</b><span>${money(mRev)} dari ${target ? money(target) : '(atur di Pengaturan)'}</span><span class="spacer"></span>
@@ -529,43 +540,128 @@
         <div class="track" title="Garis = posisi hari ini dalam bulan"><i style="width:${target ? Math.min(100, (mRev / target) * 100) : 0}%"></i><em style="left:${(td.getDate() / mDays) * 100}%"></em></div>
       </div>
       <section class="panel solid">
-        <div class="panel-head"><h2>Omzet per channel</h2>${legend(salesSeries)}</div>
+        <div class="panel-head"><h2>Omzet order per channel</h2>${legend(salesSeries)}</div>
         <div class="chart" id="chSales"></div>
       </section>
       <section class="panel solid">
-        <div class="panel-head"><h2>Penjualan per channel</h2><span class="muted small">pesanan masuk → selesai, batal, retur</span></div>
+        <div class="panel-head"><h2>Order per channel</h2><span class="muted small">pesanan masuk → selesai, batal, retur</span></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Channel</th><th class="num">Omzet</th><th class="num">Unit</th><th class="num">Masuk</th><th class="num">Selesai</th><th class="num">Batal</th><th class="num">Retur</th><th class="num">% batal+retur</th><th class="num">Nilai batal</th><th class="num">Fee</th></tr></thead>
-          <tbody>${Object.entries(SALES_CH).filter(([k]) => m.byState[k]).map(([k, c]) => { const x = m.byCh[k] || { revenue: 0, units: 0, fees: 0 }, s = m.byState[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.revenue)}</td><td class="num">${num(x.units)}</td><td class="num">${num(s.all)}</td><td class="num">${num(s.completed)}</td><td class="num">${num(s.cancelled)}</td><td class="num">${num(s.returned)}</td><td class="num">${pct(s.all ? (s.cancelled + s.returned) / s.all : NaN)}</td><td class="num">${money(s.cancelValue)}</td><td class="num">${money(x.fees)}</td></tr>`; }).join('') || '<tr><td colspan="10" class="muted">Belum ada penjualan di periode ini.</td></tr>'}</tbody>
+          <thead><tr><th>Channel</th><th class="num">Omzet</th><th class="num">Unit</th><th class="num">Masuk</th><th class="num">Selesai</th><th class="num">Batal</th><th class="num">Retur</th><th class="num">% batal+retur</th><th class="num">Nilai batal</th></tr></thead>
+          <tbody>${Object.entries(SALES_CH).filter(([k]) => m.byState[k]).map(([k, c]) => { const x = m.byCh[k] || { revenue: 0, units: 0 }, s = m.byState[k]; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${c.label}</span></td><td class="num">${money(x.revenue)}</td><td class="num">${num(x.units)}</td><td class="num">${num(s.all)}</td><td class="num">${num(s.completed)}</td><td class="num">${num(s.cancelled)}</td><td class="num">${num(s.returned)}</td><td class="num">${pct(s.all ? (s.cancelled + s.returned) / s.all : NaN)}</td><td class="num">${money(s.cancelValue)}</td></tr>`; }).join('') || '<tr><td colspan="9" class="muted">Belum ada order di periode ini.</td></tr>'}</tbody>
         </table></div>
       </section>
-      ${calendar({ title: 'Omzet paid', days: cd.sales, unit: 'order', tiers: [8e6, 4e6] })}
+      ${calendar({ title: 'Omzet order', days: cd.sales, unit: 'order', tiers: [8e6, 4e6] })}
       <div class="grid-3">
         <section class="panel solid">
           <div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">omzet · unit</span></div>
-          <div class="hbar">${topProducts.map(([id, x]) => { const pr = product(id); return `<div class="hbar-row"><span class="hb-name" title="${esc(pname(id))}">${esc(pname(id))}</span><span class="hb-track"><i style="width:${(x.revenue / maxTop) * 100}%;background:${pr ? pr.color : '#8a8f99'}"></i></span><span class="hb-val">${compact(x.revenue)} · ${num(x.units)}</span></div>`; }).join('') || '<p class="muted">Belum ada penjualan.</p>'}</div>
+          <div class="hbar">${topProducts.map(([id, x]) => { const pr = product(id); return `<div class="hbar-row"><span class="hb-name" title="${esc(pname(id))}">${esc(pname(id))}</span><span class="hb-track"><i style="width:${(x.revenue / maxTop) * 100}%;background:${pr ? pr.color : '#2a78d6'}"></i></span><span class="hb-val">${compact(x.revenue)} · ${num(x.units)}</span></div>`; }).join('') || '<p class="muted">Belum ada order.</p>'}</div>
         </section>
         <section class="panel solid">
-          <div class="panel-head"><h2>Laba rugi</h2></div>
+          <div class="panel-head"><h2>Stok menipis</h2><button class="btn sm" type="button" data-go="stock">Kelola stok</button></div>
+          <div class="alert-list">${alerts.slice(0, 8).map((a) => `<div><span>${esc(a.name)}${a.size ? ` · ${esc(a.size)}` : ''}</span><span class="badge ${a.left <= 0 ? 'bad' : 'warn'}">${a.left <= 0 ? 'HABIS' : `sisa ${a.left}`}</span></div>`).join('') || '<p class="muted">Semua stok aman.</p>'}</div>
+        </section>
+      </div>`;
+
+    const incomeTab = () => {
+      const MI = window.MarketImport;
+      const fg = MI.GROUP_ORDER.filter((g) => inc.groups[g] && !MI.NOT_FEES.includes(g)).map((g) => [g, Math.abs(inc.groups[g])]).sort((a, b) => b[1] - a[1]);
+      const maxF = Math.max(1, ...fg.map(([, x]) => x));
+      const ads = m.adSpend, opex = m.expenses;
+      const profit = inc.payout - inc.cogs - ads - opex;
+      const incSeries = Object.entries(SALES_CH).map(([key, c]) => ({ key, ...c })).filter((s) => inc.byCh[s.key]);
+      return `
+      ${secHead('Income', 'Pesanan yang sudah selesai dan dananya sudah masuk ke saldo penjual setelah dipotong semua fee. Tanggal = tanggal dana dilepaskan.', ['income', 'Rincian income'])}
+      <div class="kpis">
+        ${kpi('Dana cair ke saldo', money(inc.payout), delta(inc.payout, incP.payout), true)}
+        ${kpi('Harga produk', money(inc.price), delta(inc.price, incP.price))}
+        ${kpi('Total fee marketplace', `${money(Math.abs(inc.fees))}`, `<div class="k-delta">${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'} dari harga produk</div>`)}
+        ${kpi('Pesanan cair', num(inc.orders), delta(inc.orders, incP.orders))}
+        ${kpi('Voucher & subsidi', money(inc.groups['Voucher & subsidi'] || 0))}
+        ${kpi('Ongkir netto', money(inc.groups['Biaya pengiriman'] || 0))}
+        ${kpi('Refund · penyesuaian', `${compact(inc.groups['Pengembalian dana'] || 0)} · ${compact(inc.groups.Penyesuaian || 0)}`)}
+        ${kpi('Dana cair ÷ harga produk', inc.price ? pct(inc.payout / inc.price) : '–', delta(inc.price ? inc.payout / inc.price : NaN, incP.price ? incP.payout / incP.price : NaN))}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Dana cair per channel</h2>${legend(incSeries)}</div>
+        <div class="chart" id="chIncome"></div>
+      </section>
+      <div class="grid-3">
+        <section class="panel solid">
+          <div class="panel-head"><h2>Potongan fee terbesar</h2><span class="muted small">% dari harga produk</span></div>
+          <div class="hbar">${fg.map(([g, x]) => `<div class="hbar-row"><span class="hb-name">${esc(g)}</span><span class="hb-track"><i style="width:${(x / maxF) * 100}%;background:#e34948"></i></span><span class="hb-val">${compact(x)} · ${inc.price ? pct(x / inc.price) : '–'}</span></div>`).join('') || '<p class="muted">Belum ada income di periode ini.</p>'}</div>
+        </section>
+        <section class="panel solid">
+          <div class="panel-head"><h2>Laba rugi (basis dana cair)</h2></div>
           <table class="pl">
-            <tr><td>Penjualan kotor</td><td>${money(m.gross)}</td></tr>
-            <tr class="sub"><td>Diskon</td><td>−${money(m.discount)}</td></tr>
-            <tr class="mid"><td>Omzet bersih</td><td>${money(m.revenue)}</td></tr>
-            <tr class="sub"><td>Fee marketplace</td><td>−${money(m.fees)}</td></tr>
-            <tr class="sub"><td>Ongkir ditanggung</td><td>−${money(m.shipping)}</td></tr>
-            <tr class="sub"><td>HPP (modal barang)</td><td>−${money(m.cogs)}</td></tr>
-            <tr class="mid"><td>Laba kotor</td><td>${money(m.grossProfit)}</td></tr>
-            <tr class="sub"><td>Biaya iklan</td><td>−${money(m.adSpend)}</td></tr>
-            <tr class="sub"><td>Biaya operasional</td><td>−${money(m.expenses)}</td></tr>
-            <tr class="total"><td>Laba bersih</td><td style="color:${m.netProfit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(m.netProfit)}</td></tr>
+            <tr><td>Harga produk</td><td>${money(inc.price)}</td></tr>
+            <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td>−${money(inc.price - inc.payout)}</td></tr>
+            <tr class="mid"><td>Dana cair</td><td>${money(inc.payout)}</td></tr>
+            <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td>−${money(inc.cogs)}</td></tr>
+            <tr class="sub"><td>Biaya iklan</td><td>−${money(ads)}</td></tr>
+            <tr class="sub"><td>Biaya operasional</td><td>−${money(opex)}</td></tr>
+            <tr class="total"><td>Laba bersih</td><td style="color:${profit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(profit)}</td></tr>
           </table>
-          ${m.returns ? `<p class="muted small">Retur: ${num(m.returns)} pasang (${money(m.returnValue)}), tidak dihitung di omzet.</p>` : ''}${m.cancelled ? `<p class="muted small">${num(m.cancelled)} pesanan batal tidak dihitung.</p>` : ''}${m.unknownCost ? `<p class="muted small">HPP ${num(m.unknownCost)} pasang memakai estimasi ${pct(cogsRate())} dari omzet (atur di Pengaturan, atau isi HPP per produk).</p>` : ''}
+          <p class="muted small">"Biaya Isi Saldo Otomatis" Shopee sudah ikut di fee; kalau spending yang sama juga tercatat di menu Iklan, angkanya dobel.</p>
         </section>
       </div>
       <section class="panel solid">
-        <div class="panel-head"><h2>Stok menipis</h2><button class="btn sm" type="button" data-go="stock">Kelola stok</button></div>
-        <div class="alert-list">${alerts.slice(0, 8).map((a) => `<div><span>${esc(a.name)}${a.size ? ` · ${esc(a.size)}` : ''}</span><span class="badge ${a.left <= 0 ? 'bad' : 'warn'}">${a.left <= 0 ? 'HABIS' : `sisa ${a.left}`}</span></div>`).join('') || '<p class="muted">Semua stok aman.</p>'}</div>
-      </section>`}
+        <div class="panel-head"><h2>Income per channel</h2></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Channel</th><th class="num">Pesanan cair</th><th class="num">Harga produk</th><th class="num">Fee</th><th class="num">Fee %</th><th class="num">Dana cair</th></tr></thead>
+          <tbody>${['shopee', 'tiktok', 'tokopedia', 'lazada', 'blibli'].map((k) => { const x = inc.byCh[k]; return `<tr><td>${chBadge(SALES_CH, k)}</td>${x ? `<td class="num">${num(x.orders)}</td><td class="num">${money(x.price)}</td><td class="num">${money(Math.abs(x.fees))}</td><td class="num">${x.price ? pct(Math.abs(x.fees) / x.price) : '–'}</td><td class="num"><b>${money(x.payout)}</b></td>` : '<td colspan="5" class="muted">belum ada file income</td>'}</tr>`; }).slice(0, 3).join('')}</tbody>
+        </table></div>
+      </section>`;
+    };
+
+    const liveTab = () => {
+      const top = [...live.rows].sort((a, b) => b.gmv - a.gmv);
+      const best = top[0];
+      return `
+      ${secHead('Live', 'Sesi TikTok LIVE dari export Creator Live Performance. GMV = atribusi TikTok (bisa termasuk pesanan yang nanti batal).', ['online', 'Import data live'])}
+      ${live.sessions ? `
+      <div class="kpis">
+        ${kpi('GMV live', money(live.gmv), delta(live.gmv, liveP.gmv), true)}
+        ${kpi('Sesi · durasi', `${num(live.sessions)} · ${hours(live.minutes)}`, delta(live.minutes, liveP.minutes))}
+        ${kpi('GMV per jam', money(live.gmvHour), delta(live.gmvHour, liveP.gmvHour))}
+        ${kpi('Order · item', `${num(live.orders)} · ${num(live.items)}`, delta(live.orders, liveP.orders))}
+        ${kpi('Views', num(live.views), delta(live.views, liveP.views))}
+        ${kpi('Rata-rata nonton', `${Math.round(live.avgWatch)} detik`)}
+        ${kpi('CTR produk', live.pImp ? pct(live.pClicks / live.pImp) : '–', `<div class="k-delta">${num(live.pClicks)} klik dari ${compact(live.pImp)} impresi</div>`)}
+        ${kpi('Follower baru', num(live.followers), delta(live.followers, liveP.followers))}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>GMV live</h2>${best ? `<span class="muted small">sesi terbaik ${fmtDate(best.date)} ${esc(best.start)} · ${money(best.gmv)}</span>` : ''}</div>
+        <div class="chart" id="chLive"></div>
+      </section>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Semua sesi live</h2><span class="muted small">${num(live.sessions)} sesi · urut GMV</span></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Tanggal</th><th>Jam</th><th>Judul</th><th class="num">Durasi</th><th class="num">GMV</th><th class="num">Order</th><th class="num">Views</th><th class="num">Klik produk</th><th class="num">CTR</th><th class="num">Like</th><th class="num">Follower</th></tr></thead>
+          <tbody>${top.map((l) => `<tr><td>${fmtDate(l.date)}</td><td>${esc(l.start)}–${esc(l.end)}</td><td>${esc(l.title)}</td><td class="num">${hours(l.minutes)}</td><td class="num"><b>${l.gmv ? money(l.gmv) : '–'}</b></td><td class="num">${num(l.orders)}</td><td class="num">${num(l.views)}</td><td class="num">${num(l.productClicks)}</td><td class="num">${l.productImpressions ? pct(l.productClicks / l.productImpressions) : '–'}</td><td class="num">${compact(l.likes)}</td><td class="num">${num(l.followers)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </section>` : '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Belum ada sesi live di periode ini. Import file Creator Live Performance di menu Penjualan online.</p></section>'}`;
+    };
+
+    v.innerHTML = `
+      <header class="dash-head glass">
+        <img class="dh-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
+        <div class="dh-title"><h1>Dashboard Report</h1><p>${sec.label} · ${from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)} · ${len} hari`}</p></div>
+        <button class="btn" id="expReport" type="button">⬇ Export laporan</button>
+      </header>
+      <div class="toolbar">
+        <div class="seg glass">${RANGES.map(([k, l]) => `<button type="button" data-r="${k}" class="${range.key === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <span class="range-custom">dari <input type="date" id="rFrom" value="${from}"> s/d <input type="date" id="rTo" value="${to}"></span>
+      </div>
+      ${!hasData ? `<div class="demo-note glass"><b>Belum ada data penjualan / iklan.</b> Import data di menu Penjualan online & Iklan, atau coba dengan data contoh dulu. <button class="btn sm blue" id="demoFill" type="button">Isi data contoh</button></div>` : ''}
+      ${hasDemo ? `<div class="demo-note glass"><span class="badge warn">Data contoh</span> Angka di bawah memakai data contoh. <button class="btn sm danger" id="demoClear" type="button">Hapus data contoh</button></div>` : ''}
+      <div class="ov-grid">${Object.entries(SECTIONS).map(([k, s]) => `
+        <button type="button" class="ov-card${dashTab === k ? ' on' : ''}" data-tab="${k}" style="--sec:${s.color}">
+          <span class="ov-top"><i>${s.icon}</i><b>${s.label}</b><small>${s.sub}</small></span>
+          <span class="ov-value">${s.value}</span>
+          <span class="ov-meta">${s.meta}</span>
+          ${s.d}
+        </button>`).join('')}</div>
+      <div class="sec-body">${dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : orderTab()}</div>
       ${reportPanel()}`;
 
     const chartEl = (id) => document.getElementById(id);
@@ -573,6 +669,9 @@
       (b, key) => sumBy(m.salesRows, b, (r) => r.channel === key, (r) => r.net), money);
     if (chartEl('chAds')) stackedBars(chartEl('chAds'), bks, adSeries.length ? adSeries : [{ key: '_', label: 'Iklan', color: '#6250d6' }],
       (b, key) => sumBy(m.adRows, b, (r) => r.channel === key, (r) => r.spend), money);
+    if (chartEl('chIncome')) { const inc = computeIncome(from, to); const ser = Object.entries(SALES_CH).map(([key, c]) => ({ key, ...c })).filter((s) => inc.byCh[s.key]);
+      stackedBars(chartEl('chIncome'), bks, ser.length ? ser : [{ key: '_', label: 'Dana cair', color: '#0e8a4f' }], (b, key) => inc.rows.reduce((t, x) => (payDay(x) >= b.from && payDay(x) <= b.to && x.channel === key ? t + x.payout : t), 0), money); }
+    if (chartEl('chLive')) stackedBars(chartEl('chLive'), bks, [{ key: 'tiktok', label: 'GMV live', color: '#6250d6' }], (b) => (data.live || []).reduce((t, l) => (l.date >= b.from && l.date <= b.to ? t + l.gmv : t), 0), money);
     $$('[data-cal]', v).forEach((b) => b.addEventListener('click', () => { calShift += Number(b.dataset.cal); renderDashboard(); }));
     $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { dashTab = b.dataset.tab; try { localStorage.setItem('ballopDashTab', dashTab); } catch {} renderDashboard(); }));
 
@@ -1448,7 +1547,7 @@
     btn.disabled = true;
     let added = 0, updated = 0;
     try {
-      for (const target of ['orders', 'settlements']) {
+      for (const target of ['orders', 'settlements', 'live']) {
         const rows = pending.found.filter((f) => window.MarketImport.KINDS[f.kind].target === target).flatMap((f) => f.rows);
         for (let i = 0; i < rows.length; i += 1500) {
           btn.textContent = `Mengimport ${num(i)} / ${num(rows.length)}…`;
@@ -1456,7 +1555,7 @@
           added += res.added; updated += res.updated;
         }
       }
-      [data.orders, data.settlements] = await Promise.all([api('/api/orders'), api('/api/settlements')]);
+      [data.orders, data.settlements, data.live] = await Promise.all([api('/api/orders'), api('/api/settlements'), api('/api/live')]);
       pending = null;
       toast(`Import selesai: ${num(added)} baru, ${num(updated)} diperbarui`);
       renderOnline();

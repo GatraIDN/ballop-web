@@ -535,3 +535,33 @@ body.read-only .drawer input, body.read-only .drawer select, body.read-only .dra
   .cal-side { grid-template-columns: 1fr; }
 }
 body.read-only .nav[data-view="account"] { display: none !important; }
+
+/* ---------- dashboard: 4 sections (order, income, iklan, live) ---------- */
+.ov-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.ov-card { --sec: var(--brand); text-align: left; display: grid; gap: 6px; padding: 18px 18px 16px; border-radius: 22px; background: var(--panel); border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm); position: relative; overflow: hidden; cursor: pointer; transition: transform .25s var(--ease), box-shadow .25s var(--ease); min-width: 0; }
+.ov-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--sec); }
+.ov-card::after { content: ''; position: absolute; right: -40px; top: -40px; width: 120px; height: 120px; border-radius: 50%; background: var(--sec); opacity: .07; }
+.ov-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.ov-card.on { background: linear-gradient(150deg, var(--sec), color-mix(in srgb, var(--sec) 70%, #000)); color: #fff; border-color: transparent; box-shadow: 0 18px 40px -18px var(--sec); }
+.ov-card.on::after { opacity: .18; background: #fff; }
+.ov-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ov-top i { font-style: normal; width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-size: 14px; background: color-mix(in srgb, var(--sec) 14%, #fff); color: var(--sec); }
+.ov-card.on .ov-top i { background: rgba(255, 255, 255, .2); color: #fff; }
+.ov-top b { font-size: 15px; font-weight: 900; letter-spacing: -.01em; }
+.ov-top small { flex-basis: 100%; font-size: 11px; font-weight: 600; color: var(--muted); }
+.ov-value { font-size: clamp(20px, 2vw, 28px); font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
+.ov-meta { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.ov-card .k-delta { font-size: 12px; font-weight: 700; color: var(--muted); }
+.ov-card .k-delta.up { color: var(--good); }
+.ov-card .k-delta.down { color: var(--danger); }
+.ov-card.on small, .ov-card.on .ov-meta, .ov-card.on .k-delta { color: rgba(255, 255, 255, .8); }
+.ov-card.on .k-delta.up { color: #b7f5d2; }
+.ov-card.on .k-delta.down { color: #ffd0d1; }
+.sec-head { --sec: var(--brand); display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin: 4px 0 14px; padding-left: 14px; border-left: 4px solid var(--sec); }
+.sec-head > div { flex: 1; min-width: 220px; }
+.sec-head h2 { font-size: 22px; font-weight: 900; letter-spacing: -.02em; margin: 0; }
+.sec-head p { margin: 4px 0 0; font-size: 13px; color: var(--muted); max-width: 760px; }
+.sec-body .kpi.hero { background: var(--ink); }
+@media (max-width: 1200px) { .ov-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .ov-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .ov-card { padding: 14px; } .ov-top small { display: none; } }

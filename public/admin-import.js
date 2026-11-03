@@ -204,6 +204,23 @@ window.MarketImport = (() => {
         return [...byOrder.values()];
       },
     },
+    // TikTok Shop Creator "Live Performance" export: one row per LIVE session
+    tiktokLive: {
+      label: 'Live performance TikTok', target: 'live',
+      match: (h) => h.includes('Room ID') && h.includes('Attributed GMV'),
+      map: (r) => {
+        const roomId = text(r['Room ID']);
+        if (!/^\d{6,}$/.test(roomId)) return null;
+        const dur = text(r.Duration).match(/(?:(\d+)h)?\s*(?:(\d+)m)?/);
+        return {
+          key: `tiktok:live:${roomId}`, channel: 'tiktok', roomId, title: text(r['Room Title']), date: toDate(r['Start Time']),
+          start: text(r['Start Time']).slice(11, 16), end: text(r['End Time']).slice(11, 16), minutes: (Number(dur?.[1]) || 0) * 60 + (Number(dur?.[2]) || 0),
+          gmv: toNum(r['Attributed GMV']), items: toNum(r['Attributed items sold']), orders: toNum(r['Attributed orders']), customers: toNum(r.Customers),
+          views: toNum(r.Views), impressions: toNum(r.Impressions), productImpressions: toNum(r['Product Impressions']), productClicks: toNum(r['Product clicks']),
+          avgWatch: toNum(r['Avg. viewing duration']), followers: toNum(r['New followers']), comments: toNum(r.Comments), shares: toNum(r.Shares), likes: toNum(r.Likes),
+        };
+      },
+    },
     // "Adjustment" sheet of the Shopee income report: refunds after payout, compensations
     shopeeAdjust: {
       label: 'Penyesuaian Shopee', target: 'settlements',
