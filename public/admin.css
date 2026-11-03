@@ -802,3 +802,53 @@ th.d-b2b { color: #6250d6; }
 .u-rolelist div { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
 .u-rolelist .u-role { min-width: 110px; text-align: center; }
 @media (max-width: 640px) { .u-picks { grid-template-columns: 1fr; } .u-cards { grid-template-columns: 1fr 1fr; } }
+
+/* ---------- produk per channel + ringkasan SKU ---------- */
+.ls-tabs { margin-bottom: 14px; }
+.ls-tabs small { font-weight: 700; color: var(--muted); margin-left: 3px; }
+.ls-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.ls-chs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+.ls-ch { display: grid; gap: 4px; padding: 14px 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); border-top: 4px solid var(--c); box-shadow: var(--shadow-sm); font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.ls-ch b { font-size: 14px; color: var(--ink); }
+.ls-ch strong { color: var(--ink); }
+.ls-sm { font-size: clamp(14px, 1.3vw, 18px) !important; }
+.ls-row { cursor: pointer; }
+.ls-row:hover td, .ls-row.on td { background: #eef5ff; }
+.ls-gap { color: var(--warn); }
+td.ls-bad { color: var(--danger); font-weight: 900; }
+.ls-detail > td { background: #f8fafc; padding: 14px 16px !important; }
+.ls-sizes { border-collapse: collapse; font-size: 12px; min-width: 520px; }
+.ls-sizes th, .ls-sizes td { padding: 6px 12px; text-align: right; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.ls-sizes th:first-child, .ls-sizes td:first-child { text-align: left; }
+.ls-sizes thead th { font-size: 11px; font-weight: 900; }
+.ls-sizes tr.sub th { font-size: 10px; color: var(--muted); font-weight: 700; }
+.ls-sizes td.ls-hi { color: #c75d00; font-weight: 800; }
+.ls-sizes td.ls-bad { color: var(--danger); font-weight: 900; }
+.ls-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; align-items: start; }
+.ls-card { border-radius: 18px; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c); box-shadow: var(--shadow-sm); padding: 14px 16px; display: grid; gap: 10px; min-width: 0; transition: box-shadow .2s var(--ease); }
+.ls-card:hover { box-shadow: var(--shadow); }
+.ls-card.open { grid-column: 1 / -1; }
+.ls-top { display: flex; gap: 14px; align-items: flex-start; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: inherit; width: 100%; }
+.ls-name { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.ls-name b { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ls-card.open .ls-name b { -webkit-line-clamp: unset; }
+.ls-name small { font-size: 11px; color: var(--muted); font-weight: 600; }
+.ls-price { text-align: right; display: grid; gap: 2px; flex-shrink: 0; }
+.ls-price b { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.ls-price small { font-size: 11px; color: var(--muted); }
+.ls-price em { font-style: normal; color: var(--danger); font-weight: 800; }
+.ls-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ls-link { font-size: 11px; font-weight: 700; color: var(--good); }
+.ls-link.none { color: var(--muted); }
+.ls-sizes-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.ls-sizes-chips span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 8px; background: #e7f6ee; color: #0b6b3d; }
+.ls-sizes-chips span i { font-style: normal; font-weight: 700; opacity: .7; }
+.ls-sizes-chips span.low { background: #fff4d6; color: #8a5a00; }
+.ls-sizes-chips span.out { background: #fde8e8; color: #b42318; }
+.ls-edit { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 10px; }
+.ls-linkrow { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.ls-linkrow select, td select[data-link] { padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line-2, var(--line)); font-size: 13px; font-weight: 600; max-width: 320px; }
+.ls-in { width: 110px; }
+.ls-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ls-actions .spacer { flex: 1; }
+@media (max-width: 960px) { .ls-chs { grid-template-columns: 1fr; } .ls-grid { grid-template-columns: 1fr; } }
