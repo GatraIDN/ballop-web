@@ -53,6 +53,38 @@ window.MarketImport = (() => {
     return 'pending';
   }
 
+  // ---------- income breakdown ----------
+  // Shopee income columns grouped like the report's own Summary sheet; amounts keep the export's sign (− = deducted)
+  const FEE_GROUPS = [
+    ['Pengembalian dana', ['Jumlah Pengembalian Dana ke Pembeli']],
+    ['Voucher & subsidi', ['Voucher disponsor oleh Penjual', 'Cashback Koin disponsori Penjual', 'Diskon Produk dari Shopee', 'Voucher co-fund disponsor oleh Penjual', 'Cashback Koin Co-fund disponsori Penjual']],
+    ['Biaya pengiriman', ['Ongkir Dibayar Pembeli', 'Ongkos Kirim yang Dibayarkan ke Jasa Kirim', 'Potongan Ongkos Kirim dari Jasa Kirim', 'Gratis Ongkir dari Shopee', 'Ongkos Kirim Pengembalian Barang', 'Return to Seller Fee', 'Pengembalian Biaya Kirim']],
+    ['Biaya platform', ['Biaya Administrasi (termasuk PPN 11%)', 'Biaya Proses Pesanan', 'Biaya Pembayaran']],
+    ['Biaya Gratis Ongkir XTRA', ['Biaya Gratis Ongkir XTRA - Ukuran Biasa (Kategori F)', 'Biaya Gratis Ongkir XTRA - Ukuran Biasa (Kategori H)']],
+    ['Biaya layanan', ['Biaya Transaksi', 'Biaya Layanan Shopee Video XTRA', 'Biaya Layanan Promo XTRA', 'Biaya Layanan Shopee Live XTRA']],
+    ['Biaya promosi', ['Biaya Kampanye', 'Biaya Komisi AMS', 'Biaya Isi Saldo Otomatis (dari Penghasilan)']],
+    ['Biaya lainnya', ['Premi', 'FBS Fee', 'Biaya Program Hemat Biaya Kirim']],
+    ['Pajak', ['PPh 22']],
+  ];
+  const SHOPEE_DETAIL = FEE_GROUPS.flatMap(([, ks]) => ks);
+  const NOT_FEES = ['Pengembalian dana', 'Voucher & subsidi', 'Biaya pengiriman', 'Penyesuaian'];
+  // group of any breakdown line, also for TikTok / Tokopedia column names
+  function feeGroup(k) {
+    const g = FEE_GROUPS.find(([, ks]) => ks.includes(k));
+    if (g) return g[0];
+    if (/^Biaya Gratis Ongkir XTRA/i.test(k)) return 'Biaya Gratis Ongkir XTRA';
+    if (/penyesuaian|kompensasi|setelah dana dilepaskan/i.test(k)) return 'Penyesuaian';
+    if (/pengembalian dana|refund/i.test(k)) return 'Pengembalian dana';
+    if (/voucher|diskon|cashback|subsidi/i.test(k)) return 'Voucher & subsidi';
+    if (/ongkir|ongkos kirim|pengiriman|shipping/i.test(k)) return 'Biaya pengiriman';
+    if (/pajak|pph|ppn|tax/i.test(k)) return 'Pajak';
+    if (/komisi|afiliasi|affiliate|promosi|kampanye|iklan|ams/i.test(k)) return 'Biaya promosi';
+    if (/layanan|service|transaksi/i.test(k)) return 'Biaya layanan';
+    if (/admin|platform|proses|pembayaran|payment/i.test(k)) return 'Biaya platform';
+    return 'Biaya lainnya';
+  }
+  const GROUP_ORDER = ['Pengembalian dana', 'Voucher & subsidi', 'Biaya pengiriman', 'Biaya platform', 'Biaya Gratis Ongkir XTRA', 'Biaya layanan', 'Biaya promosi', 'Biaya lainnya', 'Pajak', 'Penyesuaian'];
+
   // ---------- sheet recognisers ----------
   // each: find(headerRow) -> boolean, rows(objects) -> normalized records
   const KINDS = {
@@ -145,28 +177,54 @@ window.MarketImport = (() => {
       label: 'Income / dana cair Shopee', target: 'settlements',
       match: (h) => h.includes('Lihat berdasarkan') && h.includes('No. Pesanan'),
       map: (r) => {
-        if (text(r['Lihat berdasarkan']).toLowerCase() !== 'order') return null; // per-SKU rows repeat the order totals
+        const by = text(r['Lihat berdasarkan']).toLowerCase();
         const orderId = text(r['No. Pesanan']);
         if (!orderId) return null;
+        // per-SKU rows repeat the order totals; only the product name + its price are kept, attached in finish()
+        if (by === 'sku') return { sku: true, orderId, date: '', name: text(r['Nama Produk']), productId: text(r['ID Produk']), price: toNum(r['Harga Produk']) };
+        if (by !== 'order') return null;
         const n = (k) => toNum(r[k]);
-        const service = ['Biaya Proses Pesanan', 'Biaya Pembayaran', 'Biaya Transaksi', 'Biaya Layanan Shopee Video XTRA', 'Biaya Layanan Promo XTRA',
-          'Biaya Layanan Shopee Live XTRA', 'Biaya Kampanye', 'Premi', 'FBS Fee'].reduce((s, k) => s + n(k), 0);
+        const detail = {};
+        SHOPEE_DETAIL.forEach((k) => { if (n(k)) detail[k] = n(k); });
+        const sumG = (pred) => Object.entries(detail).reduce((t, [k, v]) => (pred(feeGroup(k)) ? t + v : t), 0);
         const admin = n('Biaya Administrasi (termasuk PPN 11%)');
         const aff = n('Biaya Komisi AMS');
+        const fees = sumG((g) => !NOT_FEES.includes(g));
         return {
           key: `shopee:${orderId}:${text(r['No. Pengajuan']).replace(/^-$/, '')}`, channel: 'shopee', orderId, type: text(r['Tipe Pesanan']),
           date: toDate(r['Waktu Pesanan Dibuat']), releaseDate: toDate(r['Tanggal Dana Dilepaskan']), productPrice: n('Harga Produk'),
-          payout: n('Total Penghasilan'), fees: admin + service + aff + n('PPh 22'), adminFee: admin, serviceFee: service, affiliateFee: aff,
-          shipping: n('Ongkir Dibayar Pembeli') + n('Ongkos Kirim yang Dibayarkan ke Jasa Kirim') + n('Gratis Ongkir dari Shopee') + n('Potongan Ongkos Kirim dari Jasa Kirim'),
+          payout: n('Total Penghasilan'), fees, adminFee: admin, serviceFee: fees - admin - aff, affiliateFee: aff, shipping: sumG((g) => g === 'Biaya pengiriman'),
           refund: n('Jumlah Pengembalian Dana ke Pembeli'), sellerDiscount: n('Voucher disponsor oleh Penjual'),
+          detail, items: [], buyerPaid: n('Jumlah Dibayar Pembeli'), courier: text(r['Nama Kurir']), payment: text(r['Metode pembayaran pembeli']),
+        };
+      },
+      finish: (rows) => {
+        const byOrder = new Map(rows.filter((x) => !x.sku).map((x) => [x.orderId, x]));
+        rows.filter((x) => x.sku).forEach((x) => byOrder.get(x.orderId)?.items.push({ name: x.name, productId: x.productId, price: x.price }));
+        return [...byOrder.values()];
+      },
+    },
+    // "Adjustment" sheet of the Shopee income report: refunds after payout, compensations
+    shopeeAdjust: {
+      label: 'Penyesuaian Shopee', target: 'settlements',
+      match: (h) => h.includes('Tanggal Penyesuaian Dibuat') && h.includes('Biaya Penyesuaian'),
+      map: (r) => {
+        const date = toDate(r['Tanggal Penyesuaian Dibuat']);
+        const amount = toNum(r['Biaya Penyesuaian']);
+        if (!date || !amount) return null;
+        const what = text(r['Tipe Penyesuaian | Deskripsi']) || 'Penyesuaian';
+        const orderId = text(r['No. Pesanan Terhubung']);
+        return {
+          key: `shopee:adj:${date}:${orderId}:${amount}`, channel: 'shopee', orderId, type: 'Penyesuaian', date, releaseDate: date,
+          payout: amount, fees: 0, detail: { [what]: amount }, note: text(r['Alasan Penyesuaian']),
         };
       },
     },
   };
 
-  // find the header row (first 6 rows) and the kind it belongs to
+  // find the header row (first 20 rows, Shopee puts notes above it) and the kind it belongs to
   function readSheet(aoa) {
-    for (let i = 0; i < Math.min(6, aoa.length); i++) {
+    for (let i = 0; i < Math.min(20, aoa.length); i++) {
       const head = (aoa[i] || []).map(text);
       const kind = Object.keys(KINDS).find((k) => KINDS[k].match(head));
       if (!kind) continue;
@@ -178,7 +236,7 @@ window.MarketImport = (() => {
         const rec = KINDS[kind].map(obj);
         if (rec && rec.date !== undefined) out.push(rec);
       });
-      return { kind, rows: out };
+      return { kind, rows: KINDS[kind].finish ? KINDS[kind].finish(out) : out };
     }
     return null;
   }
@@ -217,5 +275,5 @@ window.MarketImport = (() => {
     XLSX.writeFile(wb, 'template-penjualan-ballop.xlsx');
   }
 
-  return { readFiles, template, KINDS, toNum, toDate };
+  return { readFiles, template, KINDS, toNum, toDate, feeGroup, GROUP_ORDER, NOT_FEES };
 })();

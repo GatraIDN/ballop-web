@@ -81,7 +81,7 @@
       case 'lastm': return { from: iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)), to: iso(new Date(d.getFullYear(), d.getMonth(), 0)) };
       case 'ytd': return { from: iso(new Date(d.getFullYear(), 0, 1)), to: t };
       case 'all': {
-        const dates = [...data.sales, ...data.orders, ...data.offline, ...data.ads, ...data.expenses].map((r) => r.date).sort();
+        const dates = [...data.sales, ...data.orders, ...data.settlements, ...data.offline, ...data.ads, ...data.expenses].map((r) => r.date).filter(Boolean).sort();
         return { from: dates[0] || addDays(t, -29), to: dates.length && dates[dates.length - 1] > t ? dates[dates.length - 1] : t };
       }
       default: return { from: range.from || addDays(t, -29), to: range.to || t };
@@ -154,6 +154,26 @@
         date: o.date, channel: o.channel, orderKey: ok, pkey: p ? p.id : `n:${o.productName}${o.variation ? ` (${o.variation.replace(/,\s*[^,]*$/, '')})` : ''}`,
         qty: o.qty, gross: o.gross, discount: o.sellerDiscount, net: o.net, fee, shipping: 0,
         cost: p && unitCost(p.id) ? o.qty * unitCost(p.id) : o.net * cogsRate(), estCost: !(p && unitCost(p.id)), state,
+      });
+    });
+    // income exports without a matching order export: the income row is a finished order (1 unit per product line)
+    const ordered = new Set(data.orders.map((o) => `${o.channel}:${o.orderId}`));
+    data.settlements.filter((s) => inR(s) && s.type !== 'Penyesuaian' && s.productPrice > 0 && !ordered.has(`${s.channel}:${s.orderId}`)).forEach((s) => {
+      const ok = `${s.channel}:${s.orderId}`;
+      const items = (s.items || []).filter((x) => x.price > 0);
+      const parts = items.length ? items : [{ name: '(produk tanpa nama)', price: s.productPrice }];
+      const total = parts.reduce((t, x) => t + x.price, 0) || 1;
+      const refund = Math.abs(s.refund || 0);
+      const state = refund >= s.productPrice ? 'returned' : 'completed';
+      parts.forEach((x, i) => {
+        const share = x.price / total;
+        const disc = Math.abs(s.sellerDiscount || 0) * share;
+        const net = x.price - disc - (state === 'completed' ? refund * share : 0);
+        lines.push({
+          date: s.date, channel: s.channel, orderKey: ok, pkey: `n:${x.name.split(/\s+[–|-]\s+/)[0]}`,
+          qty: 1, gross: x.price, discount: disc, net, fee: i ? 0 : Math.abs(s.fees || 0), shipping: i ? 0 : Math.max(0, -(s.shipping || 0)),
+          cost: net * cogsRate(), estCost: true, state,
+        });
       });
     });
     return lines;
@@ -1564,7 +1584,7 @@
 
   // shared with other admin modules
   window.Biz = {
-    data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge,
+    data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge, SALES_CH,
     fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv,
     get loaded() { return loaded; },
     registerView(name, fn) { extraViews[name] = fn; },
