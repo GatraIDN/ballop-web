@@ -89,6 +89,9 @@
       const head = ['Kategori', 'Produk', 'Warna', 'Size KR', 'Size EU', 'Kode SKU', 'Item pickpack', 'Good', 'Damaged', 'Total', 'Status', 'Gudang', 'Update'];
       window.A.download(`ballop-stok-${today()}.csv`, new Blob([`﻿${toCsv([head, ...rows.map((r) => [r.category, r.product, r.color, r.sizeKr, r.size, r.sku, r.note, val(r, 'available'), val(r, 'damaged'), total(r), STATUS[status(val(r, 'available'))], r.warehouse, r.updatedAt || r.date])])}`], { type: 'text/csv' }));
     });
+    // the save bar floats over the page: an ancestor of the view creates a containing block for position:fixed
+    document.querySelectorAll('body > #stSave').forEach((el) => el.remove());
+    document.body.appendChild($('#stSave', v));
     $('#stUndo').addEventListener('click', () => { edits.clear(); render(); });
     $('#stDo').addEventListener('click', saveEdits);
     pendingBar();
@@ -451,4 +454,6 @@
 
   addEventListener('beforeunload', (e) => { if (edits.size || drafts.size) { e.preventDefault(); e.returnValue = ''; } });
   B.registerView('stock3pl', render);
+  // the floating bar lives on <body>; hide it on other pages, show it again (with pending edits) when coming back
+  document.addEventListener('admin:view', (e) => { const bar = document.querySelector('body > #stSave'); if (bar) bar.hidden = e.detail !== 'stock3pl' || !edits.size; });
 })();
