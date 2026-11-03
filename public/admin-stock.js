@@ -16,7 +16,8 @@
   const STATUS = { habis: 'Habis', tipis: 'Tipis', aman: 'Aman' };
   // Korean mm sizes first (numeric), then letter / other sizes
   const sizeKey = (s) => { const n = parseFloat(s); return Number.isFinite(n) ? n : 1e4 + ['XS', 'S', 'M', 'L', 'XL', 'XXL'].indexOf(String(s).toUpperCase()); };
-  const byItem = (a, b) => a.product.localeCompare(b.product) || a.color.localeCompare(b.color) || sizeKey(a.sizeKr || a.size) - sizeKey(b.sizeKr || b.size);
+  // same order as the STOK TERKINI sheet (Padel Pulse first …); new SKUs go after their product
+  const byItem = (a, b) => (a.order || 1e6) - (b.order || 1e6) || a.product.localeCompare(b.product) || a.color.localeCompare(b.color) || sizeKey(a.sizeKr || a.size) - sizeKey(b.sizeKr || b.size);
   const rowsAll = () => B.data.stock3pl.map((r) => ({ ...r, product: r.product || r.name || r.sku, color: r.color || '', category: r.category || 'Lainnya' }));
   const remember = () => { try { localStorage.setItem('ballopStock', JSON.stringify({ tab: st.tab, cat: st.cat, product: st.product, color: st.color, status: st.status })); } catch {} };
 
@@ -27,7 +28,8 @@
       && (!q || `${r.product} ${r.color} ${r.sku} ${r.note} ${r.sizeKr} ${r.size}`.toLowerCase().includes(q))).sort(byItem);
   }
   const opts = (list, cur, all) => `<option value="">${all}</option>${list.map(([v, n]) => `<option value="${esc(v)}"${cur === v ? ' selected' : ''}>${esc(v)} (${num(n)})</option>`).join('')}`;
-  const countBy = (rows, k) => Object.entries(rows.reduce((m, r) => { m[r[k]] = (m[r[k]] || 0) + 1; return m; }, {})).sort((a, b) => a[0].localeCompare(b[0]));
+  // dropdown options in sheet order (rows are sorted with byItem first)
+  const countBy = (rows, k) => Object.entries([...rows].sort(byItem).reduce((m, r) => { m[r[k]] = (m[r[k]] || 0) + 1; return m; }, {}));
   const stepper = (r, k) => `<span class="stepper${edits.get(r.id)?.[k] !== undefined && edits.get(r.id)[k] !== r[k] ? ' changed' : ''}"><button type="button" data-step="-1" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}>−</button><input type="number" inputmode="numeric" min="0" value="${val(r, k)}" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}><button type="button" data-step="1" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}>+</button></span>`;
 
   function render() {
