@@ -757,3 +757,9 @@ th.d-b2b { color: #6250d6; }
 .cs-fs input.wide { width: 220px; }
 .cs-fs input.sm { width: 70px; }
 @media (max-width: 960px) { .cs-chs, .cs-tasks { grid-template-columns: 1fr; } .cs-grid { grid-template-columns: 1fr 1fr; } }
+.dc.quiet { background: #eef2f8; border-color: #d5deeb; }
+.dc-quiet { font-size: 11px; font-weight: 800; color: #4a6283; }
+.dc-legend i.quiet { background: #eef2f8; border: 1px solid #d5deeb; }
+.d-note.quiet { background: #eef2f8; }
+.d-note.quiet b { color: #4a6283; }
+@media (max-width: 640px) { .dc-quiet { display: none; } .dc.quiet::after { content: '–'; color: #4a6283; font-weight: 900; } }

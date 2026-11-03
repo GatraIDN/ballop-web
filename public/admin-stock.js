@@ -194,9 +194,11 @@
   };
   const MONTHS_L = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const longDay = (d) => { const [y, m, n] = d.split('-').map(Number); return `${n} ${MONTHS_L[m - 1]} ${y}`; };
+  // a day marked "no sales / nothing left the warehouse" is one entry without a SKU
+  const NONE = 'NO_MOVEMENT';
   function dayTotals() {
     const days = {};
-    B.data.stockdaily.forEach((e) => { const d = days[e.date] = days[e.date] || { shopee: 0, tiktok: 0, b2b: 0, ret: 0, damaged: 0, skus: 0, by: '', at: '' }; ['shopee', 'tiktok', 'b2b', 'ret', 'damaged'].forEach((k) => { d[k] += e[k]; }); d.skus++; if ((e.updatedAt || '') >= d.at) { d.at = e.updatedAt || ''; d.by = e.updatedBy; } });
+    B.data.stockdaily.forEach((e) => { const d = days[e.date] = days[e.date] || { shopee: 0, tiktok: 0, b2b: 0, ret: 0, damaged: 0, skus: 0, none: false, by: '', at: '' }; if (e.key === NONE) d.none = true; else { ['shopee', 'tiktok', 'b2b', 'ret', 'damaged'].forEach((k) => { d[k] += e[k]; }); d.skus++; } if ((e.updatedAt || '') >= d.at) { d.at = e.updatedAt || ''; d.by = e.updatedBy; } });
     return days;
   }
   const endAfter = (d) => B.data.stock3pl.reduce((s, r) => s + r.available + r.damaged - B.data.stockdaily.reduce((t, e) => (e.ref === r.id && e.date > d ? t + effect(e) + e.damaged : t), 0), 0);
@@ -212,8 +214,9 @@
     for (let n = 1; n <= len; n++) {
       const d = key(n), x = days[d], future = d > t;
       if (x) { filled++; out += x.shopee + x.tiktok + x.b2b; ret += x.ret; }
-      cells.push(`<button type="button" class="dc${x ? ' done' : future ? ' future' : ' todo'}${d === t ? ' today' : ''}" data-cday="${d}" ${future ? 'disabled' : ''}>
-        <span class="dc-n">${n}</span>${x ? `<span class="dc-ok">✓ Sudah input</span><small>Keluar ${num(x.shopee + x.tiktok + x.b2b)}${x.ret ? ` · Retur ${num(x.ret)}` : ''}</small>` : future ? '' : '<span class="dc-no">Belum input</span>'}</button>`);
+      const quiet = x && x.none && !x.skus;
+      cells.push(`<button type="button" class="dc${quiet ? ' quiet' : x ? ' done' : future ? ' future' : ' todo'}${d === t ? ' today' : ''}" data-cday="${d}" ${future ? 'disabled' : ''}>
+        <span class="dc-n">${n}</span>${quiet ? '<span class="dc-quiet">Tidak ada barang keluar</span>' : x ? `<span class="dc-ok">✓ Sudah input</span><small>Keluar ${num(x.shopee + x.tiktok + x.b2b)}${x.ret ? ` · Retur ${num(x.ret)}` : ''}</small>` : future ? '' : '<span class="dc-no">Belum input</span>'}</button>`);
     }
     const past = Math.min(len, t.slice(0, 7) === dst.month ? Number(t.slice(8)) : t > dst.month ? len : 0);
     return `
@@ -223,7 +226,7 @@
           <span class="cal-nav"><button class="btn sm" type="button" data-cmonth="-1" aria-label="Bulan sebelumnya">‹</button><button class="btn sm" type="button" data-cmonth="0">Bulan ini</button><button class="btn sm" type="button" data-cmonth="1" aria-label="Bulan berikutnya">›</button></span></div>
         <div class="dc-grid dc-head">${['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'].map((h) => `<span>${h}</span>`).join('')}</div>
         <div class="dc-grid">${cells.join('')}</div>
-        <div class="dc-legend"><span><i class="done"></i>Sudah input</span><span><i class="todo"></i>Belum input</span><span class="muted">Klik tanggal untuk lihat / input stok hari itu.</span></div>
+        <div class="dc-legend"><span><i class="done"></i>Sudah input</span><span><i class="quiet"></i>Tidak ada penjualan / barang keluar</span><span><i class="todo"></i>Belum input</span><span class="muted">Klik tanggal untuk lihat / input stok hari itu.</span></div>
       </section>`;
   }
   function bindDaily(v) {
@@ -245,7 +248,9 @@
   };
   // step 1: what is on this date, with Edit / Input
   function dayPopup(d) {
-    const x = dayTotals()[d];
+    const x0 = dayTotals()[d];
+    const quiet = x0 && x0.none && !x0.skus;
+    const x = quiet ? null : x0;
     const box = popup('d-day', `
       <header><div><span class="muted small">Stok gudang</span><h2>${longDay(d)}</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
       <div class="raw-body">${x ? `
@@ -254,14 +259,38 @@
           <div><span>SALES SHOPEE</span><b>${num(x.shopee)}</b></div><div><span>SALES TIKTOK</span><b>${num(x.tiktok)}</b></div>
           <div><span>STOCK TAKING</span><b>${num(x.b2b)}</b></div><div><span>TOTAL</span><b>${num(x.shopee + x.tiktok + x.b2b)}</b></div>
           <div><span>RETURN</span><b>${num(x.ret)}</b></div><div class="end"><span>END QTY</span><b>${num(endAfter(d))}</b></div>
-        </div>` : `
+        </div>` : quiet ? `
+        <div class="d-note quiet"><b>Tidak ada penjualan / barang keluar</b><span>Ditandai oleh ${esc(x0.by || '–')}${x0.at ? ` · ${esc(x0.at)}` : ''} · END QTY tetap ${num(endAfter(d))} pcs</span></div>` : `
         <div class="d-note"><b>Belum ada input untuk tanggal ini</b><span>OPENING QTY = END QTY hari sebelumnya: ${num(endAfter(B.addDays(d, -1)))} pcs</span></div>`}
       </div>
-      <footer><span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? `<button class="btn sm primary" type="button" data-open>${x ? '✎ Edit input' : '+ Input data tanggal ini'}</button>` : ''}</footer>`);
+      <footer>${canEdit() && x0 ? '<button class="btn sm danger" type="button" data-del>🗑 Hapus input</button>' : ''}${canEdit() && !x0 ? '<button class="btn sm" type="button" data-none>Tidak ada penjualan / barang keluar</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? `<button class="btn sm primary" type="button" data-open>${x ? '✎ Edit input' : '+ Input data tanggal ini'}</button>` : ''}</footer>`);
     box.addEventListener('click', (e) => {
       if (e.target === box || e.target.closest('[data-close]')) box.remove();
       if (e.target.closest('[data-open]')) { box.remove(); inputPopup(d); }
+      if (e.target.closest('[data-del]') && confirm(`Hapus semua input stok ${longDay(d)}? Stok dikembalikan seperti sebelum input ini.`)) { box.remove(); deleteDay(d); }
+      if (e.target.closest('[data-none]')) { box.remove(); markNone(d); }
     });
+  }
+  async function putDaily(daily, stock, msg) {
+    try {
+      B.data.stockdaily = await api('/api/stockdaily', json('PUT', daily));
+      if (stock) B.data.stock3pl = await api('/api/stock3pl', json('PUT', stock));
+      toast(msg); render();
+    } catch (e) { toast(e.message, true); }
+  }
+  // undo every movement of that day on the current stock, then drop the day (back to "belum input")
+  function deleteDay(d) {
+    const gone = B.data.stockdaily.filter((e) => e.date === d);
+    const at = stamp(), by = who();
+    const stock = B.data.stock3pl.map((r) => {
+      const mine = gone.filter((e) => e.ref === r.id);
+      if (!mine.length) return r;
+      return { ...r, available: r.available - mine.reduce((s, e) => s + effect(e), 0), damaged: r.damaged - mine.reduce((s, e) => s + e.damaged, 0), updatedAt: at, updatedBy: by };
+    });
+    putDaily(B.data.stockdaily.filter((e) => e.date !== d), stock, `Input ${longDay(d)} dihapus`);
+  }
+  function markNone(d) {
+    putDaily([...B.data.stockdaily, { id: '', date: d, ref: '', key: NONE, ...blank, updatedAt: stamp(), updatedBy: who() }], null, `${longDay(d)} ditandai tidak ada barang keluar`);
   }
 
   // step 2: the sheet block for that date, one row per SKU
@@ -342,7 +371,7 @@
     // stock can't go below 0 (the server clamps it), so fix those rows first
     if (neg.length) { toast(`${neg.length} SKU stok GOOD jadi minus (mis. ${neg[0].note}). Cek lagi angkanya.`, true); return false; }
     const at = stamp(), by = who();
-    const daily = B.data.stockdaily.filter((e) => !(e.date === dst.date && drafts.has(e.ref)));
+    const daily = B.data.stockdaily.filter((e) => !(e.date === dst.date && (drafts.has(e.ref) || e.key === NONE)));
     const stock = B.data.stock3pl.map((r) => {
       if (!drafts.has(r.id)) return r;
       const e = drafts.get(r.id), old = { ...blank, ...(entryOf(r.id, dst.date) || {}) };
