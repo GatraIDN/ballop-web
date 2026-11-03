@@ -67,6 +67,10 @@ window.MarketImport = (() => {
     ['Pajak', ['PPh 22']],
   ];
   const SHOPEE_DETAIL = FEE_GROUPS.flatMap(([, ks]) => ks);
+  // TikTok Shop income (English export): the leaf columns of its Reports sheet, placed in the same groups
+  const TIKTOK_GROUPS = {'Biaya platform': ['Platform commission fee', 'Pre-order service fee', 'Mall service fee', 'Payment Fee', 'Credit card installment - Handling fee', 'Order processing fee', 'Platform special service fee', 'PayLater program fee', 'Dilayani Tokopedia fee'], 'Biaya pengiriman': ['Shipping costs passed on to the logistics provider', 'Replacement shipping fee (passed on to the customer)', 'Exchange shipping fee (passed on to the customer)', 'Shipping cost borne by the platform', 'Shipping cost paid by the customer', 'Refunded shipping cost paid by the customer', 'Return shipping costs (passed on to the customer)', 'Shipping cost subsidy', 'Distance shipping fee from Horizon+ Program', 'Logistics service fee', 'Insurance reimbursement', 'Failed delivery shipping fee', 'Buyer-fault return shipping fee', 'Insurance fee'], 'Biaya layanan': ['Shipping Fee Program service fee', 'Growth Xtra Program service fee', 'LIVE Specials service fee', 'Growth Xtra Program Super service fee', 'EAMS Program service fee', 'Brands Crazy Deals/Flash Sale service fee', 'Campaign resource fee', 'Installation service fee', 'Managed service plan (Per order fee)'], 'Biaya promosi': ['Affiliate Commission', 'Affiliate partner commission', 'Affiliate Shop Ads commission', 'Affiliate commission deposit', 'Affiliate commission refund', 'Affiliate Partner shop ads commission', 'Dynamic commission', 'GMV Max ad fee', 'GMV Max coupon'], 'Biaya lainnya': ['Distance item fee from Horizon+ Program'], 'Pajak': ['Article 22 Income Tax withheld', 'GMV Max coupon sales tax', 'Managed service plan (Sales tax)'], 'Pengembalian dana': ['Refund amount after discount']};
+  Object.entries(TIKTOK_GROUPS).forEach(([g, ks]) => FEE_GROUPS.find(([n]) => n === g)[1].push(...ks));
+  const TIKTOK_DETAIL = Object.values(TIKTOK_GROUPS).flat();
   const NOT_FEES = ['Pengembalian dana', 'Voucher & subsidi', 'Biaya pengiriman', 'Penyesuaian'];
   // group of any breakdown line, also for TikTok / Tokopedia column names
   function feeGroup(k) {
@@ -156,20 +160,27 @@ window.MarketImport = (() => {
     },
     tiktokIncome: {
       label: 'Income / dana cair TikTok Shop', target: 'settlements',
-      match: (h) => h.includes('ID Pesanan/Penyesuaian') || h.includes('Order/adjustment ID'),
+      match: (h) => h.includes('ID Pesanan/Penyesuaian') || (h.some((x) => x.toLowerCase() === 'order/adjustment id') && h.includes('Total settlement amount')),
       map: (r) => {
-        const idv = text(r['ID Pesanan/Penyesuaian'] ?? r['Order/adjustment ID']);
-        if (!idv) return null;
-        const type = text(r['Jenis transaksi'] ?? r.Type);
-        const sumOf = (pred) => Object.entries(r).reduce((s, [k, v]) => (pred(k) ? s + toNum(v) : s), 0);
+        const g = (...ks) => { for (const k of ks) if (r[k] !== undefined && r[k] !== '') return r[k]; return ''; };
+        const idv = text(g('Order/Adjustment ID', 'Order/adjustment ID', 'ID Pesanan/Penyesuaian'));
+        if (!/^\d{6,}$/.test(idv)) return null;
+        const type = text(g('Transaction type', 'Type', 'Jenis transaksi'));
+        const payout = toNum(g('Total settlement amount', 'Jumlah penyelesaian pembayaran', 'Total Pendapatan'));
+        const base = { key: `tiktok:${idv}:${type}`, channel: 'tiktok', releaseDate: toDate(g('Order settled time', 'Waktu penyelesaian', 'Waktu pembayaran pesanan')), payout };
+        // ads paid from the balance, marketing packages, reimbursements ...
+        if (!/^(order|pesanan)$/i.test(type)) return { ...base, orderId: text(g('Related order ID', 'ID pesanan terkait')) || idv, type: 'Penyesuaian', date: base.releaseDate, fees: 0, detail: { [type]: payout } };
+        const detail = {};
+        TIKTOK_DETAIL.forEach((k) => { const v = toNum(r[k]); if (v) detail[k] = v; });
+        const sumG = (pred) => Object.entries(detail).reduce((t, [k, v]) => (pred(feeGroup(k)) ? t + v : t), 0);
+        const fees = sumG((x) => !NOT_FEES.includes(x));
+        const admin = toNum(r['Platform commission fee']);
+        const aff = sumG((x) => x === 'Biaya promosi');
         return {
-          key: `tiktok:${idv}:${type}`, channel: 'tiktok', orderId: text(r['ID pesanan terkait']) || idv, type,
-          date: toDate(r['Waktu pemesanan']), releaseDate: toDate(r['Waktu penyelesaian'] ?? r['Waktu pembayaran pesanan']),
-          productPrice: toNum(r['Subtotal setelah diskon penjual']), payout: toNum(r['Jumlah penyelesaian pembayaran'] ?? r['Total Pendapatan']),
-          fees: toNum(r['Total Biaya']), adminFee: toNum(r['Biaya komisi platform']),
-          serviceFee: sumOf((k) => /^Biaya layanan|^Biaya pemrosesan|^Biaya Pembayaran$/i.test(k)),
-          affiliateFee: sumOf((k) => /^Komisi (Afiliasi|mitra afiliasi|Iklan Toko afiliasi|dinamis)/i.test(k)),
-          shipping: toNum(r.Ongkir), refund: toNum(r['Total pengembalian dana setelah diskon']), sellerDiscount: toNum(r['Diskon penjual']),
+          ...base, orderId: idv, type: 'Order', date: toDate(g('Order created time', 'Waktu pemesanan')),
+          productPrice: toNum(g('Subtotal after seller discounts', 'Subtotal setelah diskon penjual')), fees, adminFee: admin, serviceFee: fees - admin - aff, affiliateFee: aff,
+          shipping: sumG((x) => x === 'Biaya pengiriman'), refund: toNum(g('Refund amount after discount', 'Total pengembalian dana setelah diskon')),
+          sellerDiscount: 0, detail, items: [], buyerPaid: toNum(r['Customer payment']),
         };
       },
     },
@@ -269,7 +280,10 @@ window.MarketImport = (() => {
         ? XLSX.read(new TextDecoder('utf-8').decode(buf).replace(/^﻿/, ''), { type: 'string', raw: true })
         : XLSX.read(buf, { type: 'array', cellDates: true });
       wb.SheetNames.forEach((sn) => {
-        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '' });
+        const ws = wb.Sheets[sn];
+        // TikTok exports declare a too-small range (!ref); widen it to every cell that exists
+        if (ws['!ref']) { const r = XLSX.utils.decode_range(ws['!ref']); Object.keys(ws).forEach((k) => { if (k[0] !== '!') { const c = XLSX.utils.decode_cell(k); r.e.r = Math.max(r.e.r, c.r); r.e.c = Math.max(r.e.c, c.c); } }); ws['!ref'] = XLSX.utils.encode_range(r); }
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
         const res = readSheet(aoa);
         if (res) found.push({ file: file.name, sheet: sn, ...res });
         else unknown.push(`${file.name}${wb.SheetNames.length > 1 ? ` › ${sn}` : ''}`);
