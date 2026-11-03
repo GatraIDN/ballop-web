@@ -351,7 +351,7 @@ table.data tfoot td { font-weight: 900; background: var(--panel-2); border-top: 
 .pe-preview li::marker { color: var(--orange); }
 
 .toast {
-  position: fixed; left: 50%; bottom: 24px; z-index: 90; transform: translate(-50%, 20px); opacity: 0;
+  position: fixed; left: 50%; bottom: 24px; z-index: 1000; transform: translate(-50%, 20px); opacity: 0;
   background: rgba(17, 19, 24, .92); color: #fff; font-weight: 700; font-size: 14px; padding: 11px 18px; border-radius: 99px;
   box-shadow: var(--shadow-lg); transition: opacity .3s, transform .4s var(--ease); pointer-events: none;
 }
