@@ -5,7 +5,7 @@
   const B = window.Biz;
   const { esc, num, fmtDate, today, toCsv } = B;
 
-  const st = { tab: 'daily', cat: '', product: '', color: '', status: '', q: '' };
+  const st = { wh: '', tab: 'daily', cat: '', product: '', color: '', status: '', q: '' };
   try { Object.assign(st, JSON.parse(localStorage.getItem('ballopStock') || '{}')); } catch {}
   const edits = new Map(); // id -> { available, damaged }
   const low = () => window.A.settings.lowStock || 5;
@@ -64,7 +64,7 @@
         <label class="grow">Cari<input type="search" data-f="q" placeholder="Nama, kode SKU, size…" value="${esc(st.q)}"></label>
         ${st.cat || st.product || st.color || st.status || st.q ? '<button class="btn sm" type="button" id="stReset">Reset filter</button>' : ''}
       </div>
-      <div class="seg glass st-tabs"><button type="button" data-tab="daily" class="${st.tab === 'daily' ? 'on' : ''}">✎ Input harian</button><button type="button" data-tab="now" class="${st.tab === 'now' ? 'on' : ''}">Stok terkini per SKU</button><button type="button" data-tab="size" class="${st.tab === 'size' ? 'on' : ''}">Stok per size</button></div>
+      <div class="seg glass st-tabs"><button type="button" data-tab="daily" class="${st.tab === 'daily' ? 'on' : ''}">✎ Input harian</button><button type="button" data-tab="now" class="${st.tab === 'now' ? 'on' : ''}">Stock balance</button><button type="button" data-tab="size" class="${st.tab === 'size' ? 'on' : ''}">Stok per size</button></div>
       ${st.tab === 'daily' ? daily(rows) : `<section class="panel solid">${st.tab === 'size' ? matrix(rows) : list(rows)}</section>`}
       <div class="st-save" id="stSave" hidden><span id="stSaveText"></span><button class="btn sm" type="button" id="stUndo">Batal</button><button class="btn sm primary" type="button" id="stDo">Simpan perubahan</button></div>`;
 
@@ -82,6 +82,7 @@
       const input = b.parentElement.querySelector('input');
       setVal(b.dataset.id, b.dataset.k, Math.max(0, val(r, b.dataset.k) + Number(b.dataset.step)), input);
     }));
+    $$('[data-wh]', v).forEach((b) => b.addEventListener('click', () => { st.wh = b.dataset.wh; render(); }));
     $$('[data-grp]', v).forEach((tr) => tr.addEventListener('click', () => { const k = tr.dataset.grp; if (openGroups.has(k)) openGroups.delete(k); else openGroups.add(k); render(); }));
     $$('[data-edit]', v).forEach((b) => b.addEventListener('click', () => openForm(B.data.stock3pl.find((x) => x.id === b.dataset.edit))));
     $('#stAdd')?.addEventListener('click', () => openForm(null));
@@ -100,28 +101,45 @@
 
   // product · colour groups start folded; a search opens them all
   const openGroups = new Set();
+  // stock balance like the 3PL export: one line per item, per warehouse or summed over all of them
+  const BAL = [['opening', 'Opening'], ['stockIn', 'Stock In'], ['otherIn', 'Other In'], ['orderOut', 'Order Out'], ['otherOut', 'Other Out'], ['ending', 'Ending']];
+  const whList = () => [...new Set(B.data.stock3pl.flatMap((r) => (r.whs || []).map((w) => w.wh)))].sort();
+  const balOf = (r) => {
+    const ws = (r.whs || []).filter((w) => !st.wh || w.wh === st.wh);
+    const t = Object.fromEntries(BAL.map(([k]) => [k, ws.reduce((s, w) => s + (w[k] || 0), 0)]));
+    if (!(r.whs || []).length) { t.ending = r.available + r.damaged; t.opening = t.ending; }
+    return { ...t, ws };
+  };
   function list(rows) {
-    if (!rows.length) return '<p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p>';
+    const whs = whList();
+    if (st.wh && !whs.includes(st.wh)) st.wh = '';
+    const shown = st.wh ? rows.filter((r) => (r.whs || []).some((w) => w.wh === st.wh)) : rows;
+    const tot = Object.fromEntries(BAL.map(([k]) => [k, shown.reduce((s, r) => s + balOf(r)[k], 0)]));
+    const whChip = (w) => `<button type="button" class="chip${st.wh === w ? ' on' : ''}" data-wh="${esc(w)}">${w ? esc(w) : 'Semua gudang (akumulasi)'} <i>${num(w ? rows.reduce((s, r) => s + ((r.whs || []).find((x) => x.wh === w)?.ending || 0), 0) : rows.reduce((s, r) => s + balOf({ ...r, whs: r.whs }).ending, 0))}</i></button>`;
     let last = '';
     const sums = {};
-    rows.forEach((r) => { const k = `${r.product}|${r.color}`; const x = sums[k] = sums[k] || { n: 0, good: 0, dmg: 0, habis: 0, tipis: 0 }; x.n++; x.good += val(r, 'available'); x.dmg += val(r, 'damaged'); const s = status(val(r, 'available')); if (s !== 'aman') x[s]++; });
+    shown.forEach((r) => { const k = `${r.product}|${r.color}`; const b = balOf(r); const x = sums[k] = sums[k] || { n: 0, habis: 0, tipis: 0, ...Object.fromEntries(BAL.map(([c]) => [c, 0])) }; x.n++; BAL.forEach(([c]) => { x[c] += b[c]; }); const s = status(val(r, 'available')); if (s !== 'aman') x[s]++; });
     const isOpen = (k) => !!st.q || openGroups.has(k);
-    return `<div class="table-wrap"><table class="data st-table">
-      <thead><tr><th>Produk · warna</th><th>Size KR</th><th>Size EU</th><th>Kode SKU</th><th class="num">Good</th><th class="num">Damaged</th><th class="num">Total</th><th>Status</th><th class="num" title="Keluar bulan ini: Shopee / TikTok / Offline">Keluar bln ini</th><th>Update</th><th></th></tr></thead>
-      <tbody>${rows.map((r) => {
+    const flow = `<div class="bl-flow">${BAL.map(([k, l], i) => `<div class="bl-step${k === 'ending' ? ' end' : /Out/.test(l) ? ' out' : /In/.test(l) ? ' in' : ''}"><span>${l}</span><b>${/Out/.test(l) && tot[k] ? '−' : /In/.test(l) && tot[k] ? '+' : ''}${num(tot[k])}</b></div>${i < BAL.length - 1 ? `<i>${i === BAL.length - 2 ? '=' : /Out/.test(BAL[i + 1][1]) ? '−' : '+'}</i>` : ''}`).join('')}</div>`;
+    return `
+      <div class="st-chips bl-whs">${['', ...whs].map(whChip).join('')}</div>
+      ${flow}
+      ${!shown.length ? '<p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p>' : `<div class="table-wrap"><table class="data st-table bl-table">
+      <thead><tr><th>Item</th><th>UoM</th><th>W/H</th>${BAL.map(([, l]) => `<th class="num">${l}</th>`).join('')}<th>Status</th><th></th></tr></thead>
+      <tbody>${shown.map((r) => {
         const grp = `${r.product}|${r.color}`;
         const x = sums[grp], open = isOpen(grp);
-        const head = grp !== last ? `<tr class="st-group${open ? ' open' : ''}" data-grp="${esc(grp)}"><td colspan="4"><span class="st-caret">▾</span><b>${esc(r.product)}</b>${r.color ? ` · ${esc(r.color)}` : ''}<span class="muted small"> ${esc(r.category)} · ${num(x.n)} size</span></td><td class="num"><b>${num(x.good)}</b></td><td class="num">${num(x.dmg)}</td><td class="num"><b>${num(x.good + x.dmg)}</b></td><td colspan="4">${x.habis ? `<span class="badge bad">${num(x.habis)} habis</span> ` : ''}${x.tipis ? `<span class="badge warn">${num(x.tipis)} tipis</span>` : ''}${!x.habis && !x.tipis ? '<span class="badge live">aman</span>' : ''}</td></tr>` : '';
+        const head = grp !== last ? `<tr class="st-group${open ? ' open' : ''}" data-grp="${esc(grp)}"><td colspan="3"><span class="st-caret">▾</span><b>${esc(r.product)}</b>${r.color ? ` · ${esc(r.color)}` : ''}<span class="muted small"> ${esc(r.category)} · ${num(x.n)} size</span></td>${BAL.map(([c]) => `<td class="num">${c === 'ending' ? `<b>${num(x[c])}</b>` : num(x[c])}</td>`).join('')}<td colspan="2">${x.habis ? `<span class="badge bad">${num(x.habis)} habis</span> ` : ''}${x.tipis ? `<span class="badge warn">${num(x.tipis)} tipis</span>` : ''}${!x.habis && !x.tipis ? '<span class="badge live">aman</span>' : ''}</td></tr>` : '';
         last = grp;
-        const s = status(val(r, 'available'));
-        const out = r.outShopee + r.outTiktok + r.outOffline;
-        return `${head}<tr data-row="${r.id}"${open ? '' : ' hidden'}><td class="muted small" title="${esc(r.note)}">${esc(r.note || r.name)}</td><td><b>${esc(r.sizeKr || '–')}</b></td><td>${esc(r.size || '–')}</td><td class="small">${esc(r.sku || '–')}</td>
-          <td class="num">${stepper(r, 'available')}</td><td class="num">${stepper(r, 'damaged')}</td><td class="num"><b data-total="${r.id}">${num(total(r))}</b></td>
-          <td><span class="badge ${s === 'habis' ? 'bad' : s === 'tipis' ? 'warn' : 'live'}" data-status="${r.id}">${STATUS[s]}</span></td>
-          <td class="num small" title="Shopee ${r.outShopee} · TikTok ${r.outTiktok} · Offline ${r.outOffline}">${out ? num(out) : '–'}</td>
-          <td class="small muted" title="${esc(r.updatedBy || '')}">${r.updatedAt ? fmtDate(r.updatedAt.slice(0, 10)) : '–'}</td>
+        const b = balOf(r), s = status(val(r, 'available'));
+        return `${head}<tr data-row="${r.id}"${open ? '' : ' hidden'}><td title="${esc(r.sku)}"><span class="bl-item">${esc(r.note || r.name)}</span>${r.sku ? `<small class="muted"> ${esc(r.sku)}</small>` : ''}</td><td class="small">${esc(r.uom || 'EA')}</td>
+          <td><div class="bl-wh">${(st.wh ? b.ws : r.whs || []).map((w) => `<span class="${/DAMAGED/i.test(w.wh) ? 'dmg' : ''}" title="${esc(w.wh)}">${esc(w.wh.replace(/ - NORMAL$/, '').replace('GUNUNG SINDUR', 'G. SINDUR'))} <b>${num(w.ending)}</b></span>`).join('') || '<span class="muted small">–</span>'}</div></td>
+          ${BAL.map(([c]) => `<td class="num${c === 'ending' ? ' bl-end' : ''}">${c === 'ending' ? `<b>${num(b[c])}</b>` : b[c] ? num(b[c]) : '<span class="muted">–</span>'}</td>`).join('')}
+          <td><span class="badge ${s === 'habis' ? 'bad' : s === 'tipis' ? 'warn' : 'live'}">${STATUS[s]}</span></td>
           <td>${canEdit() ? `<button class="icon-btn" type="button" data-edit="${r.id}" title="Edit detail">✎</button>` : ''}</td></tr>`;
-      }).join('')}</tbody></table></div>`;
+      }).join('')}</tbody>
+      <tfoot><tr><th colspan="3">TOTAL ${st.wh ? esc(st.wh) : 'SEMUA GUDANG'}</th>${BAL.map(([c]) => `<th class="num">${num(tot[c])}</th>`).join('')}<th colspan="2"></th></tr></tfoot></table></div>`}
+      <p class="muted small">Ending = Opening + Stock In + Other In − Order Out − Other Out, per gudang (dari export stock balance 3PL). "Semua gudang" menjumlahkan BINTARO + GUNUNG SINDUR (+ damaged). Good di kartu atas = gudang normal, Damaged = gudang damaged.</p>`;
   }
 
   // product × colour rows, one column per Korean size; each cell edits the Good qty of that SKU

@@ -904,3 +904,22 @@ td.ls-bad { color: var(--danger); font-weight: 900; }
 .st-table .st-group:hover td { background: #eaf1fb; }
 .st-caret { display: inline-block; width: 18px; color: var(--muted); transition: transform .2s var(--ease); transform: rotate(-90deg); }
 .st-group.open .st-caret { transform: none; color: var(--brand); }
+
+/* ---------- stok gudang: stock balance (kolom export 3PL) ---------- */
+.bl-whs .chip i { font-weight: 800; }
+.bl-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
+.bl-flow i { font-style: normal; font-weight: 900; color: var(--muted); }
+.bl-step { display: grid; gap: 2px; padding: 10px 14px; border-radius: 14px; background: var(--soft, #f4f6f9); min-width: 96px; }
+.bl-step span { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.bl-step b { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.bl-step.in b { color: var(--good); }
+.bl-step.out b { color: var(--danger); }
+.bl-step.end { background: linear-gradient(150deg, #1b2550, #2f6fdb); }
+.bl-step.end span { color: rgba(255, 255, 255, .75); }
+.bl-step.end b { color: #fff; }
+.bl-item { font-size: 12px; font-weight: 600; }
+.bl-wh { display: flex; flex-wrap: wrap; gap: 4px; }
+.bl-wh span { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 7px; background: #eef3fb; color: #2b4a7a; white-space: nowrap; }
+.bl-wh span.dmg { background: #fde8e8; color: #b42318; }
+.bl-table td.bl-end { background: #f5f8fd; }
+.bl-table tfoot th { padding: 10px 12px; border-top: 2px solid var(--line); font-size: 12px; }
