@@ -1381,7 +1381,8 @@
       const x = m.byAd[k];
       return `<div class="sum-card solid"><div class="k-label"><i style="width:8px;height:8px;border-radius:50%;background:${c.color};display:inline-block"></i>${c.label}</div><div class="k-value">${money(x.spend)}</div><div class="k-sub">ROAS ${ratio(x.revenue / x.spend)} · CPC ${x.clicks ? money(x.spend / x.clicks) : '–'}</div></div>`;
     }).join('');
-    renderLedger('ads', '#view-ads', { before: cards ? `<div class="sum-cards">${cards}</div>` : '' });
+    renderLedger('ads', '#view-ads', { before: `${cards ? `<div class="sum-cards">${cards}</div>` : ''}<div id="adCal"></div>` });
+    window.AdsCal?.mount('#adCal');
   }
   function renderSales() {
     const st = lstate.sales = lstate.sales || { range: '30d', channel: '', product: '', status: '', q: '', limit: 100 };
@@ -1695,7 +1696,7 @@
 
   // shared with other admin modules
   window.Biz = {
-    data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge, SALES_CH,
+    data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge, SALES_CH, ADS_CH, ADS_CAMPAIGNS,
     fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv,
     get loaded() { return loaded; },
     registerView(name, fn) { extraViews[name] = fn; },

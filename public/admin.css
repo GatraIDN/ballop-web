@@ -883,3 +883,15 @@ td.ls-bad { color: var(--danger); font-weight: 900; }
 .ll-popbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--soft, #f8f9fb); }
 .ll-popbar label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .ll-skus td { padding-top: 6px; padding-bottom: 6px; }
+
+/* ---------- kalender spending iklan ---------- */
+.ac-cal { margin-bottom: 14px; }
+.ac-spend { font-size: 14px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.ac-dots { display: flex; gap: 3px; margin-top: auto; }
+.ac-dots i { width: 8px; height: 8px; border-radius: 50%; }
+.ac-pop { width: min(1100px, 100%); }
+.ac-table select, .ac-table input { padding: 7px 8px; border-radius: 9px; border: 1px solid var(--line-2, var(--line)); font-size: 13px; font-weight: 600; font-family: inherit; }
+.ac-camp { width: 200px; }
+.ac-num { width: 100px !important; }
+.ac-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+@media (max-width: 640px) { .ac-spend { font-size: 11px; } .dc .ac-dots { display: none; } }
