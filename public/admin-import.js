@@ -211,7 +211,7 @@ window.MarketImport = (() => {
       },
       finish: (rows) => {
         const byOrder = new Map(rows.filter((x) => !x.sku).map((x) => [x.orderId, x]));
-        rows.filter((x) => x.sku).forEach((x) => byOrder.get(x.orderId)?.items.push({ name: x.name, productId: x.productId, price: x.price }));
+        rows.filter((x) => x.sku).forEach((x) => { const o = byOrder.get(x.orderId); if (o) { o.items.push({ name: x.name, productId: x.productId, price: x.price }); o.raw.push(...x.raw); } });
         return [...byOrder.values()];
       },
     },
@@ -262,7 +262,10 @@ window.MarketImport = (() => {
         const obj = {};
         head.forEach((h, j) => { if (h && !(h in obj)) obj[h] = row[j]; });
         const rec = KINDS[kind].map(obj);
-        if (rec && rec.date !== undefined) out.push(rec);
+        if (!rec || rec.date === undefined) return;
+        // the original row, for the detail popup
+        rec.raw = [Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v instanceof Date ? v.toISOString().slice(0, 19).replace('T', ' ') : v]).filter(([, v]) => text(v) !== ''))];
+        out.push(rec);
       });
       return { kind, rows: KINDS[kind].finish ? KINDS[kind].finish(out) : out };
     }

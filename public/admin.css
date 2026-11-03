@@ -565,3 +565,21 @@ body.read-only .nav[data-view="account"] { display: none !important; }
 .sec-body .kpi.hero { background: var(--ink); }
 @media (max-width: 1200px) { .ov-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .ov-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .ov-card { padding: 14px; } .ov-top small { display: none; } }
+
+/* ---------- popup: original export row ---------- */
+.raw-link { font: inherit; color: var(--brand); font-weight: 700; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--brand) 35%, transparent); text-underline-offset: 3px; cursor: pointer; padding: 0; background: none; border: 0; }
+.raw-link:hover { text-decoration-color: var(--brand); }
+.raw-pop { position: fixed; inset: 0; z-index: 200; background: rgba(17, 19, 24, .45); backdrop-filter: blur(6px); display: grid; place-items: center; padding: 24px 16px; animation: rawIn .2s var(--ease); }
+@keyframes rawIn { from { opacity: 0; } }
+.raw-card { width: min(760px, 100%); max-height: calc(100vh - 48px); display: flex; flex-direction: column; background: var(--panel); border-radius: 24px; box-shadow: var(--shadow-lg); overflow: hidden; }
+.raw-card > header { display: flex; align-items: center; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+.raw-card > header > div { flex: 1; min-width: 0; }
+.raw-card h2 { margin: 2px 0 0; font-size: 20px; font-weight: 900; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.raw-card header input { width: 180px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line-2, var(--line)); font-size: 13px; }
+.raw-body { overflow: auto; padding: 8px 20px 20px; }
+.raw-body h3 { font-size: 13px; font-weight: 800; margin: 16px 0 6px; color: var(--ink-2); }
+.raw-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.raw-table th { text-align: left; font-weight: 600; color: var(--muted); padding: 7px 12px 7px 0; width: 45%; vertical-align: top; }
+.raw-table td { padding: 7px 0; font-weight: 600; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.raw-table tr + tr { border-top: 1px solid var(--line); }
+@media (max-width: 640px) { .raw-card header input { width: 110px; } .raw-table th { width: 50%; } }

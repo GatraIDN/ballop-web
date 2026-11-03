@@ -423,6 +423,9 @@
     return `<div class="k-delta ${d === 0 || neutral ? '' : good ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${pct(Math.abs(d))} vs periode lalu</div>`;
   }
 
+  // ad channels whose campaign table is collapsed (remembered in this browser)
+  let campHidden = new Set();
+  try { campHidden = new Set(JSON.parse(localStorage.getItem('ballopCampHidden') || '[]')); } catch {}
   let dashTab = 'order';
   try { dashTab = localStorage.getItem('ballopDashTab') || 'order'; } catch {}
   function renderDashboard() {
@@ -497,8 +500,9 @@
       <h2 class="ads-h"><i style="background:${c.color}"></i>Performa Iklan ${esc(c.label.replace(/ Ads$/, ''))}</h2>
       ${adKpis(m.byAd[k])}
       <section class="panel solid">
-        <div class="panel-head"><h2>Campaign ${esc(c.label)}</h2></div>
-        ${campTable(Object.values(m.byCamp).filter((x) => x.channel === k).sort((a, b) => b.spend - a.spend))}
+        <div class="panel-head"><h2>Campaign ${esc(c.label)}</h2><span class="muted small">${num(Object.values(m.byCamp).filter((x) => x.channel === k).length)} campaign</span>
+          <button class="btn sm" type="button" data-camp="${k}">${campHidden.has(k) ? '▾ Tampilkan' : '▴ Sembunyikan'}</button></div>
+        ${campHidden.has(k) ? '' : campTable(Object.values(m.byCamp).filter((x) => x.channel === k).sort((a, b) => b.spend - a.spend))}
       </section>`).join('')}
       <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di section Order, uang cair di Income. CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
     };
@@ -672,6 +676,12 @@
     if (chartEl('chIncome')) { const inc = computeIncome(from, to); const ser = Object.entries(SALES_CH).map(([key, c]) => ({ key, ...c })).filter((s) => inc.byCh[s.key]);
       stackedBars(chartEl('chIncome'), bks, ser.length ? ser : [{ key: '_', label: 'Dana cair', color: '#0e8a4f' }], (b, key) => inc.rows.reduce((t, x) => (payDay(x) >= b.from && payDay(x) <= b.to && x.channel === key ? t + x.payout : t), 0), money); }
     if (chartEl('chLive')) stackedBars(chartEl('chLive'), bks, [{ key: 'tiktok', label: 'GMV live', color: '#6250d6' }], (b) => (data.live || []).reduce((t, l) => (l.date >= b.from && l.date <= b.to ? t + l.gmv : t), 0), money);
+    $$('[data-camp]', v).forEach((b) => b.addEventListener('click', () => {
+      const k = b.dataset.camp;
+      if (campHidden.has(k)) campHidden.delete(k); else campHidden.add(k);
+      try { localStorage.setItem('ballopCampHidden', JSON.stringify([...campHidden])); } catch {}
+      renderDashboard();
+    }));
     $$('[data-cal]', v).forEach((b) => b.addEventListener('click', () => { calShift += Number(b.dataset.cal); renderDashboard(); }));
     $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { dashTab = b.dataset.tab; try { localStorage.setItem('ballopDashTab', dashTab); } catch {} renderDashboard(); }));
 
@@ -1495,7 +1505,7 @@
         <div class="panel-head"><h2>Daftar pesanan</h2><span class="muted small">${num(rows.length)} baris</span></div>
         <div class="table-wrap"><table class="data">
           <thead><tr><th>Tanggal</th><th>Channel</th><th>No. pesanan</th><th>Produk</th><th>Variasi</th><th class="num">Qty</th><th class="num">Omzet</th><th class="num">Dana cair</th><th>Status</th></tr></thead>
-          <tbody>${rows.slice(0, ost.limit).map((x) => { const pay = payoutBy.get(`${x.channel}:${x.orderId}`); return `<tr><td>${fmtDate(x.date)}</td><td>${chBadge(SALES_CH, x.channel)}</td><td>${esc(x.orderId)}</td><td title="${esc(x.productName)}">${esc(x.productName.length > 42 ? `${x.productName.slice(0, 40)}…` : x.productName)}</td><td>${esc(x.variation)}</td><td class="num">${num(x.qty)}</td><td class="num">${money(x.net)}</td><td class="num">${pay != null ? money(pay) : '<span class="muted">–</span>'}</td><td><span class="badge ${x.state === 'completed' ? 'live' : x.state === 'pending' ? '' : x.state === 'returned' ? 'warn' : 'bad'}" title="${esc(x.status)}">${ORDER_STATE[x.state]}</span></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted" style="text-align:center;padding:30px">Belum ada pesanan di filter ini.</td></tr>'}</tbody>
+          <tbody>${rows.slice(0, ost.limit).map((x) => { const pay = payoutBy.get(`${x.channel}:${x.orderId}`); return `<tr><td>${fmtDate(x.date)}</td><td>${chBadge(SALES_CH, x.channel)}</td><td><button class="raw-link" type="button" data-raw="orders" data-key="${esc(x.key)}">${esc(x.orderId)}</button></td><td title="${esc(x.productName)}">${esc(x.productName.length > 42 ? `${x.productName.slice(0, 40)}…` : x.productName)}</td><td>${esc(x.variation)}</td><td class="num">${num(x.qty)}</td><td class="num">${money(x.net)}</td><td class="num">${pay != null ? money(pay) : '<span class="muted">–</span>'}</td><td><span class="badge ${x.state === 'completed' ? 'live' : x.state === 'pending' ? '' : x.state === 'returned' ? 'warn' : 'bad'}" title="${esc(x.status)}">${ORDER_STATE[x.state]}</span></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted" style="text-align:center;padding:30px">Belum ada pesanan di filter ini.</td></tr>'}</tbody>
         </table></div>
         ${rows.length > ost.limit ? `<p style="text-align:center"><button class="btn sm" type="button" id="ordMore">Tampilkan lebih banyak</button></p>` : ''}
       </section>`;
@@ -1504,6 +1514,7 @@
       ost[el.dataset.o] = el.value; ost.limit = 150;
       if (el.tagName === 'INPUT') { clearTimeout(ost.t); ost.t = setTimeout(renderOnline, 250); } else renderOnline();
     }));
+    window.RawPopup.bind(v);
     $('#ordMore')?.addEventListener('click', () => { ost.limit += 300; renderOnline(); });
     $('#ordExport').addEventListener('click', () => {
       const head = ['date', 'channel', 'orderId', 'status', 'sku', 'productName', 'variation', 'size', 'qty', 'unitPrice', 'sellerDiscount', 'platformDiscount', 'net', 'province', 'city', 'courier'];
@@ -1549,14 +1560,15 @@
     try {
       for (const target of ['orders', 'settlements', 'live']) {
         const rows = pending.found.filter((f) => window.MarketImport.KINDS[f.kind].target === target).flatMap((f) => f.rows);
-        for (let i = 0; i < rows.length; i += 1500) {
+        for (let i = 0; i < rows.length; i += 400) {
           btn.textContent = `Mengimport ${num(i)} / ${num(rows.length)}…`;
-          const res = await api('/api/import', json('POST', { kind: target, rows: rows.slice(i, i + 1500) }));
+          const res = await api('/api/import', json('POST', { kind: target, rows: rows.slice(i, i + 400) }));
           added += res.added; updated += res.updated;
         }
       }
       [data.orders, data.settlements, data.live] = await Promise.all([api('/api/orders'), api('/api/settlements'), api('/api/live')]);
       pending = null;
+      window.RawPopup?.reset();
       toast(`Import selesai: ${num(added)} baru, ${num(updated)} diperbarui`);
       renderOnline();
     } catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Coba lagi'; }
