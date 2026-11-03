@@ -44,7 +44,7 @@ window.MarketImport = (() => {
     return '';
   }
   const text = (v) => String(v ?? '').trim();
-  const sizeOf = (variation) => { const t = text(variation).match(/size\s*[:=]\s*([0-9]{2}(?:[.,]5)?|XS|S|M|L|XL|XXL)/i); if (t) return t[1].toUpperCase(); const m = text(variation).match(/(?:,|\s)\s*([0-9]{2}(?:[.,]5)?|XS|S|M|L|XL|XXL)\s*$/i); return m ? m[1].toUpperCase() : ''; };
+  const sizeOf = (variation) => { const t = text(variation).match(/size\s*[:=]\s*([0-9]{2}(?:[.,]5)?|XS|S|M|L|XL|XXL)/i); if (t) return t[1].toUpperCase(); const m = text(variation).match(/(?:^|,|\s)\s*([0-9]{2}(?:[.,]5)?|XS|S|M|L|XL|XXL)\s*$/i); return m ? m[1].toUpperCase() : ''; };
   function stateOf(status, returnedQty, qty, extra = '') {
     const s = `${status} ${extra}`.toLowerCase();
     if (/batal|cancel/.test(s)) return 'cancelled';
