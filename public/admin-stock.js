@@ -5,7 +5,7 @@
   const B = window.Biz;
   const { esc, num, fmtDate, today, toCsv } = B;
 
-  const st = { tab: 'now', cat: '', product: '', color: '', status: '', q: '' };
+  const st = { tab: 'daily', cat: '', product: '', color: '', status: '', q: '' };
   try { Object.assign(st, JSON.parse(localStorage.getItem('ballopStock') || '{}')); } catch {}
   const edits = new Map(); // id -> { available, damaged }
   const low = () => window.A.settings.lowStock || 5;
@@ -62,8 +62,8 @@
         <label class="grow">Cari<input type="search" data-f="q" placeholder="Nama, kode SKU, size…" value="${esc(st.q)}"></label>
         ${st.cat || st.product || st.color || st.status || st.q ? '<button class="btn sm" type="button" id="stReset">Reset filter</button>' : ''}
       </div>
-      <div class="seg glass st-tabs"><button type="button" data-tab="now" class="${st.tab === 'now' ? 'on' : ''}">Stok terkini per SKU</button><button type="button" data-tab="size" class="${st.tab === 'size' ? 'on' : ''}">Stok per size</button></div>
-      <section class="panel solid">${st.tab === 'size' ? matrix(rows) : list(rows)}</section>
+      <div class="seg glass st-tabs"><button type="button" data-tab="daily" class="${st.tab === 'daily' ? 'on' : ''}">✎ Input harian</button><button type="button" data-tab="now" class="${st.tab === 'now' ? 'on' : ''}">Stok terkini per SKU</button><button type="button" data-tab="size" class="${st.tab === 'size' ? 'on' : ''}">Stok per size</button></div>
+      ${st.tab === 'daily' ? daily(rows) : `<section class="panel solid">${st.tab === 'size' ? matrix(rows) : list(rows)}</section>`}
       <div class="st-save" id="stSave" hidden><span id="stSaveText"></span><button class="btn sm" type="button" id="stUndo">Batal</button><button class="btn sm primary" type="button" id="stDo">Simpan perubahan</button></div>`;
 
     $$('[data-cat]', v).forEach((b) => b.addEventListener('click', () => { st.cat = b.dataset.cat; remember(); render(); }));
@@ -89,6 +89,7 @@
     $('#stUndo').addEventListener('click', () => { edits.clear(); render(); });
     $('#stDo').addEventListener('click', saveEdits);
     pendingBar();
+    if (st.tab === 'daily') bindDaily(v);
   }
 
   function list(rows) {
@@ -173,6 +174,136 @@
     put(B.data.stock3pl.map((r) => (edits.has(r.id) ? { ...r, ...edits.get(r.id), updatedAt: stamp(), updatedBy: who() } : r)), `${num(n)} SKU tersimpan`);
   }
 
+  // ---------- daily input (the STOCK-mm.yy sheet flow) ----------
+  // start of a day = END QTY of the day before; the warehouse types what left per channel and what came back,
+  // end = start − out + return − moved to damaged. stock3pl always holds the END QTY of the latest day.
+  const D_FIELDS = [['shopee', 'Shopee'], ['tiktok', 'TikTok'], ['b2b', 'B2B / sample / KOL'], ['ret', 'Retur'], ['damaged', 'Jadi rusak']];
+  const dst = { date: today(), moving: false, instock: false };
+  const drafts = new Map(); // stock3pl id -> {shopee, tiktok, b2b, ret, damaged}
+  const effect = (e) => -(e.shopee + e.tiktok + e.b2b) + e.ret - e.damaged;
+  const blank = { shopee: 0, tiktok: 0, b2b: 0, ret: 0, damaged: 0 };
+  const entryOf = (id, date) => B.data.stockdaily.find((e) => e.ref === id && e.date === date);
+  const dval = (id) => drafts.get(id) || entryOf(id, dst.date) || blank;
+  // stock at the start of dst.date: undo every saved movement from that day on
+  const startOf = (r) => r.available - B.data.stockdaily.reduce((s, e) => (e.ref === r.id && e.date >= dst.date ? s + effect(e) : s), 0);
+  const endOf = (r) => startOf(r) + effect({ ...blank, ...dval(r.id) });
+  const shiftDay = (d, n) => B.addDays(d, n);
+
+  function daily(rows) {
+    const shown = rows.filter((r) => (!dst.moving || effect({ ...blank, ...dval(r.id) }) !== 0 || Object.values(dval(r.id)).some((x) => typeof x === 'number' && x))
+      && (!dst.instock || startOf(r) > 0));
+    const all = B.data.stock3pl;
+    const tot = { start: 0, end: 0, shopee: 0, tiktok: 0, b2b: 0, ret: 0, damaged: 0 };
+    rows.forEach((r) => { const e = { ...blank, ...dval(r.id) }; tot.start += startOf(r); tot.end += endOf(r); D_FIELDS.forEach(([k]) => { tot[k] += e[k]; }); });
+    const out = tot.shopee + tot.tiktok + tot.b2b;
+    const saved = new Set(B.data.stockdaily.filter((e) => e.date === dst.date).map((e) => e.ref)).size;
+    // per-day totals, newest first (all SKUs, like the sheet's header row)
+    const days = {};
+    B.data.stockdaily.forEach((e) => { const d = days[e.date] = days[e.date] || { shopee: 0, tiktok: 0, b2b: 0, ret: 0, damaged: 0, skus: 0, by: e.updatedBy }; D_FIELDS.forEach(([k]) => { d[k] += e[k]; }); d.skus++; });
+    const dayList = Object.entries(days).sort((a, b) => b[0].localeCompare(a[0]));
+    const endAfter = (d) => all.reduce((s, r) => s + r.available - B.data.stockdaily.reduce((t, e) => (e.ref === r.id && e.date > d ? t + effect(e) : t), 0), 0);
+    const later = B.data.stockdaily.some((e) => e.date > dst.date);
+    return `
+      <div class="d-head solid">
+        <div class="d-date"><button class="btn sm" type="button" data-day="-1" aria-label="Hari sebelumnya">‹</button><input type="date" id="dDate" value="${dst.date}"><button class="btn sm" type="button" data-day="1" aria-label="Hari berikutnya">›</button>
+          ${dst.date !== today() ? '<button class="btn sm" type="button" id="dToday">Hari ini</button>' : ''}</div>
+        <div class="d-state">${saved ? `<span class="badge live">${num(saved)} SKU sudah diinput</span>` : '<span class="badge warn">Belum ada input</span>'}${later ? '<span class="badge">ada input di tanggal sesudahnya</span>' : ''}</div>
+      </div>
+      <div class="d-flow">
+        <div class="d-step"><span>1 · Stok awal</span><b>${num(tot.start)}</b><small>END QTY ${fmtDate(shiftDay(dst.date, -1))}</small></div>
+        <i class="d-arrow">→</i>
+        <div class="d-step out"><span>2 · Keluar</span><b>−${num(out)}</b><small>Shopee ${num(tot.shopee)} · TikTok ${num(tot.tiktok)} · B2B ${num(tot.b2b)}</small></div>
+        <i class="d-arrow">→</i>
+        <div class="d-step in"><span>3 · Retur masuk</span><b>+${num(tot.ret)}</b><small>${tot.damaged ? `${num(tot.damaged)} pindah ke rusak` : 'balik ke stok good'}</small></div>
+        <i class="d-arrow">→</i>
+        <div class="d-step end"><span>4 · Stok akhir</span><b>${num(tot.end)}</b><small>END QTY ${fmtDate(dst.date)}</small></div>
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Input ${fmtDate(dst.date)}</h2><span class="muted small">${num(shown.length)} SKU · isi angka yang keluar / masuk hari ini, stok akhir terhitung otomatis</span>
+          <label class="d-toggle"><input type="checkbox" id="dMoving"${dst.moving ? ' checked' : ''}> Hanya yang ada gerakan</label>
+          <label class="d-toggle"><input type="checkbox" id="dInstock"${dst.instock ? ' checked' : ''}> Hanya yang ada stok</label></div>
+        ${shown.length ? `<div class="table-wrap d-wrap"><table class="data d-table">
+          <thead><tr><th>Produk · warna · size</th><th class="num">Stok awal</th>${D_FIELDS.map(([k, l]) => `<th class="num d-${k}">${l}</th>`).join('')}<th class="num">Stok akhir</th></tr></thead>
+          <tbody>${shown.map((r) => { const e = { ...blank, ...dval(r.id) }; const end = endOf(r); return `<tr data-drow="${r.id}" class="${drafts.has(r.id) ? 'changed' : ''}">
+            <td><b>${esc(r.product)}</b> <span class="muted">${esc(r.color)}</span> <span class="d-size">${esc(r.sizeKr || '–')}${r.size && r.size !== '-' ? ` · EU ${esc(r.size)}` : ''}</span></td>
+            <td class="num">${num(startOf(r))}</td>
+            ${D_FIELDS.map(([k]) => `<td class="num d-${k}"><input class="d-in" type="number" inputmode="numeric" min="0" value="${e[k] || ''}" placeholder="0" data-did="${r.id}" data-dk="${k}" ${canEdit() ? '' : 'disabled'}></td>`).join('')}
+            <td class="num"><b class="d-end${end < 0 ? ' neg' : ''}" data-dend="${r.id}">${num(end)}</b></td></tr>`; }).join('')}</tbody>
+        </table></div>` : '<p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p>'}
+      </section>
+      <section class="panel solid" style="margin-top:14px">
+        <div class="panel-head"><h2>Riwayat harian</h2><span class="muted small">semua SKU · klik tanggal untuk buka / edit</span></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Tanggal</th><th class="num">Shopee</th><th class="num">TikTok</th><th class="num">B2B / sample</th><th class="num">Total keluar</th><th class="num">Retur</th><th class="num">Jadi rusak</th><th class="num">END QTY good</th><th>Input oleh</th></tr></thead>
+          <tbody>${dayList.slice(0, 60).map(([d, x]) => `<tr class="d-hist${d === dst.date ? ' on' : ''}" data-goday="${d}"><td><b>${fmtDate(d)}</b> <span class="muted small">${num(x.skus)} SKU</span></td><td class="num">${num(x.shopee)}</td><td class="num">${num(x.tiktok)}</td><td class="num">${num(x.b2b)}</td><td class="num"><b>${num(x.shopee + x.tiktok + x.b2b)}</b></td><td class="num">${num(x.ret)}</td><td class="num">${num(x.damaged)}</td><td class="num">${num(endAfter(d))}</td><td class="small muted">${esc(x.by || '')}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">Belum ada riwayat.</td></tr>'}</tbody>
+        </table></div>
+      </section>
+      <div class="st-save" id="dSave" hidden><span id="dSaveText"></span><button class="btn sm" type="button" id="dUndo">Batal</button><button class="btn sm primary" type="button" id="dDo">Simpan input ${fmtDate(dst.date)}</button></div>`;
+  }
+
+  function bindDaily(v) {
+    const go = (d) => { if (!d || d === dst.date) return; if (drafts.size && !confirm('Input belum disimpan. Pindah tanggal dan buang perubahan?')) { render(); return; } drafts.clear(); dst.date = d; render(); };
+    $('#dDate', v).addEventListener('change', (e) => go(e.target.value));
+    $$('[data-day]', v).forEach((b) => b.addEventListener('click', () => go(shiftDay(dst.date, Number(b.dataset.day)))));
+    $('#dToday', v)?.addEventListener('click', () => go(today()));
+    $$('[data-goday]', v).forEach((tr) => tr.addEventListener('click', () => go(tr.dataset.goday)));
+    $('#dMoving', v).addEventListener('change', (e) => { dst.moving = e.target.checked; render(); });
+    $('#dInstock', v).addEventListener('change', (e) => { dst.instock = e.target.checked; render(); });
+    $$('.d-in', v).forEach((el) => {
+      el.addEventListener('focus', () => el.select());
+      el.addEventListener('input', () => {
+        const id = el.dataset.did, r = B.data.stock3pl.find((x) => x.id === id);
+        const e = { ...blank, ...dval(id), [el.dataset.dk]: Math.max(0, Math.round(Number(el.value) || 0)) };
+        const old = entryOf(id, dst.date) || blank;
+        if (D_FIELDS.every(([k]) => e[k] === (old[k] || 0))) drafts.delete(id); else drafts.set(id, e);
+        el.closest('tr').classList.toggle('changed', drafts.has(id));
+        const end = endOf(r), b = v.querySelector(`[data-dend="${id}"]`);
+        b.textContent = num(end); b.classList.toggle('neg', end < 0);
+        dailyBar();
+      });
+      // Enter = same column, next row (like the spreadsheet)
+      el.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+        ev.preventDefault();
+        const col = $$(`.d-in[data-dk="${el.dataset.dk}"]`, v);
+        col[col.indexOf(el) + (ev.key === 'ArrowUp' ? -1 : 1)]?.focus();
+      });
+    });
+    $('#dUndo', v).addEventListener('click', () => { drafts.clear(); render(); });
+    $('#dDo', v).addEventListener('click', saveDaily);
+    dailyBar();
+  }
+  function dailyBar() {
+    const bar = $('#dSave');
+    if (!bar) return;
+    bar.hidden = !drafts.size;
+    let out = 0, ret = 0;
+    drafts.forEach((e) => { out += e.shopee + e.tiktok + e.b2b; ret += e.ret; });
+    $('#dSaveText').innerHTML = `<b>${num(drafts.size)} SKU</b> · keluar ${num(out)} · retur ${num(ret)}`;
+  }
+  async function saveDaily() {
+    const neg = [...drafts.keys()].map((id) => B.data.stock3pl.find((x) => x.id === id)).filter((r) => endOf(r) < 0);
+    // stock can't go below 0 (the server clamps it), so fix those rows first
+    if (neg.length) { toast(`${neg.length} SKU stok akhirnya minus (mis. ${neg[0].note}). Cek lagi angkanya.`, true); return; }
+    const at = stamp(), by = who();
+    const daily = B.data.stockdaily.filter((e) => !(e.date === dst.date && drafts.has(e.ref)));
+    const stock = B.data.stock3pl.map((r) => {
+      if (!drafts.has(r.id)) return r;
+      const e = drafts.get(r.id), old = entryOf(r.id, dst.date) || blank;
+      if (D_FIELDS.some(([k]) => e[k])) daily.push({ id: '', date: dst.date, ref: r.id, key: r.note, ...e, updatedAt: at, updatedBy: by });
+      // only the change against what was saved before for this day moves the current stock
+      return { ...r, available: r.available + effect(e) - effect({ ...blank, ...old }), damaged: r.damaged + e.damaged - (old.damaged || 0), updatedAt: at, updatedBy: by };
+    });
+    try {
+      B.data.stockdaily = await api('/api/stockdaily', json('PUT', daily));
+      B.data.stock3pl = await api('/api/stock3pl', json('PUT', stock));
+      const n = drafts.size;
+      drafts.clear();
+      toast(`Input ${fmtDate(dst.date)} tersimpan (${num(n)} SKU)`);
+      render();
+    } catch (e) { toast(e.message, true); }
+  }
+
   // add / edit one SKU in a popup (reuses the raw popup look)
   function openForm(r) {
     const all = rowsAll();
@@ -217,6 +348,6 @@
     });
   }
 
-  addEventListener('beforeunload', (e) => { if (edits.size) { e.preventDefault(); e.returnValue = ''; } });
+  addEventListener('beforeunload', (e) => { if (edits.size || drafts.size) { e.preventDefault(); e.returnValue = ''; } });
   B.registerView('stock3pl', render);
 })();

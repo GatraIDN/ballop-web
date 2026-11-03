@@ -49,7 +49,7 @@
   const CONTENT = { menunggu: 'Menunggu', brief: 'Brief dikirim', draft: 'Draft', revisi: 'Revisi', posted: 'Sudah posting', tidak: 'Tidak posting' };
   const CASH_CATS = ['Penjualan offline', 'Pencairan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
 
-  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'live', 'offline', 'stock3pl', 'kol', 'cashflow', 'contents', 'contentplans'];
+  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'live', 'stockdaily', 'offline', 'stock3pl', 'kol', 'cashflow', 'contents', 'contentplans'];
   const extraViews = {}; // views added by other admin modules (admin-konten.js)
   const data = Object.fromEntries(COLLS.map((c) => [c, []]));
   let loaded = false;
