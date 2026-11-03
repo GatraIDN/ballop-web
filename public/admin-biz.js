@@ -1152,7 +1152,7 @@
   }
 
   function rerender(name) {
-    const views = { stock: renderStock, stock3pl: renderStock3pl, offline: renderOffline, kol: renderKol, cashflow: renderFinance, sales: renderSales, ads: renderAds };
+    const views = { stock: renderStock, stock3pl: () => extraViews.stock3pl?.(), offline: renderOffline, kol: renderKol, cashflow: renderFinance, sales: renderSales, ads: renderAds };
     if (views[name]) views[name]();
     else if (LEDGERS[name]?.ownView) refresh();
     else renderLedger(name, `#view-${name}`);
@@ -1672,7 +1672,7 @@
   function refresh() {
     const views = {
       dashboard: renderDashboard, sales: renderSales, ads: renderAds, stock: renderStock, online: renderOnline,
-      offline: renderOffline, stock3pl: renderStock3pl, kol: renderKol, finance: renderFinance,
+      offline: renderOffline, kol: renderKol, finance: renderFinance,
       expenses: () => renderLedger('expenses', '#view-expenses'),
     };
     const fn = views[current] || extraViews[current];
