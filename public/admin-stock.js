@@ -115,9 +115,15 @@
   // product × colour rows, one column per Korean size; each cell edits the Good qty of that SKU
   function matrix(rows) {
     if (!rows.length) return '<p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p>';
-    const sizes = [...new Set(rows.map((r) => r.sizeKr || r.size || '-'))].sort((a, b) => sizeKey(a) - sizeKey(b));
+    // columns are EU sizes; a model with two Korean sizes on the same EU size keeps both ("40 · 255")
     const groups = new Map();
-    rows.forEach((r) => { const k = `${r.product}|${r.color}`; if (!groups.has(k)) groups.set(k, { product: r.product, color: r.color, cells: {} }); groups.get(k).cells[r.sizeKr || r.size || '-'] = r; });
+    rows.forEach((r) => {
+      const k = `${r.product}|${r.color}`;
+      if (!groups.has(k)) groups.set(k, { product: r.product, color: r.color, cells: {} });
+      const cells = groups.get(k).cells, eu = (r.size && r.size !== '-' ? r.size : r.sizeKr || '-').replace(/^[A-Z]+\s+(?=\d)/i, '');
+      cells[cells[eu] ? `${eu} · ${r.sizeKr}` : eu] = r;
+    });
+    const sizes = [...new Set([...groups.values()].flatMap((g) => Object.keys(g.cells)))].sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b));
     const colTot = Object.fromEntries(sizes.map((s) => [s, 0]));
     const body = [...groups.values()].map((g) => {
       let t = 0;
@@ -125,11 +131,11 @@
         const r = g.cells[s];
         if (!r) return '<td class="mx-none"></td>';
         const n = val(r, 'available'); t += n; colTot[s] += n;
-        return `<td class="mx ${status(n)}" title="${esc(r.note)} · EU ${esc(r.size)}${r.damaged ? ` · damaged ${val(r, 'damaged')}` : ''}"><input type="number" inputmode="numeric" min="0" value="${n}" data-id="${r.id}" data-k="available" ${canEdit() ? '' : 'disabled'}><small>EU ${esc(r.size || '–')}</small></td>`;
+        return `<td class="mx ${status(n)}" title="${esc(r.note)} · KR ${esc(r.sizeKr)}${r.damaged ? ` · damaged ${val(r, 'damaged')}` : ''}"><input type="number" inputmode="numeric" min="0" value="${n}" data-id="${r.id}" data-k="available" ${canEdit() ? '' : 'disabled'}><small>KR ${esc(r.sizeKr || '–')}</small></td>`;
       }).join('');
       return `<tr><th class="mx-name"><b>${esc(g.product)}</b><span>${esc(g.color || '–')}</span></th>${cells}<td class="num"><b>${num(t)}</b></td></tr>`;
     }).join('');
-    return `<div class="mx-legend"><span><i class="habis"></i>Habis (0)</span><span><i class="tipis"></i>Tipis (≤ ${low()})</span><span><i class="aman"></i>Aman</span><span class="muted">Angka = stok good. Kosong = size tidak ada untuk model ini.</span></div>
+    return `<div class="mx-legend"><span><i class="habis"></i>Habis (0)</span><span><i class="tipis"></i>Tipis (≤ ${low()})</span><span><i class="aman"></i>Aman</span><span class="muted">Kolom = size EU, angka = stok good, kecil = size KR. Kosong = size tidak ada untuk model ini.</span></div>
       <div class="table-wrap mx-wrap"><table class="mx-table"><thead><tr><th class="mx-name">Produk · warna</th>${sizes.map((s) => `<th>${esc(s)}</th>`).join('')}<th class="num">Total</th></tr></thead>
       <tbody>${body}</tbody><tfoot><tr><th class="mx-name">Total</th>${sizes.map((s) => `<td><b>${num(colTot[s])}</b></td>`).join('')}<td class="num"><b>${num(Object.values(colTot).reduce((a, b) => a + b, 0))}</b></td></tr></tfoot></table></div>`;
   }
