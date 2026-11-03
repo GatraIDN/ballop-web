@@ -84,7 +84,12 @@ code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; font-si
 .side-logo { width: 104px; }
 .side-close { display: none; }
 .side-nav { display: grid; gap: 2px; }
-.nav-group { font-size: 10px; font-weight: 900; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin: 14px 12px 4px; }
+.nav-group { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--ink); margin: 16px 4px 4px; padding: 7px 8px; border-radius: 10px; cursor: pointer; user-select: none; transition: background .15s; }
+.nav-group::after { content: '▾'; font-size: 12px; color: var(--muted); transition: transform .2s var(--ease); }
+.nav-group:hover { background: rgba(17, 19, 24, .05); }
+.nav-group.shut { color: var(--muted); }
+.nav-group.shut::after { transform: rotate(-90deg); }
+.nav.folded { display: none !important; }
 .nav {
   display: flex; align-items: center; gap: 10px; text-align: left; padding: 9px 12px; border-radius: 12px; color: var(--ink-2);
   font-weight: 700; font-size: 14px; text-decoration: none; transition: background .2s, color .2s;

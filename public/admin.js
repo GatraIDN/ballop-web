@@ -77,6 +77,30 @@
   const canUse = (mod) => !mod || (me && me.modules.includes(mod));
   const viewAllowed = (name) => { const b = $(`.nav[data-view="${name}"]`); return !!b && canUse(b.dataset.mod); };
 
+  // division headers fold their menu items (remembered in this browser); the open menu stays visible
+  let folded = [];
+  try { folded = JSON.parse(localStorage.getItem('ballopNavFold') || '[]'); } catch {}
+  function foldGroups() {
+    $$('#sideNav .nav-group').forEach((g) => {
+      const key = g.textContent.trim();
+      const shut = folded.includes(key);
+      g.classList.toggle('shut', shut);
+      for (let n = g.nextElementSibling; n && !n.classList.contains('nav-group'); n = n.nextElementSibling) n.classList.toggle('folded', shut && !n.classList.contains('on'));
+    });
+  }
+  $$('#sideNav .nav-group').forEach((g) => {
+    g.setAttribute('role', 'button');
+    g.tabIndex = 0;
+    const flip = () => {
+      const key = g.textContent.trim();
+      folded = folded.includes(key) ? folded.filter((k) => k !== key) : [...folded, key];
+      try { localStorage.setItem('ballopNavFold', JSON.stringify(folded)); } catch {}
+      foldGroups();
+    };
+    g.addEventListener('click', flip);
+    g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+  });
+
   // show only the menu items this user's roles allow; drop division headers left empty
   function applyAccess() {
     $$('.nav[data-view]').forEach((b) => { b.hidden = !canUse(b.dataset.mod); });
@@ -85,6 +109,7 @@
       while (n && !n.classList.contains('nav-group')) { if (n.matches('.nav[data-view]') && !n.hidden) any = true; n = n.nextElementSibling; }
       g.hidden = !any;
     });
+    foldGroups();
     document.body.classList.toggle('read-only', !!me.readOnly);
     const u = me.user;
     $('#meBox').innerHTML = `<b></b><span>${u.roles.join(' · ')}</span>`;
@@ -115,6 +140,7 @@
   function showView(name) {
     if (!$(`#view-${name}`) || !viewAllowed(name)) name = $$('.nav[data-view]').find((b) => !b.hidden)?.dataset.view || 'account';
     $$('.nav[data-view]').forEach((x) => x.classList.toggle('on', x.dataset.view === name));
+    foldGroups();
     $$('.view').forEach((v) => { v.hidden = v.id !== `view-${name}`; });
     const btn = $(`.nav[data-view="${name}"]`);
     $('#mobileTitle').textContent = btn ? btn.lastChild.textContent.trim() : '';
