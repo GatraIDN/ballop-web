@@ -900,3 +900,7 @@ td.ls-bad { color: var(--danger); font-weight: 900; }
 .ac-num { width: 100px !important; }
 .ac-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 @media (max-width: 640px) { .ac-spend { font-size: 11px; } .dc .ac-dots { display: none; } }
+.st-table .st-group { cursor: pointer; }
+.st-table .st-group:hover td { background: #eaf1fb; }
+.st-caret { display: inline-block; width: 18px; color: var(--muted); transition: transform .2s var(--ease); transform: rotate(-90deg); }
+.st-group.open .st-caret { transform: none; color: var(--brand); }

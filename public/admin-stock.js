@@ -82,6 +82,7 @@
       const input = b.parentElement.querySelector('input');
       setVal(b.dataset.id, b.dataset.k, Math.max(0, val(r, b.dataset.k) + Number(b.dataset.step)), input);
     }));
+    $$('[data-grp]', v).forEach((tr) => tr.addEventListener('click', () => { const k = tr.dataset.grp; if (openGroups.has(k)) openGroups.delete(k); else openGroups.add(k); render(); }));
     $$('[data-edit]', v).forEach((b) => b.addEventListener('click', () => openForm(B.data.stock3pl.find((x) => x.id === b.dataset.edit))));
     $('#stAdd')?.addEventListener('click', () => openForm(null));
     $('#stExport').addEventListener('click', () => {
@@ -94,18 +95,24 @@
     if (st.tab === 'daily') bindDaily(v);
   }
 
+  // product · colour groups start folded; a search opens them all
+  const openGroups = new Set();
   function list(rows) {
     if (!rows.length) return '<p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p>';
     let last = '';
+    const sums = {};
+    rows.forEach((r) => { const k = `${r.product}|${r.color}`; const x = sums[k] = sums[k] || { n: 0, good: 0, dmg: 0, habis: 0, tipis: 0 }; x.n++; x.good += val(r, 'available'); x.dmg += val(r, 'damaged'); const s = status(val(r, 'available')); if (s !== 'aman') x[s]++; });
+    const isOpen = (k) => !!st.q || openGroups.has(k);
     return `<div class="table-wrap"><table class="data st-table">
       <thead><tr><th>Produk · warna</th><th>Size KR</th><th>Size EU</th><th>Kode SKU</th><th class="num">Good</th><th class="num">Damaged</th><th class="num">Total</th><th>Status</th><th class="num" title="Keluar bulan ini: Shopee / TikTok / Offline">Keluar bln ini</th><th>Update</th><th></th></tr></thead>
       <tbody>${rows.map((r) => {
         const grp = `${r.product}|${r.color}`;
-        const head = grp !== last ? `<tr class="st-group"><td colspan="11"><b>${esc(r.product)}</b>${r.color ? ` · ${esc(r.color)}` : ''}<span class="muted small"> ${esc(r.category)}</span></td></tr>` : '';
+        const x = sums[grp], open = isOpen(grp);
+        const head = grp !== last ? `<tr class="st-group${open ? ' open' : ''}" data-grp="${esc(grp)}"><td colspan="4"><span class="st-caret">▾</span><b>${esc(r.product)}</b>${r.color ? ` · ${esc(r.color)}` : ''}<span class="muted small"> ${esc(r.category)} · ${num(x.n)} size</span></td><td class="num"><b>${num(x.good)}</b></td><td class="num">${num(x.dmg)}</td><td class="num"><b>${num(x.good + x.dmg)}</b></td><td colspan="4">${x.habis ? `<span class="badge bad">${num(x.habis)} habis</span> ` : ''}${x.tipis ? `<span class="badge warn">${num(x.tipis)} tipis</span>` : ''}${!x.habis && !x.tipis ? '<span class="badge live">aman</span>' : ''}</td></tr>` : '';
         last = grp;
         const s = status(val(r, 'available'));
         const out = r.outShopee + r.outTiktok + r.outOffline;
-        return `${head}<tr data-row="${r.id}"><td class="muted small" title="${esc(r.note)}">${esc(r.note || r.name)}</td><td><b>${esc(r.sizeKr || '–')}</b></td><td>${esc(r.size || '–')}</td><td class="small">${esc(r.sku || '–')}</td>
+        return `${head}<tr data-row="${r.id}"${open ? '' : ' hidden'}><td class="muted small" title="${esc(r.note)}">${esc(r.note || r.name)}</td><td><b>${esc(r.sizeKr || '–')}</b></td><td>${esc(r.size || '–')}</td><td class="small">${esc(r.sku || '–')}</td>
           <td class="num">${stepper(r, 'available')}</td><td class="num">${stepper(r, 'damaged')}</td><td class="num"><b data-total="${r.id}">${num(total(r))}</b></td>
           <td><span class="badge ${s === 'habis' ? 'bad' : s === 'tipis' ? 'warn' : 'live'}" data-status="${r.id}">${STATUS[s]}</span></td>
           <td class="num small" title="Shopee ${r.outShopee} · TikTok ${r.outTiktok} · Offline ${r.outOffline}">${out ? num(out) : '–'}</td>
