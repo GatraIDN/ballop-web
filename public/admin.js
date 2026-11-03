@@ -723,6 +723,27 @@
   }
 
   // shared helpers for admin-biz.js / admin-content.js
+  // pasting "797,863", "Rp 1.268.559" or "4,5" into any number field: drop currency and thousand separators
+  // (a number input would otherwise reject the text and end up empty)
+  const cleanNumber = (raw) => {
+    let s = String(raw).replace(/[^\d.,-]/g, '');
+    if (/^-?\d{1,3}([.,]\d{3})+$/.test(s)) return s.replace(/[.,]/g, '');
+    if (/^-?\d{1,3}(\.\d{3})+,\d+$/.test(s)) return s.replace(/\./g, '').replace(',', '.');
+    if (/^-?\d{1,3}(,\d{3})+\.\d+$/.test(s)) return s.replace(/,/g, '');
+    return s.replace(',', '.');
+  };
+  document.addEventListener('paste', (e) => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || el.type !== 'number') return;
+    const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+    const n = cleanNumber(text);
+    if (!n || n === text.trim()) return;
+    e.preventDefault();
+    el.value = n;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, true);
+
   window.A = {
     $, $$, api, json, toast, money, slug, uploadFiles, dropZone, wireDrag, download, showView, hueCss,
     get products() { return products; },
