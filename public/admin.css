@@ -679,3 +679,51 @@ th.d-shopee { color: #eb6834; } th.d-tiktok { color: #2a78d6; } th.d-ret { color
 .d-hist { cursor: pointer; }
 .d-hist:hover td, .d-hist.on td { background: #eef5ff; }
 @media (max-width: 960px) { .d-flow { grid-template-columns: 1fr 1fr; } .d-arrow { display: none; } }
+
+/* ---------- stok gudang: kalender input harian + popup ---------- */
+.dc-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.dc-head span { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); padding: 4px 0; }
+.dc { min-height: 92px; border-radius: 14px; padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; transition: transform .2s var(--ease), box-shadow .2s var(--ease); font: inherit; }
+.dc:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--shadow); }
+.dc.empty { border: 0; background: none; cursor: default; }
+.dc-n { font-size: 15px; font-weight: 900; }
+.dc.done { background: #e7f6ee; border-color: #bfe6cf; }
+.dc.todo { background: #fff8e6; border-color: #f3e0ad; }
+.dc.future { opacity: .45; cursor: default; }
+.dc.today { box-shadow: 0 0 0 2px var(--brand); }
+.dc-ok { font-size: 11px; font-weight: 800; color: var(--good); }
+.dc-no { font-size: 11px; font-weight: 800; color: var(--warn); }
+.dc small { font-size: 11px; color: var(--ink-2); font-weight: 600; }
+.dc-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; font-size: 12px; font-weight: 600; }
+.dc-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
+.dc-legend i.done { background: #e7f6ee; border: 1px solid #bfe6cf; }
+.dc-legend i.todo { background: #fff8e6; border: 1px solid #f3e0ad; }
+.raw-card footer { display: flex; gap: 8px; align-items: center; padding: 14px 20px; border-top: 1px solid var(--line); }
+.raw-card footer .spacer { flex: 1; }
+.d-day { width: min(520px, 100%); }
+.d-note { display: grid; gap: 4px; padding: 14px 16px; border-radius: 14px; background: #fff8e6; margin-top: 12px; }
+.d-note b { color: var(--warn); }
+.d-note.ok { background: #e7f6ee; }
+.d-note.ok b { color: var(--good); }
+.d-note span { font-size: 12px; color: var(--ink-2); }
+.d-sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.d-sum div { padding: 12px; border-radius: 12px; border: 1px solid var(--line); display: grid; gap: 2px; }
+.d-sum span { font-size: 10px; font-weight: 800; color: var(--muted); letter-spacing: .02em; }
+.d-sum b { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.d-sum .end { background: linear-gradient(150deg, #1b2550, #2f6fdb); color: #fff; border-color: transparent; }
+.d-sum .end span { color: rgba(255, 255, 255, .75); }
+.d-input { width: min(1280px, 100%); height: calc(100vh - 48px); }
+.d-input > header { flex-wrap: wrap; }
+.d-flowmini { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: var(--muted); }
+.d-flowmini span { padding: 6px 10px; border-radius: 10px; background: var(--soft, #f2f4f7); }
+.d-flowmini b { font-size: 14px; color: var(--ink); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.d-flowmini .out b { color: var(--danger); } .d-flowmini .in b { color: var(--good); }
+.d-flowmini .end { background: var(--ink); color: rgba(255, 255, 255, .75); } .d-flowmini .end b { color: #fff; }
+.d-flowmini i { font-style: normal; }
+.d-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.d-tools select, .d-tools input[type=search] { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line-2, var(--line)); font-size: 13px; font-weight: 600; }
+.d-tools input[type=search] { flex: 1; min-width: 180px; }
+.d-body { flex: 1; padding-top: 0; }
+.d-body .d-table thead th { top: 0; font-size: 10px; letter-spacing: .03em; white-space: nowrap; }
+th.d-b2b { color: #6250d6; }
+@media (max-width: 640px) { .dc { min-height: 64px; padding: 6px; } .dc small, .dc-ok, .dc-no { display: none; } .dc.done::after { content: '✓'; color: var(--good); font-weight: 900; } .d-sum { grid-template-columns: 1fr 1fr; } }
