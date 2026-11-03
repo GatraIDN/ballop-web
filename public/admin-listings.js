@@ -126,7 +126,7 @@
       .sort((a, b) => sum(b.variants, 'stock') - sum(a.variants, 'stock'));
     const vs = all.flatMap((l) => l.variants);
     return `
-      <header class="bar"><div><h1>${CH[c].label}</h1><p class="muted">${c === 'shopee' ? 'Produk Shopee yang terhubung ke katalog tampil di landing page, harganya ikut Shopee. ' : ''}Klik listing untuk lihat & edit harga / stok per SKU.</p></div></header>
+      <header class="bar"><div><h1>${CH[c].label}</h1><p class="muted">${c === 'shopee' ? 'Produk Shopee yang terhubung ke katalog tampil di landing page, harganya ikut Shopee. ' : ''}Klik baris untuk lihat & edit harga / stok per SKU.</p></div></header>
       <div class="st-cards">
         <div class="st-card hero" style="background:linear-gradient(150deg, ${CH[c].color}, color-mix(in srgb, ${CH[c].color} 60%, #000))"><span>Listing</span><b>${num(all.length)}</b><small>${num(vs.length)} SKU</small></div>
         <div class="st-card"><span>Total stok</span><b>${num(sum(vs, 'stock'))}</b><small>${num(vs.filter((v) => !v.stock).length)} SKU habis</small></div>
@@ -137,35 +137,69 @@
       </div>
       <div class="st-filters solid"><label class="grow">Cari<input type="search" data-lsq placeholder="Nama listing, SKU…" value="${esc(st.q)}"></label>
         <label>Tampilkan<select data-lss><option value="">Semua listing</option><option value="promo"${st.status === 'promo' ? ' selected' : ''}>Sedang promo</option><option value="habis"${st.status === 'habis' ? ' selected' : ''}>Stok habis</option><option value="unlinked"${st.status === 'unlinked' ? ' selected' : ''}>Belum terhubung katalog</option></select></label></div>
-      <div class="ls-grid">${shown.map((l) => listingCard(l)).join('') || '<p class="muted" style="text-align:center;padding:30px">Tidak ada listing di filter ini.</p>'}</div>`;
+      ${listTable(c, shown)}`;
   }
-  function listingCard(l) {
+  // one row per listing; the SKUs open in a popup
+  function listRow(l) {
     const vs = [...l.variants].sort((a, b) => sizeKey(euOf(a.size)) - sizeKey(euOf(b.size)));
     const pr = range(vs, 'price'), old = range(vs, 'oldPrice');
     const disc = pr && old && old[1] > pr[0] ? 1 - pr[0] / old[1] : 0;
-    const stock = sum(vs, 'stock');
+    const stock = sum(vs, 'stock'), out = vs.filter((v) => !v.stock).length;
     const p = products().find((x) => x.id === l.productId);
-    const open = st.open === l.id;
-    return `<article class="ls-card${open ? ' open' : ''}" style="--c:${CH[l.channel].color}">
-      <button type="button" class="ls-top" data-lscard="${esc(l.id)}">
-        <span class="ls-name"><b>${esc(l.name)}</b><small>${esc(l.parentSku || '–')} · ID ${esc(l.listingId)}${l.status && l.status !== 'Aktif' ? ` · ${esc(l.status)}` : ''}</small></span>
-        <span class="ls-price"><b>${rangeText(pr)}</b>${disc ? `<small><s>${money(old[1])}</s> <em>−${Math.round(disc * 100)}%</em></small>` : ''}</span>
-      </button>
-      <div class="ls-meta">${disc ? `<span class="badge warn">${esc(l.promo || 'Promo')}</span>` : ''}<span class="badge ${stock ? 'live' : 'bad'}">Stok ${num(stock)}</span>${l.channel === 'shopee' && sum(vs, 'sold') ? `<span class="badge">Terjual ${num(sum(vs, 'sold'))}</span>` : ''}
-        ${p ? `<span class="ls-link">↔ ${esc(pLabel(p))}${l.channel === 'shopee' ? ' · tampil di LP' : ''}</span>` : '<span class="ls-link none">Belum terhubung katalog</span>'}</div>
-      <div class="ls-sizes-chips">${vs.map((v) => `<span class="${v.stock ? v.stock <= 2 ? 'low' : '' : 'out'}" title="${esc(v.sku)}${v.location ? ` · ${esc(v.location)}` : ''}">${esc(euOf(v.size) || '–')}<i>${num(v.stock)}</i></span>`).join('')}</div>
-      ${open ? `<div class="ls-edit">
-        <label class="ls-linkrow">Produk katalog ${linkSelect(l)}</label>
-        <div class="table-wrap"><table class="data"><thead><tr><th>Size</th><th>SKU</th>${l.channel === 'blibli' ? '<th>Lokasi</th>' : ''}<th class="num">Harga hari ini</th><th class="num">Harga coret</th><th class="num">Diskon</th><th class="num">Stok</th>${l.channel === 'shopee' ? '<th class="num">Terjual</th>' : ''}</tr></thead>
-        <tbody>${l.variants.map((v, i) => `<tr><td><b>${esc(euOf(v.size) || '–')}</b></td><td class="small">${esc(v.sku)}</td>${l.channel === 'blibli' ? `<td class="small">${esc(v.location)}</td>` : ''}
+    const img = p?.images?.[0];
+    const short = l.name.replace(/^BALLOP\s+/i, '').split(/\s+[–-]\s+|\s+Sepatu|\s+Sandal|\s+Sneakers/i)[0];
+    return `<tr class="ll-row" data-lsrow="${esc(l.id)}">
+      <td><div class="ll-prod"><span class="ll-thumb" style="--c:${CH[l.channel].color}">${img ? `<img src="${esc(img)}" alt="">` : esc(short.slice(0, 2).toUpperCase())}</span>
+        <span class="ll-txt"><b title="${esc(l.name)}">${esc(short)}</b><small>${esc(l.parentSku || '–')} · ${num(vs.length)} SKU${l.status && l.status !== 'Aktif' ? ` · ${esc(l.status)}` : ''}</small></span></div></td>
+      <td class="num"><b class="ll-price">${rangeText(pr)}</b>${disc ? `<small class="ll-old"><s>${money(old[1])}</s></small>` : ''}</td>
+      <td class="num">${disc ? `<span class="ll-disc">−${Math.round(disc * 100)}%</span>` : '<span class="muted">–</span>'}</td>
+      <td><div class="ll-stock"><span><b>${num(stock)}</b>${out ? `<small class="bad">${num(out)} habis</small>` : ''}</span><i><em style="width:${vs.length ? ((vs.length - out) / vs.length) * 100 : 0}%"></em></i></div></td>
+      ${l.channel === 'shopee' ? `<td class="num">${num(sum(vs, 'sold'))}</td>` : ''}
+      <td>${p ? `<span class="ll-link">${esc(pLabel(p))}</span>` : '<span class="ll-link none">Belum terhubung</span>'}</td>
+      <td class="ll-go">›</td></tr>`;
+  }
+  function listTable(c, shown) {
+    return `<section class="panel solid ll-panel"><div class="table-wrap"><table class="data ll-table">
+      <thead><tr><th>Produk</th><th class="num">Harga</th><th class="num">Diskon</th><th>Stok · size tersedia</th>${c === 'shopee' ? '<th class="num">Terjual</th>' : ''}<th>Katalog${c === 'shopee' ? ' / LP' : ''}</th><th></th></tr></thead>
+      <tbody>${shown.map(listRow).join('') || `<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">Tidak ada listing di filter ini.</td></tr>`}</tbody></table></div></section>`;
+  }
+
+  // listing detail: every SKU with editable price / stock and the catalog link
+  function openListing(id) {
+    const l = B.data.listings.find((x) => x.id === id);
+    const vs = l.variants.map((v) => ({ ...v }));
+    const order = vs.map((v, i) => i).sort((a, b) => sizeKey(euOf(vs[a].size)) - sizeKey(euOf(vs[b].size)));
+    const box = document.createElement('div');
+    box.className = 'raw-pop';
+    const disc = (v) => (v.oldPrice > v.price && v.price ? `−${Math.round((1 - v.price / v.oldPrice) * 100)}%` : '–');
+    box.innerHTML = `<div class="raw-card ll-pop" style="--c:${CH[l.channel].color}">
+      <header><div><span class="muted small"><i class="ls-dot" style="background:${CH[l.channel].color}"></i>${CH[l.channel].label} · ID ${esc(l.listingId)}</span><h2>${esc(l.name)}</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
+      <div class="ll-popbar"><label>Produk katalog ${linkSelect(l)}</label>${l.promo ? `<span class="badge warn">${esc(l.promo)}</span>` : ''}<span class="muted small">Update ${esc(l.updatedAt || '–')}${l.updatedBy ? ` · ${esc(l.updatedBy)}` : ''}</span></div>
+      <div class="raw-body"><table class="data ll-skus"><thead><tr><th>Size</th><th>SKU</th>${l.channel === 'blibli' ? '<th>Lokasi</th>' : ''}<th class="num">Harga hari ini</th><th class="num">Harga coret</th><th class="num">Diskon</th><th class="num">Stok</th>${l.channel === 'shopee' ? '<th class="num">Terjual</th>' : ''}</tr></thead>
+        <tbody>${order.map((i) => { const v = vs[i]; return `<tr><td><span class="d-size">${esc(euOf(v.size) || '–')}</span></td><td class="small muted">${esc(v.sku)}</td>${l.channel === 'blibli' ? `<td class="small">${esc(v.location)}</td>` : ''}
           <td class="num"><input class="d-in ls-in" type="number" min="0" data-vi="${i}" data-vk="price" value="${v.price || ''}" ${canEdit() ? '' : 'disabled'}></td>
           <td class="num"><input class="d-in ls-in" type="number" min="0" data-vi="${i}" data-vk="oldPrice" value="${v.oldPrice || ''}" ${canEdit() ? '' : 'disabled'}></td>
-          <td class="num" data-disc="${i}">${v.oldPrice > v.price && v.price ? `${Math.round((1 - v.price / v.oldPrice) * 100)}%` : '–'}</td>
-          <td class="num"><input class="d-in" type="number" min="0" data-vi="${i}" data-vk="stock" value="${v.stock}" ${canEdit() ? '' : 'disabled'}></td>${l.channel === 'shopee' ? `<td class="num">${num(v.sold)}</td>` : ''}</tr>`).join('')}</tbody></table></div>
-        <div class="ls-actions"><span class="muted small">Update terakhir ${esc(l.updatedAt || '–')}${l.updatedBy ? ` · ${esc(l.updatedBy)}` : ''}</span><span class="spacer"></span>
-          ${canEdit() ? `<button class="btn sm" type="button" data-lsall="${esc(l.id)}">Samakan harga semua size</button><button class="btn sm primary" type="button" data-lssave="${esc(l.id)}">Simpan</button>` : ''}</div>
-      </div>` : ''}
-    </article>`;
+          <td class="num"><span class="ll-disc sm" data-disc="${i}">${disc(v)}</span></td>
+          <td class="num"><input class="d-in" type="number" min="0" data-vi="${i}" data-vk="stock" value="${v.stock}" ${canEdit() ? '' : 'disabled'}></td>${l.channel === 'shopee' ? `<td class="num">${num(v.sold)}</td>` : ''}</tr>`; }).join('')}</tbody></table></div>
+      <footer>${canEdit() ? '<button class="btn sm" type="button" data-same>Samakan harga semua size</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? '<button class="btn sm primary" type="button" data-save>Simpan</button>' : ''}</footer></div>`;
+    document.body.appendChild(box);
+    let dirty = false;
+    const close = () => { if (dirty && !confirm('Perubahan belum disimpan. Tutup?')) return; box.remove(); };
+    box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) close(); });
+    $$('[data-vi]', box).forEach((el) => el.addEventListener('input', () => {
+      const v = vs[Number(el.dataset.vi)];
+      v[el.dataset.vk] = Math.max(0, Number(el.value) || 0);
+      box.querySelector(`[data-disc="${el.dataset.vi}"]`).textContent = disc(v);
+      dirty = true;
+    }));
+    $('[data-same]', box)?.addEventListener('click', () => {
+      const first = order[0];
+      ['price', 'oldPrice'].forEach((k) => $$(`[data-vk="${k}"]`, box).forEach((el) => { el.value = vs[first][k] || ''; el.dispatchEvent(new Event('input')); }));
+    });
+    $('[data-link]', box).addEventListener('change', () => { dirty = true; });
+    $('[data-save]', box)?.addEventListener('click', async () => {
+      if (await saveListing(id, { variants: vs, productId: $('[data-link]', box).value }, 'Listing disimpan')) box.remove();
+    });
   }
 
   // ---------- events ----------
@@ -177,6 +211,7 @@
     $$('[data-lss]', box).forEach((el) => el.addEventListener('change', () => { st.status = el.value; render(); }));
     $$('[data-lsopen]', box).forEach((tr) => tr.addEventListener('click', () => { st.open = st.open === tr.dataset.lsopen ? '' : tr.dataset.lsopen; render(); }));
     $$('[data-lscard]', box).forEach((b) => b.addEventListener('click', () => { st.open = st.open === b.dataset.lscard ? '' : b.dataset.lscard; drafts.clear(); render(); }));
+    $$('[data-lsrow]', box).forEach((tr) => tr.addEventListener('click', () => openListing(tr.dataset.lsrow)));
     $$('[data-link]', box).forEach((el) => el.addEventListener('change', () => saveListing(el.dataset.link, { productId: el.value }, el.value ? 'Listing dihubungkan ke katalog' : 'Hubungan ke katalog dilepas')));
     $$('[data-vi]', box).forEach((el) => el.addEventListener('input', () => {
       const id = st.open, l = B.data.listings.find((x) => x.id === id);
@@ -204,7 +239,8 @@
       drafts.delete(id);
       toast(msg);
       render();
-    } catch (e) { toast(e.message, true); }
+      return true;
+    } catch (e) { toast(e.message, true); return false; }
   }
 
   // the Produk view belongs to admin.js; render the tabs whenever it opens or the catalog changes
