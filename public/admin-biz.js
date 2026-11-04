@@ -510,6 +510,24 @@
     // four separate sources: orders (what came in), income (money that reached the wallet), ads, LIVE
     const inc = computeIncome(from, to), incP = computeIncome(addDays(from, -len), addDays(from, -1));
     const live = computeLive(from, to), liveP = computeLive(addDays(from, -len), addDays(from, -1));
+    // offline: toko, distributor, reseller, event (completed sales), piutang = not yet paid
+    const offOf = (a, b) => {
+      const rows = data.offline.filter((x) => x.date >= a && x.date <= b && x.status === 'completed');
+      const val = (x) => x.qty * x.price - x.discount;
+      const t = { rows, omzet: 0, units: 0, trx: new Set(), unpaid: 0, byOutlet: {}, byType: {}, byProd: {} };
+      rows.forEach((x) => {
+        const v = val(x); t.omzet += v; t.units += x.qty; t.trx.add(x.invoice || x.id);
+        if (x.payment !== 'lunas') t.unpaid += v;
+        const o = t.byOutlet[x.outlet || '(tanpa nama)'] = t.byOutlet[x.outlet || '(tanpa nama)'] || { v: 0, q: 0, type: x.type }; o.v += v; o.q += x.qty;
+        t.byType[x.type] = (t.byType[x.type] || 0) + v;
+        const pk = pname(x.productId); const p = t.byProd[pk] = t.byProd[pk] || { v: 0, q: 0 }; p.v += v; p.q += x.qty;
+      });
+      t.trx = t.trx.size;
+      return t;
+    };
+    const off = offOf(from, to), offP = offOf(addDays(from, -len), addDays(from, -1));
+    const allUnpaid = data.offline.filter((x) => x.status === 'completed' && x.payment !== 'lunas');
+    const overdue = allUnpaid.filter((x) => x.dueDate && x.dueDate < today());
     const hours = (min) => `${Math.floor(min / 60)}j ${String(min % 60).padStart(2, '0')}m`;
     const SECTIONS = {
       order: { label: 'Order', sub: 'pesanan masuk dari export order', color: '#2a78d6', icon: '◈',
@@ -518,6 +536,8 @@
         value: money(inc.payout), meta: `${num(inc.orders)} pesanan cair · fee ${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'}`, d: delta(inc.payout, incP.payout) },
       ads: { label: 'Iklan', sub: 'spending & atribusi platform iklan', color: '#e8552b', icon: '◎',
         value: money(m.adSpend), meta: `ROAS ${ratio(m.adRoas)} · GMV ${compact(m.adRevenue)}`, d: delta(m.adSpend, p.adSpend, true, true) },
+      offline: { label: 'Offline', sub: 'toko, distributor, reseller, event', color: '#0e8a8a', icon: '⌂',
+        value: money(off.omzet), meta: `${num(off.trx)} transaksi · ${num(off.units)} pcs`, d: delta(off.omzet, offP.omzet) },
       live: { label: 'Live', sub: 'TikTok LIVE (GMV atribusi)', color: '#6250d6', icon: '●',
         value: money(live.gmv), meta: `${num(live.sessions)} sesi · ${hours(live.minutes)} · ${num(live.orders)} order`, d: delta(live.gmv, liveP.gmv) },
     };
@@ -617,6 +637,39 @@
       </section>`;
     };
 
+    const offlineTab = () => {
+      const outlets = Object.entries(off.byOutlet).sort((a, b) => b[1].v - a[1].v);
+      const maxO = Math.max(1, ...outlets.map(([, x]) => x.v));
+      const prods = Object.entries(off.byProd).sort((a, b) => b[1].v - a[1].v).slice(0, 8);
+      const maxP = Math.max(1, ...prods.map(([, x]) => x.v));
+      const TYPES = { toko: 'Toko', distributor: 'Distributor', reseller: 'Reseller', event: 'Event / bazar' };
+      return `
+      ${secHead('Offline', 'Penjualan langsung di luar marketplace: toko, distributor, reseller, dan event / bazar (dari menu Penjualan offline). Piutang = transaksi tempo / belum bayar.', ['offline', 'Penjualan offline'])}
+      <div class="kpis">
+        ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, offP.omzet), true)}
+        ${kpi('Transaksi', num(off.trx), delta(off.trx, offP.trx))}
+        ${kpi('Unit terjual', `${num(off.units)} pcs`, delta(off.units, offP.units))}
+        ${kpi('Rata-rata per transaksi', off.trx ? money(off.omzet / off.trx) : '–')}
+        ${kpi('Piutang periode ini', money(off.unpaid), '<div class="k-delta">belum lunas / tempo</div>')}
+        ${kpi('Total piutang berjalan', money(allUnpaid.reduce((t2, x) => t2 + x.qty * x.price - x.discount, 0)), `<div class="k-delta${overdue.length ? ' down' : ''}">${num(overdue.length)} lewat jatuh tempo</div>`)}
+        ${Object.entries(TYPES).filter(([k]) => off.byType[k]).slice(0, 2).map(([k, l]) => kpi(`Omzet ${l.toLowerCase()}`, money(off.byType[k]))).join('')}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Omzet offline</h2></div>
+        <div class="chart" id="chOffline"></div>
+      </section>
+      <div class="grid-3">
+        <section class="panel solid"><div class="panel-head"><h2>Per outlet / event</h2><span class="muted small">omzet · pcs</span></div>
+          <div class="hbar">${outlets.map(([n, x]) => `<div class="hbar-row"><span class="hb-name" title="${esc(n)}">${esc(n)} <small class="muted">${esc(TYPES[x.type] || '')}</small></span><span class="hb-track"><i style="width:${(x.v / maxO) * 100}%;background:#0e8a8a"></i></span><span class="hb-val">${compact(x.v)} · ${num(x.q)}</span></div>`).join('') || '<p class="muted">Belum ada penjualan offline di periode ini.</p>'}</div>
+        </section>
+        <section class="panel solid"><div class="panel-head"><h2>Produk terlaris offline</h2></div>
+          <div class="hbar">${prods.map(([n, x]) => `<div class="hbar-row"><span class="hb-name" title="${esc(n)}">${esc(n)}</span><span class="hb-track"><i style="width:${(x.v / maxP) * 100}%;background:#2a78d6"></i></span><span class="hb-val">${compact(x.v)} · ${num(x.q)}</span></div>`).join('') || '<p class="muted">–</p>'}</div>
+        </section>
+      </div>
+      ${allUnpaid.length ? `<section class="panel solid"><div class="panel-head"><h2>Piutang belum lunas</h2><span class="muted small">${num(allUnpaid.length)} transaksi</span></div>
+        <div class="table-wrap"><table class="data"><thead><tr><th>Tanggal</th><th>Outlet</th><th>Produk</th><th class="num">Nilai</th><th>Jatuh tempo</th><th>Status</th></tr></thead>
+        <tbody>${allUnpaid.sort((a, b) => (a.dueDate || '9').localeCompare(b.dueDate || '9')).slice(0, 20).map((x) => `<tr><td>${fmtDate(x.date)}</td><td>${esc(x.outlet)}</td><td>${esc(pname(x.productId))}</td><td class="num">${money(x.qty * x.price - x.discount)}</td><td>${x.dueDate ? fmtDate(x.dueDate) : '–'}</td><td><span class="badge ${x.dueDate && x.dueDate < today() ? 'bad' : 'warn'}">${x.dueDate && x.dueDate < today() ? 'Lewat tempo' : x.payment === 'tempo' ? 'Tempo' : 'Belum bayar'}</span></td></tr>`).join('')}</tbody></table></div></section>` : ''}`;
+    };
     const liveTab = () => {
       const top = [...live.rows].sort((a, b) => b.gmv - a.gmv);
       const best = top[0];
@@ -665,7 +718,7 @@
           <span class="ov-meta">${s.meta}</span>
           ${s.d}
         </button>`).join('')}</div>
-      <div class="sec-body">${dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : orderTab()}</div>
+      <div class="sec-body">${dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : dashTab === 'offline' ? offlineTab() : orderTab()}</div>
       ${reportPanel()}`;
 
     const chartEl = (id) => document.getElementById(id);
@@ -675,6 +728,7 @@
       (b, key) => sumBy(m.adRows, b, (r) => r.channel === key, (r) => r.spend), money);
     if (chartEl('chIncome')) { const inc = computeIncome(from, to); const ser = Object.entries(SALES_CH).map(([key, c]) => ({ key, ...c })).filter((s) => inc.byCh[s.key]);
       stackedBars(chartEl('chIncome'), bks, ser.length ? ser : [{ key: '_', label: 'Dana cair', color: '#0e8a4f' }], (b, key) => inc.rows.reduce((t, x) => (payDay(x) >= b.from && payDay(x) <= b.to && x.channel === key ? t + x.payout : t), 0), money); }
+    if (chartEl('chOffline')) stackedBars(chartEl('chOffline'), bks, [{ key: 'off', label: 'Omzet offline', color: '#0e8a8a' }], (b) => data.offline.reduce((t, x) => (x.status === 'completed' && x.date >= b.from && x.date <= b.to ? t + x.qty * x.price - x.discount : t), 0), money);
     if (chartEl('chLive')) stackedBars(chartEl('chLive'), bks, [{ key: 'tiktok', label: 'GMV live', color: '#6250d6' }], (b) => (data.live || []).reduce((t, l) => (l.date >= b.from && l.date <= b.to ? t + l.gmv : t), 0), money);
     $$('[data-camp]', v).forEach((b) => b.addEventListener('click', () => {
       const k = b.dataset.camp;
