@@ -5,8 +5,9 @@
   const B = window.Biz;
   const { esc, num, fmtDate, today, toCsv } = B;
 
-  const st = { wh: '', tab: 'daily', cat: '', product: '', color: '', status: '', q: '' };
+  const st = { wh: '', tab: 'sum', cat: '', product: '', color: '', status: '', q: '' };
   try { Object.assign(st, JSON.parse(localStorage.getItem('ballopStock') || '{}')); } catch {}
+  if (!['sum', 'now', 'size'].includes(st.tab)) st.tab = 'sum';
   const edits = new Map(); // id -> { available, damaged }
   const low = () => window.A.settings.lowStock || 5;
   const canEdit = () => window.A.can('stock3pl') && !window.A.me?.readOnly;
@@ -31,6 +32,80 @@
   // dropdown options in sheet order (rows are sorted with byItem first)
   const countBy = (rows, k) => Object.entries([...rows].sort(byItem).reduce((m, r) => { m[r[k]] = (m[r[k]] || 0) + 1; return m; }, {}));
   const stepper = (r, k) => `<span class="stepper${edits.get(r.id)?.[k] !== undefined && edits.get(r.id)[k] !== r[k] ? ' changed' : ''}"><button type="button" data-step="-1" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}>−</button><input type="number" inputmode="numeric" min="0" value="${val(r, k)}" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}><button type="button" data-step="1" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}>+</button></span>`;
+
+  // landing overview: what is plentiful, what ran out, what moves fastest, what sits still
+  function summary(rows) {
+    if (!rows.length) return '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p></section>';
+    const W = (r, k) => (r.whs || []).reduce((t, w) => t + (w[k] || 0), 0);
+    const G = {};
+    rows.forEach((r) => {
+      const k = `${r.product}|${r.color}`, g = G[k] = G[k] || { k, product: r.product, color: r.color, good: 0, out: 0, inn: 0, habis: [], tipis: [] };
+      const a = val(r, 'available'); g.good += a;
+      g.out += W(r, 'orderOut') + W(r, 'otherOut'); g.inn += W(r, 'stockIn') + W(r, 'otherIn');
+      const sz = r.size || r.sizeKr || '–'; if (a <= 0) g.habis.push(sz); else if (a <= low()) g.tipis.push(`${sz} (${a})`);
+    });
+    const gs = Object.values(G);
+    // real sales: marketplace orders of the last 30 days, matched to a warehouse model by product + colour words
+    const toks = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9.]+/g, ' ').trim().split(' ').filter((w) => w && w !== 'BALLOP');
+    const models = gs.map((g) => ({ g, p: toks(g.product), c: toks(g.color) })).sort((a, b) => b.p.length - a.p.length);
+    const since = B.addDays ? B.addDays(today(), -29) : today().slice(0, 8) + '01';
+    const memo = {};
+    const match = (name, varn) => {
+      const k = `${name}|${varn}`; if (k in memo) return memo[k];
+      const w = new Set(toks(`${name} ${varn}`));
+      const hit = models.filter((m) => m.p.length && m.p.every((t) => w.has(t)));
+      const best = hit.length ? Math.max(...hit.map((m) => m.p.length)) : 0;
+      const top = hit.filter((m) => m.p.length === best);
+      return (memo[k] = (top.find((m) => m.c.length && m.c.every((t) => w.has(t))) || (top.length === 1 ? top[0] : null))?.g || null);
+    };
+    gs.forEach((g) => { g.sold = 0; g.ch = {}; });
+    (B.data.orders || []).forEach((o) => {
+      if (o.date < since || o.state === 'cancelled') return;
+      const g = match(o.productName || o.sku, o.variation); if (!g) return;
+      const q = Math.max(0, (o.qty || 0) - (o.returnedQty || 0)); g.sold += q; g.ch[o.channel] = (g.ch[o.channel] || 0) + q;
+    });
+    const totSold = gs.reduce((t, g) => t + g.sold, 0);
+    gs.forEach((g) => { g.cover = g.sold ? Math.round(g.good / (g.sold / 30)) : null; });
+    const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
+    const bars = (list, key, color) => { const mx = Math.max(1, ...list.map((g) => g[key])); return list.map((g, i) => `<div class="ss-row" data-goto="${esc(g.k)}"><span class="ss-i">${i + 1}</span><span class="ss-n">${nm(g)}</span><span class="ss-t"><i style="width:${(g[key] / mx) * 100}%;background:${color}"></i></span><span class="ss-v">${num(g[key])} pcs</span></div>`).join(''); };
+    const top = [...gs].sort((a, b) => b.good - a.good).slice(0, 8);
+    const fast = gs.filter((g) => g.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 8);
+    const slowAll = gs.filter((g) => !g.sold && g.good > 0).sort((a, b) => b.good - a.good);
+    const habisAll = gs.filter((g) => g.good <= 0);
+    const habisPart = gs.filter((g) => g.good > 0 && g.habis.length).sort((a, b) => b.habis.length - a.habis.length);
+    const tipis = gs.filter((g) => g.tipis.length).sort((a, b) => b.tipis.length - a.tipis.length);
+    const cat = {}; rows.forEach((r) => { const c = cat[r.category] = cat[r.category] || { k: r.category, good: 0, skus: 0, habis: 0 }; c.good += val(r, 'available'); c.skus++; if (val(r, 'available') <= 0) c.habis++; });
+    const cats = Object.values(cat).sort((a, b) => b.good - a.good), cmx = Math.max(1, ...cats.map((c) => c.good));
+    const wh = {}; rows.forEach((r) => (r.whs || []).forEach((w) => { wh[w.wh] = (wh[w.wh] || 0) + w.ending; }));
+    const whs = Object.entries(wh).sort((a, b) => b[1] - a[1]), wsum = whs.reduce((t, [, n]) => t + n, 0) || 1;
+    const sz = {}; rows.forEach((r) => { const k = r.size || r.sizeKr; if (!k) return; const x = sz[k] = sz[k] || { good: 0, habis: 0 }; x.good += val(r, 'available'); if (val(r, 'available') <= 0) x.habis++; });
+    const sizes = Object.entries(sz).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]) || a[0].localeCompare(b[0])), smx = Math.max(1, ...sizes.map(([, x]) => x.good));
+    const totOut = gs.reduce((t, g) => t + g.out, 0), totIn = gs.reduce((t, g) => t + g.inn, 0), totGood = gs.reduce((t, g) => t + g.good, 0) || 1;
+    const empty = (t) => `<p class="muted small" style="padding:10px 2px">${t}</p>`;
+    return `
+      <div class="ss-kpis">
+        <div><span>Produk × warna</span><b>${num(gs.length)}</b><small>${num(rows.length)} SKU / size</small></div>
+        <div><span>Terjual 30 hari</span><b>${num(totSold)}</b><small>order marketplace (non batal)</small></div>
+        <div><span>Keluar / masuk 3PL</span><b>${num(totOut)} / ${num(totIn)}</b><small>dari export stock balance</small></div>
+        <div class="bad"><span>Model habis total</span><b>${num(habisAll.length)}</b><small>semua size kosong</small></div>
+        <div class="warn"><span>Model size bolong</span><b>${num(habisPart.length)}</b><small>sebagian size habis</small></div>
+        <div><span>Stok diam</span><b>${num(slowAll.reduce((t, g) => t + g.good, 0))}</b><small>${num(slowAll.length)} model tidak terjual 30 hari</small></div>
+      </div>
+      <div class="ss-grid">
+        <section class="panel solid"><div class="panel-head"><h2>🔥 Paling banyak keluar</h2><span class="muted small">laku 30 hari · sisa stok · cukup ±hari</span></div>${fast.length ? fast.map((g, i) => `<div class="ss-row" data-goto="${esc(g.k)}"><span class="ss-i">${i + 1}</span><span class="ss-n">${nm(g)}<small class="muted"> ${Object.entries(g.ch).map(([c, n]) => `${esc((B.SALES_CH[c] || {}).label || c)} ${num(n)}`).join(' · ')}</small></span><span class="ss-t"><i style="width:${(g.sold / fast[0].sold) * 100}%;background:#e8552b"></i></span><span class="ss-v">${num(g.sold)} terjual · sisa ${num(g.good)}${g.cover !== null ? ` · <b style="color:${g.cover <= 14 ? '#d23b3b' : g.cover <= 30 ? '#c98a00' : 'inherit'}">±${num(g.cover)} hr</b>` : ''}</span></div>`).join('') : empty('Belum ada order marketplace 30 hari terakhir.')}</section>
+        <section class="panel solid"><div class="panel-head"><h2>📦 Stok terbanyak</h2><span class="muted small">good per model</span></div>${bars(top, 'good', '#2a78d6')}</section>
+        <section class="panel solid"><div class="panel-head"><h2>⛔ Sudah habis</h2><span class="muted small">${num(habisAll.length)} model kosong · ${num(habisPart.length)} size bolong</span></div>
+          <div class="ss-list">${habisAll.map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}</span><span class="badge bad">HABIS semua size</span></div>`).join('')}${habisPart.slice(0, 12).map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}<small class="muted"> sisa ${num(g.good)}</small></span><span class="ss-sz">${g.habis.map((x) => `<em>${esc(x)}</em>`).join('')}</span></div>`).join('') || (habisAll.length ? '' : empty('Tidak ada yang habis.'))}</div></section>
+        <section class="panel solid"><div class="panel-head"><h2>⚠ Stok tipis</h2><span class="muted small">good ≤ ${low()} per size</span></div>
+          <div class="ss-list">${tipis.slice(0, 12).map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}</span><span class="ss-sz warn">${g.tipis.map((x) => `<em>${esc(x)}</em>`).join('')}</span></div>`).join('') || empty('Tidak ada stok tipis.')}</div></section>
+        <section class="panel solid"><div class="panel-head"><h2>💤 Stok diam</h2><span class="muted small">stok ada, tidak terjual 30 hari</span></div>${slowAll.length ? bars(slowAll.slice(0, 8), 'good', '#8a8f98') : empty('Semua model ada yang keluar.')}</section>
+        <section class="panel solid"><div class="panel-head"><h2>Per kategori</h2></div>
+          ${cats.map((c) => `<div class="ss-row" data-gocat="${esc(c.k)}"><span class="ss-n"><b>${esc(c.k)}</b> <small class="muted">${num(c.skus)} SKU${c.habis ? ` · ${num(c.habis)} habis` : ''}</small></span><span class="ss-t"><i style="width:${(c.good / cmx) * 100}%;background:#0e8a4f"></i></span><span class="ss-v">${num(c.good)} · ${Math.round((c.good / totGood) * 100)}%</span></div>`).join('')}
+          ${whs.length ? `<h3 class="ss-h3">Per gudang</h3><div class="ss-wh">${whs.map(([w, n]) => `<div><span>${esc(w.replace(/ - NORMAL$/, ''))}</span><b>${num(n)}</b><i style="width:${(n / wsum) * 100}%"></i></div>`).join('')}</div>` : ''}</section>
+        <section class="panel solid ss-wide"><div class="panel-head"><h2>Stok per size</h2><span class="muted small">total good semua model · merah = jumlah SKU habis</span></div>
+          <div class="ss-sizes">${sizes.map(([k, x]) => `<div title="${esc(k)}: ${num(x.good)} pcs${x.habis ? `, ${x.habis} SKU habis` : ''}"><b>${num(x.good)}</b><span class="ss-bar"><i style="height:${Math.max(3, (x.good / smx) * 100)}%"></i></span><span>${esc(k)}</span>${x.habis ? `<em>${x.habis}</em>` : '<em class="z"></em>'}</div>`).join('')}</div></section>
+      </div>`;
+  }
 
   function render() {
     const v = $('#view-stock3pl');
@@ -64,10 +139,12 @@
         <label class="grow">Cari<input type="search" data-f="q" placeholder="Nama, kode SKU, size…" value="${esc(st.q)}"></label>
         ${st.cat || st.product || st.color || st.status || st.q ? '<button class="btn sm" type="button" id="stReset">Reset filter</button>' : ''}
       </div>
-      <div class="seg glass st-tabs"><button type="button" data-tab="daily" class="${st.tab === 'daily' ? 'on' : ''}">✎ Input harian</button><button type="button" data-tab="now" class="${st.tab === 'now' ? 'on' : ''}">Stock balance</button><button type="button" data-tab="size" class="${st.tab === 'size' ? 'on' : ''}">Stok per size</button></div>
-      ${st.tab === 'daily' ? daily(rows) : `<section class="panel solid">${st.tab === 'size' ? matrix(rows) : list(rows)}</section>`}
+      <div class="seg glass st-tabs"><button type="button" data-tab="sum" class="${st.tab === 'sum' ? 'on' : ''}">◈ Ringkasan</button><button type="button" data-tab="now" class="${st.tab === 'now' ? 'on' : ''}">Stock balance</button><button type="button" data-tab="size" class="${st.tab === 'size' ? 'on' : ''}">Stok per size</button></div>
+      ${st.tab === 'sum' ? summary(rows) : `<section class="panel solid">${st.tab === 'size' ? matrix(rows) : list(rows)}</section>`}
       <div class="st-save" id="stSave" hidden><span id="stSaveText"></span><button class="btn sm" type="button" id="stUndo">Batal</button><button class="btn sm primary" type="button" id="stDo">Simpan perubahan</button></div>`;
 
+    $$('[data-goto]', v).forEach((b) => b.addEventListener('click', () => { const [p, c] = b.dataset.goto.split('|'); st.product = p; st.color = c; st.cat = ''; st.tab = 'now'; openGroups.add(b.dataset.goto); remember(); render(); }));
+    $$('[data-gocat]', v).forEach((b) => b.addEventListener('click', () => { st.cat = b.dataset.gocat; remember(); render(); }));
     $$('[data-cat]', v).forEach((b) => b.addEventListener('click', () => { st.cat = b.dataset.cat; remember(); render(); }));
     $$('[data-quick]', v).forEach((b) => b.addEventListener('click', () => { st.status = st.status === b.dataset.quick ? '' : b.dataset.quick; remember(); render(); }));
     $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { st.tab = b.dataset.tab; remember(); render(); }));
