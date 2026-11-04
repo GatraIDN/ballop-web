@@ -174,8 +174,8 @@
       orderKeys.add(r.orderKey);
       const c = m.byCh[r.channel] = m.byCh[r.channel] || { revenue: 0, units: 0, orders: new Set(), fees: 0 };
       c.revenue += r.net; c.units += r.qty; c.fees += r.fee; c.orders.add(r.orderKey);
-      const p = m.byProduct[r.pkey] = m.byProduct[r.pkey] || { revenue: 0, units: 0 };
-      p.revenue += r.net; p.units += r.qty;
+      const p = m.byProduct[r.pkey] = m.byProduct[r.pkey] || { revenue: 0, units: 0, ch: {} };
+      p.revenue += r.net; p.units += r.qty; p.ch[r.channel] = (p.ch[r.channel] || 0) + r.qty;
     });
     lines.filter((r) => r.state === 'returned').forEach((r) => { m.returns += r.qty; m.returnValue += r.net; });
     m.cancelled = new Set(lines.filter((r) => r.state === 'cancelled').map((r) => r.orderKey)).size;
@@ -453,6 +453,19 @@
 
     const topProducts = Object.entries(m.byProduct).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 6);
     const maxTop = Math.max(1, ...topProducts.map(([, x]) => x.revenue));
+    // group size/variant lines into one model: catalog name, or the listing name without its "(43)" / "(EU 38)" suffix
+    const t5map = {};
+    Object.entries(m.byProduct).forEach(([id, x]) => {
+      const pr = product(id), name = pr ? pr.name : pname(id).replace(/\s*\((?:EU\s*)?\d+(?:[.,]\d+)?\)\s*$/i, '').replace(/\s+[–-]\s+Sepatu.*$/i, '').trim();
+      const g = t5map[name] = t5map[name] || { id, revenue: 0, units: 0, ch: {}, sizes: 0 };
+      g.revenue += x.revenue; g.units += x.units; g.sizes++;
+      Object.entries(x.ch || {}).forEach(([c, u]) => { g.ch[c] = (g.ch[c] || 0) + u; });
+    });
+    const top5 = Object.entries(t5map).sort((a, b) => b[1].units - a[1].units || b[1].revenue - a[1].revenue).slice(0, 5).map(([name, g]) => [g.id, g, name]);
+    const top5Html = `<section class="panel solid top5">
+        <div class="panel-head"><h2>Top 5 produk paling laku</h2><span class="muted small">${fmtDay(from)}${from !== to ? ` – ${fmtDay(to)}` : ''} · urut unit terjual</span></div>
+        ${top5.length ? `<ol class="t5-list">${top5.map(([id, x, nm], i) => { const pr = product(id); return `<li><span class="t5-rank r${i + 1}">${i + 1}</span><span class="t5-dot" style="background:${pr ? pr.color : '#2a78d6'}"></span><div class="t5-name"><b title="${esc(nm)}">${esc(nm)}</b><small class="muted">${Object.entries(x.ch || {}).sort((a, b) => b[1] - a[1]).map(([c, u]) => `${esc((SALES_CH[c] || {}).label || c)} ${num(u)}`).join(' · ')}</small></div><div class="t5-val"><b>${num(x.units)} pcs</b><small class="muted">${money(x.revenue)} · ${pct(m.units ? x.units / m.units : NaN)}</small></div></li>`; }).join('')}</ol>` : '<p class="muted" style="padding:14px">Belum ada produk terjual di periode ini.</p>'}
+      </section>`;
     const lv = stockLevels();
     const alerts = [];
     window.A.products.forEach((pr) => {
@@ -558,6 +571,7 @@
         ${kpi('Tingkat batal + retur', pct(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN), delta(m.allOrders ? (m.cancelled + m.returnOrders) / m.allOrders : NaN, p.allOrders ? (p.cancelled + p.returnOrders) / p.allOrders : NaN, true))}
         ${kpi('Diskon penjual (dari harga coret)', money(m.discount), delta(m.discount, p.discount, true, true))}
       </div>
+      ${top5Html}
       <div class="target solid">
         <div class="target-top"><b>Target ${MONTHS[td.getMonth()]} ${td.getFullYear()}</b><span>${money(mRev)} dari ${target ? money(target) : '(atur di Pengaturan)'}</span><span class="spacer"></span>
           <span>${target ? `${pct(mRev / target)} · proyeksi akhir bulan ${money(projected)}` : ''}</span></div>

@@ -923,3 +923,12 @@ td.ls-bad { color: var(--danger); font-weight: 900; }
 .bl-wh span.dmg { background: #fde8e8; color: #b42318; }
 .bl-table td.bl-end { background: #f5f8fd; }
 .bl-table tfoot th { padding: 10px 12px; border-top: 2px solid var(--line); font-size: 12px; }
+/* top 5 produk paling laku */
+.top5 .t5-list{list-style:none;margin:0;padding:4px 0;display:flex;flex-direction:column;gap:6px}
+.top5 .t5-list li{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:var(--bg-soft,#f6f7f9)}
+.top5 .t5-rank{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:#e5e7eb;color:#374151;flex:none}
+.top5 .t5-rank.r1{background:#f5c542;color:#5a3d00}.top5 .t5-rank.r2{background:#cfd6de;color:#2f3a46}.top5 .t5-rank.r3{background:#e0a46e;color:#4a2508}
+.top5 .t5-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.top5 .t5-name{flex:1;min-width:0;display:flex;flex-direction:column}
+.top5 .t5-name b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top5 .t5-val{text-align:right;display:flex;flex-direction:column;flex:none}
