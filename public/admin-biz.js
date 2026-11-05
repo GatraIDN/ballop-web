@@ -188,6 +188,7 @@
       orderKeys.add(r.orderKey);
       const c = m.byCh[r.channel] = m.byCh[r.channel] || { revenue: 0, units: 0, orders: new Set(), fees: 0 };
       c.revenue += r.net; c.units += r.qty; c.fees += r.fee; c.orders.add(r.orderKey);
+      if (!r.pkey) return;
       const p = m.byProduct[r.pkey] = m.byProduct[r.pkey] || { revenue: 0, units: 0, ch: {} };
       p.revenue += r.net; p.units += r.qty; p.ch[r.channel] = (p.ch[r.channel] || 0) + r.qty;
     });
@@ -690,12 +691,9 @@
         <div class="panel-head"><h2>Omzet offline</h2></div>
         <div class="chart" id="chOffline"></div>
       </section>
-      <div class="grid-3">
+      <div>
         <section class="panel solid"><div class="panel-head"><h2>Per outlet / event</h2><span class="muted small">omzet · pcs</span></div>
           <div class="hbar">${outlets.map(([n, x]) => `<div class="hbar-row"><span class="hb-name" title="${esc(n)}">${esc(n)} <small class="muted">${esc(TYPES[x.type] || '')}</small></span><span class="hb-track"><i style="width:${(x.v / maxO) * 100}%;background:#0e8a8a"></i></span><span class="hb-val">${compact(x.v)} · ${num(x.q)}</span></div>`).join('') || '<p class="muted">Belum ada penjualan offline di periode ini.</p>'}</div>
-        </section>
-        <section class="panel solid"><div class="panel-head"><h2>Produk terlaris offline</h2></div>
-          <div class="hbar">${prods.map(([n, x]) => `<div class="hbar-row"><span class="hb-name" title="${esc(n)}">${esc(n)}</span><span class="hb-track"><i style="width:${(x.v / maxP) * 100}%;background:#2a78d6"></i></span><span class="hb-val">${compact(x.v)} · ${num(x.q)}</span></div>`).join('') || '<p class="muted">–</p>'}</div>
         </section>
       </div>
       ${allUnpaid.length ? `<section class="panel solid"><div class="panel-head"><h2>Piutang belum lunas</h2><span class="muted small">${num(allUnpaid.length)} transaksi</span></div>
@@ -1081,8 +1079,6 @@
         { k: 'channel', label: 'Channel', type: 'select', options: () => Object.entries(SALES_CH).map(([k, c]) => [k, c.label]), half: 1 },
         { k: 'orderId', label: 'No. order (opsional)', half: 1 },
         { k: 'status', label: 'Status', type: 'select', options: () => Object.entries(STATUS), half: 1 },
-        { k: 'productId', label: 'Produk', type: 'select', options: productOptions },
-        { k: 'size', label: 'Ukuran', type: 'select', options: (f) => sizeOptions(f.productId.value), half: 1 },
         { k: 'qty', label: 'Jumlah (pasang)', type: 'number', min: 1, def: 1, half: 1 },
         { k: 'price', label: 'Harga satuan', type: 'number', step: 1000, half: 1 },
         { k: 'discount', label: 'Diskon / voucher (total)', type: 'number', step: 1000, half: 1 },
@@ -1219,8 +1215,6 @@
         { k: 'type', label: 'Jenis', type: 'select', options: () => Object.entries(OFF_TYPES), half: 1 },
         { k: 'outlet', label: 'Nama toko / distributor', half: 1, list: () => [...new Set(data.offline.map((r) => r.outlet).filter(Boolean))] },
         { k: 'invoice', label: 'No. invoice / nota', half: 1 },
-        { k: 'productId', label: 'Produk', type: 'select', options: productOptions },
-        { k: 'size', label: 'Ukuran', type: 'select', options: (f) => sizeOptions(f.productId.value), half: 1 },
         { k: 'qty', label: 'Jumlah (pasang)', type: 'number', min: 1, def: 1, half: 1 },
         { k: 'price', label: 'Harga satuan', type: 'number', step: 1000, half: 1 },
         { k: 'discount', label: 'Diskon (total)', type: 'number', step: 1000, half: 1 },
@@ -1229,24 +1223,19 @@
         { k: 'status', label: 'Status', type: 'select', options: () => Object.entries(STATUS) },
         { k: 'note', label: 'Catatan' },
       ],
-      onChange(f, k) {
-        if (k === 'productId') { const p = product(f.productId.value); fillSelect(f.size, sizeOptions(f.productId.value)); if (p) f.price.value = p.price; }
-      },
       summary: (f) => `Total ${money((Number(f.qty.value) || 0) * (Number(f.price.value) || 0) - (Number(f.discount.value) || 0))}`,
       columns: [
         { label: 'Tanggal', get: (r) => fmtDate(r.date) },
         { label: 'Jenis', get: (r) => OFF_TYPES[r.type] },
         { label: 'Toko / distributor', get: (r) => esc(r.outlet || '–') },
         { label: 'Invoice', get: (r) => esc(r.invoice || '–') },
-        { label: 'Produk', get: (r) => esc(pname(r.productId)) },
-        { label: 'Ukuran', get: (r) => esc(r.size || '–') },
         { label: 'Qty', num: true, get: (r) => num(r.qty), sum: (r) => r.qty },
         { label: 'Total', num: true, get: (r) => money(r.qty * r.price - r.discount), sum: (r) => r.qty * r.price - r.discount, fmt: money },
         { label: 'Bayar', get: (r) => `<span class="badge ${r.payment === 'lunas' ? 'live' : r.payment === 'tempo' ? 'warn' : 'bad'}">${PAY[r.payment]}${r.payment === 'tempo' && r.dueDate ? ` · ${fmtDay(r.dueDate)}` : ''}</span>` },
         { label: 'Status', get: (r) => `<span class="badge ${r.status === 'completed' ? 'live' : 'warn'}">${STATUS[r.status]}</span>` },
       ],
-      filters: ['product', 'status', { k: 'type', label: 'Semua jenis', options: () => Object.entries(OFF_TYPES) }, { k: 'payment', label: 'Semua pembayaran', options: () => Object.entries(PAY) }],
-      csv: ['date', 'type', 'outlet', 'invoice', 'sku', 'size', 'qty', 'price', 'discount', 'payment', 'dueDate', 'status', 'note'],
+      filters: ['status', { k: 'type', label: 'Semua jenis', options: () => Object.entries(OFF_TYPES) }, { k: 'payment', label: 'Semua pembayaran', options: () => Object.entries(PAY) }],
+      csv: ['date', 'type', 'outlet', 'invoice', 'qty', 'price', 'discount', 'payment', 'dueDate', 'status', 'note'],
     },
 
     stock3pl: {
@@ -1462,7 +1451,7 @@
         else r[k] = String(v || '').trim();
       });
       if (name === 'stock3pl' && !r.productId) r.productId = '';
-      if (['sales', 'stock', 'offline'].includes(name) && !r.productId) { skipped++; return; }
+      if (['sales', 'stock'].includes(name) && !r.productId) { skipped++; return; }
       out.push(r); ok++;
     });
     if (!ok) { toast(`Tidak ada baris valid (${skipped} dilewati: produk/SKU tidak dikenal)`, true); return; }
@@ -1792,7 +1781,10 @@
         c.all.add(x.orderId); if (x.state === 'completed' || x.state === 'pending') { c.done.add(x.orderId); c.omzet += x.net; c.units += x.qty; } if (x.state === 'cancelled') c.cancelled.add(x.orderId); if (x.state === 'returned') c.returned.add(x.orderId); });
       const chs = Object.entries(byCh).sort((a, b) => b[1].omzet - a[1].omzet);
       const filt = [ost.channel ? SALES_CH[ost.channel].label : 'Semua marketplace', ost.state ? ORDER_STATE[ost.state] : 'Semua status', ost.q ? `cari "${esc(ost.q)}"` : ''].filter(Boolean).join(' · ');
-      const list = rows.slice(0, 400);
+      const dayMap = {};
+      rows.forEach((x) => { const c = dayMap[x.date] = dayMap[x.date] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0 }; const k = `${x.channel}:${x.orderId}`;
+        c.all.add(k); if (x.state === 'completed' || x.state === 'pending') { c.done.add(k); c.omzet += x.net; c.units += x.qty; } if (x.state === 'cancelled') c.cancelled.add(k); if (x.state === 'returned') c.returned.add(k); });
+      const perDay = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0]));
       const body = `
         ${R.h2('Ringkasan pesanan')}
         ${R.tiles([
@@ -1810,9 +1802,10 @@
           <div>${R.h2('Produk terlaris', 'omzet · pasang')}${R.table([['Produk'], ['Pasang', 1], ['Omzet', 1]], top.slice(0, 10).map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, num(x.units), R.rp(x.revenue)]))}</div>
           <div>${R.h2('Provinsi teratas', 'pasang')}${R.table([['Provinsi'], ['Pasang', 1]], cities.map(([c, q]) => [esc(c), num(q)]))}</div>
         </div>
-        ${R.h2('Daftar pesanan', `${num(list.length)} dari ${num(rows.length)} baris`)}
-        ${R.table([['Tanggal'], ['Channel'], ['No. pesanan'], ['Produk'], ['Variasi'], ['Qty', 1], ['Omzet', 1], ['Status']],
-          list.map((x) => [fmtDate(x.date), esc(SALES_CH[x.channel]?.label || x.channel), esc(x.orderId), esc(x.productName.length > 46 ? `${x.productName.slice(0, 44)}…` : x.productName), esc(x.variation), num(x.qty), R.rp(x.net), `<span class="chip ${x.state === 'completed' ? 'ok' : x.state === 'returned' ? 'warn' : x.state === 'pending' ? '' : 'bad'}">${ORDER_STATE[x.state]}</span>`]))}`;
+        ${R.h2('Pesanan per tanggal', 'akumulasi per tanggal pesanan dibuat')}
+        ${R.table([['Tanggal'], ['Pesanan masuk', 1], ['Selesai/diproses', 1], ['Batal', 1], ['Retur', 1], ['Pasang', 1], ['Omzet', 1]],
+          perDay.map(([d, x]) => [fmtDate(d), num(x.all.size), num(x.done.size), num(x.cancelled.size), num(x.returned.size), num(x.units), `<b>${R.rp(x.omzet)}</b>`]),
+          ['Total', num(perDay.reduce((s, [, x]) => s + x.all.size, 0)), num(orders.size), num(cnt('cancelled')), num(cnt('returned')), num(live.reduce((s, x) => s + x.qty, 0)), R.rp(omzet)])}`;
       R.open({ title: 'Laporan Order', period: R.period(r.from, r.to), meta: [['Periode', R.period(r.from, r.to)], ['Filter', filt]], body,
         note: 'Tanggal = tanggal pesanan dibuat. Omzet = subtotal setelah diskon, belum dipotong fee marketplace.' });
     });
@@ -1890,7 +1883,39 @@
       <div class="sum-card solid"><div class="k-label">Omzet offline</div><div class="k-value">${money(total)}</div><div class="k-sub">${num(rows.reduce((s, x) => s + x.qty, 0))} pasang</div></div>
       <div class="sum-card solid"><div class="k-label">Piutang (belum lunas)</div><div class="k-value" style="color:var(--warn)">${money(unpaid.reduce((s, x) => s + x.qty * x.price - x.discount, 0))}</div><div class="k-sub">${num(unpaid.length)} transaksi${overdue.length ? ` · <b style="color:var(--danger)">${overdue.length} lewat jatuh tempo</b>` : ''}</div></div>
       <div class="sum-card solid"><div class="k-label">Toko / distributor terbesar</div><div class="k-value" style="font-size:16px">${topOutlet ? esc(topOutlet[0]) : '–'}</div><div class="k-sub">${topOutlet ? money(topOutlet[1]) : ''}</div></div>
+      <div style="display:flex;align-items:center"><button class="btn btn-export" type="button" id="offPdf">⬇ Export PDF</button></div>
     </div>` });
+    $('#offPdf')?.addEventListener('click', () => offlinePdf(r));
+  }
+  function offlinePdf(r) {
+    const R = window.PdfReport;
+    const all = data.offline.filter((x) => x.date >= r.from && x.date <= r.to);
+    const done = all.filter((x) => x.status === 'completed');
+    const val = (x) => x.qty * x.price - x.discount;
+    const total = done.reduce((s, x) => s + val(x), 0), units = done.reduce((s, x) => s + x.qty, 0);
+    const unpaidP = done.filter((x) => x.payment !== 'lunas');
+    const unpaidAll = data.offline.filter((x) => x.status === 'completed' && x.payment !== 'lunas');
+    const group = (key) => { const g = {}; done.forEach((x) => { const k = key(x); const o = g[k] = g[k] || { v: 0, q: 0, n: 0, unpaid: 0, type: x.type }; o.v += val(x); o.q += x.qty; o.n++; if (x.payment !== 'lunas') o.unpaid += val(x); }); return Object.entries(g).sort((a, b) => b[1].v - a[1].v); };
+    const outlets = group((x) => x.outlet || '(tanpa nama)');
+    const types = group((x) => OFF_TYPES[x.type] || x.type);
+    const days = group((x) => x.date).sort((a, b) => a[0].localeCompare(b[0]));
+    const body = `
+      ${R.h2('Ringkasan penjualan offline')}
+      ${R.tiles([
+        R.tile('Omzet offline', R.rp(total), `${num(done.length)} transaksi`, true),
+        R.tile('Pasang terjual', num(units), `rata-rata ${done.length ? R.rp(total / done.length) : '–'} / transaksi`),
+        R.tile('Piutang periode ini', R.rp(unpaidP.reduce((s, x) => s + val(x), 0)), `${num(unpaidP.length)} transaksi belum lunas`),
+        R.tile('Total piutang berjalan', R.rp(unpaidAll.reduce((s, x) => s + val(x), 0)), `${num(unpaidAll.filter((x) => x.dueDate && x.dueDate < today()).length)} lewat jatuh tempo`),
+      ])}
+      <div class="two">
+        <div>${R.h2('Per toko / distributor', 'omzet')}${R.table([['Toko / distributor'], ['Jenis'], ['Trx', 1], ['Pasang', 1], ['Omzet', 1]], outlets.map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, esc(OFF_TYPES[x.type] || ''), num(x.n), num(x.q), `<b>${R.rp(x.v)}</b>`]), null, 'Belum ada penjualan offline.')}</div>
+        <div>${R.h2('Per jenis')}${R.table([['Jenis'], ['Trx', 1], ['Pasang', 1], ['Omzet', 1], ['Share', 1]], types.map(([n, x]) => [esc(n), num(x.n), num(x.q), R.rp(x.v), R.pct(total ? x.v / total : NaN)]))}</div>
+      </div>
+      ${R.h2('Penjualan per tanggal', 'akumulasi')}
+      ${R.table([['Tanggal'], ['Transaksi', 1], ['Pasang', 1], ['Belum lunas', 1], ['Omzet', 1]], days.map(([d, x]) => [fmtDate(d), num(x.n), num(x.q), x.unpaid ? R.rp(x.unpaid) : '–', `<b>${R.rp(x.v)}</b>`]), ['Total', num(done.length), num(units), R.rp(unpaidP.reduce((s, x) => s + val(x), 0)), R.rp(total)])}
+      ${unpaidAll.length ? `${R.h2('Piutang belum lunas', `${num(unpaidAll.length)} transaksi`)}${R.table([['Tanggal'], ['Toko / distributor'], ['Invoice'], ['Nilai', 1], ['Jatuh tempo'], ['Status']], unpaidAll.sort((a, b) => (a.dueDate || '9').localeCompare(b.dueDate || '9')).map((x) => [fmtDate(x.date), esc(x.outlet), esc(x.invoice || '–'), R.rp(val(x)), x.dueDate ? fmtDate(x.dueDate) : '–', x.dueDate && x.dueDate < today() ? '<span class="chip bad">Lewat tempo</span>' : `<span class="chip warn">${PAY[x.payment]}</span>`]))}` : ''}`;
+    R.open({ title: 'Laporan Penjualan Offline', period: R.period(r.from, r.to), meta: [['Periode', R.period(r.from, r.to)], ['Cakupan', 'Toko, distributor, reseller, event']], body,
+      note: 'Hanya transaksi berstatus selesai. Piutang = pembayaran tempo / belum bayar.', sign: ['Dibuat oleh', 'Mengetahui'] });
   }
 
   // latest report per warehouse + item + size

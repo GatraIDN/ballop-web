@@ -114,7 +114,7 @@
     $('#incMore')?.addEventListener('click', () => { st.limit += 300; render(); });
     $('#incPdf').addEventListener('click', () => {
       const R = window.PdfReport;
-      const list = rows.slice(0, 400);
+      const byDay = [...new Set(rows.map((s) => day(s)).filter(Boolean))].sort().map((d) => [d, sum(rows.filter((s) => day(s) === d))]);
       const body = `
         ${R.h2(`Ringkasan income · ${esc(chLabel(st.ch))}`)}
         ${R.tiles([
@@ -133,9 +133,10 @@
           <div>${R.h2('Per bulan', 'tanggal dana cair')}
             ${R.table([['Bulan'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1]], byMonth.map(([m, x]) => [monthLabel(m), num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), `<b>${R.rp(x.payout)}</b>`]))}</div>
         </div>
-        ${R.h2('Daftar income', `${num(list.length)} dari ${num(rows.length)} baris`)}
-        ${R.table([['Dana cair'], ...(st.ch === 'all' ? [['Channel']] : []), ['No. pesanan'], ['Produk'], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1]],
-          list.map((s) => { const x = sum([s]); return [day(s) ? fmtDate(day(s)) : '–', ...(st.ch === 'all' ? [SALES_CH[s.channel].label] : []), `${esc(s.orderId)}${s.type === 'Penyesuaian' ? ' <span class="chip warn">penyesuaian</span>' : ''}`, esc(prod(s).length > 40 ? `${prod(s).slice(0, 38)}…` : prod(s)), R.rp(s.productPrice), R.rp(Math.abs(x.fees)), `<b>${R.rp(s.payout)}</b>`]; }))}`;
+        ${R.h2('Income per tanggal', 'akumulasi per tanggal dana cair')}
+        ${R.table([['Tanggal'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Fee %', 1], ['Refund · penyesuaian', 1], ['Omzet bersih', 1]],
+          byDay.map(([d, x]) => [fmtDate(d), num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? pct(Math.abs(x.fees) / x.price) : '–', R.rp(g(x, 'Pengembalian dana') + g(x, 'Penyesuaian')), `<b>${R.rp(x.payout)}</b>`]),
+          ['Total', num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(g(t, 'Pengembalian dana') + g(t, 'Penyesuaian')), R.rp(t.payout)])}`;
       R.open({ title: 'Laporan Income', period: R.period(r.from, r.to), meta: [['Periode', st.range === 'all' ? 'Semua data' : R.period(r.from, r.to)], ['Channel', esc(chLabel(st.ch))]], body,
         note: 'Income = pesanan selesai yang dananya sudah cair ke saldo penjual. Tanggal = tanggal dana dilepaskan. Omzet bersih = GMV kotor setelah semua fee, voucher, ongkir & refund.' });
     });

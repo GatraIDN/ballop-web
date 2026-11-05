@@ -46,8 +46,11 @@ window.MarketImport = (() => {
   const text = (v) => String(v ?? '').trim();
   const sizeOf = (variation) => { const t = text(variation).match(/size\s*[:=]\s*([0-9]{2}(?:[.,]5)?|XS|S|M|L|XL|XXL)/i); if (t) return t[1].toUpperCase(); const m = text(variation).match(/(?:^|,|\s)\s*([0-9]{2}(?:[.,]5)?|XS|S|M|L|XL|XXL)\s*$/i); return m ? m[1].toUpperCase() : ''; };
   function stateOf(status, returnedQty, qty, extra = '') {
-    const s = `${status} ${extra}`.toLowerCase();
+    // Shopee "Pesanan diterima, namun Pembeli masih dapat mengajukan pengembalian hingga …" is a received order,
+    // not a return: drop that phrase before looking for return words
+    const s = `${status} ${extra}`.toLowerCase().replace(/masih dapat mengajukan pengembalian[^,;]*/g, '');
     if (/batal|cancel/.test(s)) return 'cancelled';
+    if (/pesanan diterima/.test(s) && !(returnedQty && returnedQty >= qty) && !/pengembalian|return|refund|dikembalikan/.test(s)) return 'completed';
     if ((returnedQty && returnedQty >= qty) || /pengembalian|return|refund|dikembalikan/.test(s)) return 'returned';
     if (/selesai|completed|delivered|terkirim/.test(s)) return 'completed';
     return 'pending';
