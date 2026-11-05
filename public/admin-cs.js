@@ -49,7 +49,7 @@
   const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const longDay = (d) => { const [y, m, n] = d.split('-').map(Number); return `${n} ${MONTHS[m - 1]} ${y}`; };
   const st = { month: today().slice(0, 7) };
-  const sst = { ch: 'all', range: '7d', from: '', to: '', limit: 150 };
+  const sst = { ch: 'all', range: 'mtd', from: '', to: '', limit: 150 };
   const canEdit = () => window.A.can('cs') && !window.A.me?.readOnly;
   const who = () => window.A.me?.user?.name || window.A.me?.user?.username || 'admin';
   const stamp = () => { const d = new Date(); return `${today()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };

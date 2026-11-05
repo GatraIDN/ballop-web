@@ -10,7 +10,7 @@
   const chLabel = (c) => (c === 'all' ? 'Semua marketplace' : SALES_CH[c].label);
   const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
   const monthLabel = (m) => `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}`;
-  const st = { ch: 'all', range: '30d', from: '', to: '', q: '', limit: 150, open: '' };
+  const st = { ch: 'all', range: 'mtd', from: '', to: '', q: '', limit: 150, open: '' };
   const day = (s) => s.releaseDate || s.date || '';
 
   // {column: amount}; older rows (TikTok / ops sheet) only carry the summed fields

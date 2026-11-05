@@ -10,7 +10,7 @@
   const ratio = (n) => (Number.isFinite(n) && n > 0 ? `${n.toLocaleString('id-ID', { maximumFractionDigits: 2 })}×` : '–');
   const canEdit = () => window.A.can('ads') && !window.A.me?.readOnly;
   const st = { month: today().slice(0, 7) };
-  const est = { range: '7d', from: '', to: '', limit: 150 };
+  const est = { range: 'mtd', from: '', to: '', limit: 150 };
 
   // ---------- PDF: one day (from the popup, may be unsaved) or a period ----------
   function adsPdf(from, to, list) {

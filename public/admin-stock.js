@@ -6,7 +6,7 @@
   const { esc, num, fmtDate, today, toCsv } = B;
 
   const st = { wh: '', tab: 'sum', cat: '', product: '', color: '', status: '', q: '' };
-  const pst = { range: '7d', from: '', to: '', limit: 150 };
+  const pst = { range: 'mtd', from: '', to: '', limit: 150 };
   try { Object.assign(st, JSON.parse(localStorage.getItem('ballopStock') || '{}')); } catch {}
   if (!['sum', 'now', 'size'].includes(st.tab)) st.tab = 'sum';
   const edits = new Map(); // id -> { available, damaged }

@@ -67,7 +67,7 @@
   const RANGES = [
     ['today', 'Hari ini'], ['yday', 'Kemarin'], ['7d', '7 hari'], ['30d', '30 hari'], ['90d', '90 hari'], ['mtd', 'Bulan ini'], ['lastm', 'Bulan lalu'], ['ytd', 'Tahun ini'], ['all', 'Semua'],
   ];
-  let range = { key: '30d', from: '', to: '' };
+  let range = { key: 'mtd', from: '', to: '' };
   function resolveRange(key) {
     const t = today();
     const d = parse(t);
@@ -1428,7 +1428,7 @@
   const lstate = {};
   function renderLedger(name, targetSel, opts = {}) {
     const cfg = LEDGERS[name];
-    const st = lstate[name] = lstate[name] || { range: '30d', channel: '', product: '', status: '', category: '', q: '', limit: 100 };
+    const st = lstate[name] = lstate[name] || { range: 'mtd', channel: '', product: '', status: '', category: '', q: '', limit: 100 };
     const root = $(targetSel);
     const r = st.range === 'all' ? { from: '0000-00-00', to: '9999-12-31' } : resolveRange(st.range);
     let rows = data[name].filter((x) => x.date >= r.from && x.date <= r.to);
@@ -1707,7 +1707,7 @@
 
   // ---------- ads summary on top of the ads ledger ----------
   function renderAds() {
-    const st = lstate.ads = lstate.ads || { range: '30d', channel: '', q: '', limit: 100 };
+    const st = lstate.ads = lstate.ads || { range: 'mtd', channel: '', q: '', limit: 100 };
     const r = st.range === 'all' ? { from: '0000-00-00', to: '9999-12-31' } : resolveRange(st.range);
     const m = compute(r.from, r.to);
     const cards = Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).map(([k, c]) => {
@@ -1718,7 +1718,7 @@
     window.AdsCal?.mount('#adCal');
   }
   function renderSales() {
-    const st = lstate.sales = lstate.sales || { range: '30d', channel: '', product: '', status: '', q: '', limit: 100 };
+    const st = lstate.sales = lstate.sales || { range: 'mtd', channel: '', product: '', status: '', q: '', limit: 100 };
     const r = st.range === 'all' ? { from: '0000-00-00', to: '9999-12-31' } : resolveRange(st.range);
     const m = compute(r.from, r.to);
     const cards = Object.entries(SALES_CH).filter(([k]) => m.byCh[k]).map(([k, c]) => {
@@ -1776,7 +1776,7 @@
 
   // ---------- online sales (imported marketplace exports) ----------
   const ORDER_STATE = { completed: 'Selesai', pending: 'Diproses', cancelled: 'Batal', returned: 'Retur' };
-  const ost = { range: '30d', channel: '', state: '', q: '', limit: 150 };
+  const ost = { range: 'mtd', channel: '', state: '', q: '', limit: 150 };
   let pending = null; // parsed files waiting for the Import button
   const R_period = (r) => (window.PdfReport ? window.PdfReport.period(r.from, r.to) : `${r.from} – ${r.to}`);
   function renderOnline() {
@@ -1949,9 +1949,9 @@
   }
 
   // ---------- offline / 3PL / KOL / finance ----------
-  const rangeOf = (name) => { const st = lstate[name] || { range: '30d' }; return st.range === 'all' ? { from: '0000-00-00', to: '9999-12-31' } : resolveRange(st.range || '30d'); };
+  const rangeOf = (name) => { const st = lstate[name] || { range: 'mtd' }; return st.range === 'all' ? { from: '0000-00-00', to: '9999-12-31' } : resolveRange(st.range || '30d'); };
   function renderOffline() {
-    lstate.offline = lstate.offline || { range: '30d', limit: 100 };
+    lstate.offline = lstate.offline || { range: 'mtd', limit: 100 };
     const r = rangeOf('offline');
     const rows = data.offline.filter((x) => x.date >= r.from && x.date <= r.to && x.status === 'completed');
     const total = rows.reduce((s, x) => s + x.qty * x.price - x.discount, 0);
@@ -2085,7 +2085,7 @@
     if (fn && !$(`#view-${current}`).hidden) fn();
   }
   document.addEventListener('admin:ready', async () => {
-    setRange('30d');
+    setRange('mtd');
     renderDashboard();
     // each user only receives the collections their roles allow; the rest stay empty
     const got = await Promise.all(COLLS.map((n) => api(`/api/${n}`).catch(() => [])));
