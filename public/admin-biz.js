@@ -1013,16 +1013,49 @@
   // "1500000" or "1.500.000" -> "Rp 1,500,000"; anything else is kept as typed
   const saldoText = (v) => { const n = Number(String(v).replace(/[^0-9]/g, '')); return /^[\s\d.,rpRP]*$/.test(v) && n ? repMoney(n) : v; };
   // the report date is the end of the selected range; totals are month-to-date up to that date
+  // WhatsApp report = the Ringkasan numbers for the selected period, online channels only (offline left out)
   function reportText() {
-    const r = repGet(), d = parse(range.to);
-    const m = compute(iso(new Date(d.getFullYear(), d.getMonth(), 1)), range.to);
+    const r = repGet();
+    const len = daysBetween(range.from, range.to);
+    const S = summary(range.from, range.to), P = summary(addDays(range.from, -len), addDays(range.from, -1));
+    const on = (X) => {
+      const chs = X.channels.filter((c) => c.key !== 'offline');
+      const t = chs.reduce((o, c) => { ['omzet', 'orders', 'units', 'all', 'cancelled', 'returned', 'gmv', 'net', 'fees', 'adSpend', 'adRevenue', 'margin'].forEach((k) => { o[k] += c[k] || 0; }); return o; },
+        { omzet: 0, orders: 0, units: 0, all: 0, cancelled: 0, returned: 0, gmv: 0, net: 0, fees: 0, adSpend: 0, adRevenue: 0, margin: 0 });
+      // ads that belong to no sales channel (Meta, Google) still count as online ad spend
+      X.adOnly.forEach((x) => { t.adSpend += x.spend; t.adRevenue += x.revenue; t.margin -= x.spend; });
+      t.chs = chs; t.profit = t.margin - X.m.expenses;
+      return t;
+    };
+    const c = on(S), p = on(P);
+    const chg = (x, y) => { if (!y || !Number.isFinite(x) || !Number.isFinite(y)) return ''; const d = (x - y) / Math.abs(y); return ` (${d >= 0 ? '▲' : '▼'} ${(Math.abs(d) * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%)`; };
+    const pc = (x) => (Number.isFinite(x) ? `${(x * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%` : '–');
+    const period = range.from === range.to ? longDate(range.from) : `${longDate(range.from)} – ${longDate(range.to)}`;
+    const top = S.products.slice(0, 3);
+    let n = 0;
+    const L = (txt) => `${++n}. ${txt}`;
     return [
-      `Selamat pagi mister, berikut ini daily report untuk Ballop E-Commerce per tanggal ${longDate(range.to)} :`, '',
-      `1. Total pengeluaran iklan selama bulan ini : ${repMoney(m.adSpend)}`,
-      `2. Total GMV yang dihasilkan selama bulan ini : ${repMoney(m.adRevenue)}`,
-      `3. Roas yang dihasilkan selama bulan ini : ${repRatio(m.adRoas)}`,
-      ...SALDO.map(([k, l], i) => `${i + 4}. ${l} : ${saldoText(r[k] || '') || '-'}`),
-      '', '', r.footer ?? FOOTER,
+      `Selamat pagi mister, berikut ini report Ballop E-Commerce periode ${period} :`, '',
+      '*Ringkasan online (Shopee, TikTok Shop, Tokopedia)*',
+      L(`Omzet pesanan : ${repMoney(c.omzet)}${chg(c.omzet, p.omzet)}`),
+      L(`Jumlah pesanan : ${num(c.orders)} pesanan · ${num(c.units)} pasang${chg(c.orders, p.orders)}`),
+      L(`AOV : ${c.orders ? repMoney(c.omzet / c.orders) : '-'}`),
+      L(`Batal + retur : ${pc(c.all ? (c.cancelled + c.returned) / c.all : NaN)} (${num(c.cancelled + c.returned)} dari ${num(c.all)} pesanan)`),
+      L(`GMV kotor (dana cair) : ${repMoney(c.gmv)}`),
+      L(`Fee marketplace : ${repMoney(c.fees)} (${pc(c.gmv ? c.fees / c.gmv : NaN)} dari GMV)`),
+      L(`Omzet bersih (dana cair) : ${repMoney(c.net)}${chg(c.net, p.net)}`),
+      L(`Total pengeluaran iklan : ${repMoney(c.adSpend)}${chg(c.adSpend, p.adSpend)}`),
+      L(`GMV dari iklan : ${repMoney(c.adRevenue)}`),
+      L(`ROAS iklan : ${repRatio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}`),
+      L(`Laba bersih online (estimasi) : ${repMoney(c.profit)}`),
+      ...(S.live.sessions ? [L(`TikTok LIVE : ${repMoney(S.live.gmv)} dari ${num(S.live.sessions)} sesi`)] : []),
+      '', '*Per channel*',
+      ...c.chs.map((x) => `- ${x.label} : omzet ${repMoney(x.omzet)} · ${num(x.orders)} pesanan · omzet bersih ${repMoney(x.net)}${x.adSpend ? ` · iklan ${repMoney(x.adSpend)} (ROAS ${repRatio(x.adRevenue / x.adSpend)})` : ''}`),
+      ...(top.length ? ['', '*Produk terlaris*', ...top.map((x, i) => `${i + 1}. ${x.name} : ${num(x.units)} pasang · ${repMoney(x.revenue)}`)] : []),
+      '', '*Saldo iklan*',
+      ...SALDO.map(([k, l]) => `- ${l} : ${saldoText(r[k] || '') || '-'}`),
+      '', `▲▼ = dibanding ${longDate(P.from)} – ${longDate(P.to)}. Omzet bersih & GMV kotor = dana yang sudah cair di periode ini.`,
+      '', r.footer ?? FOOTER,
     ].join('\n');
   }
   const copyReport = async () => { try { await navigator.clipboard.writeText(reportText()); toast('Teks report disalin'); } catch { toast('Tidak bisa menyalin', true); } };
@@ -1034,7 +1067,7 @@
     box.innerHTML = `<div class="raw-card rep-pop">
       <header><div><span class="muted small">Teks daily report</span><h2>Atur saldo & penutup</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
       <div class="raw-body">
-        <p class="muted small" style="margin-top:0">Angka iklan = bulan berjalan s/d tanggal akhir periode yang dipilih. Saldo & kalimat penutup tersimpan di browser ini.</p>
+        <p class="muted small" style="margin-top:0">Angka = data Ringkasan untuk periode yang dipilih di atas, hanya channel online (offline tidak ikut). Saldo & kalimat penutup tersimpan di browser ini.</p>
         <div class="row three">${SALDO.map(([k, l]) => `<label>${l}<input type="text" inputmode="numeric" data-rep="${k}" value="${esc(r[k] || '')}" placeholder="mis. 1500000"></label>`).join('')}</div>
         <label>Kalimat penutup<textarea data-rep="footer" rows="2">${esc(r.footer ?? FOOTER)}</textarea></label>
         <pre class="report-text" id="reportText"></pre>
