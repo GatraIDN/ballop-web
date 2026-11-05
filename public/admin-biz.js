@@ -1791,9 +1791,6 @@
     rows.sort((a, b) => b.date.localeCompare(a.date));
     const live = rows.filter((x) => x.state === 'completed' || x.state === 'pending');
     const orders = new Set(live.map((x) => `${x.channel}:${x.orderId}`));
-    const sett = data.settlements.filter((s) => (!ost.channel || s.channel === ost.channel) && (s.releaseDate || s.date) >= r.from && (s.releaseDate || s.date) <= r.to);
-    const payoutBy = new Map();
-    data.settlements.forEach((s) => { const k = `${s.channel}:${s.orderId}`; payoutBy.set(k, (payoutBy.get(k) || 0) + s.payout); });
     const byProd = {};
     live.forEach((x) => { const k = x.productName; const p = byProd[k] = byProd[k] || { units: 0, revenue: 0, sizes: {} }; p.units += x.qty; p.revenue += x.net; if (x.size) p.sizes[x.size] = (p.sizes[x.size] || 0) + x.qty; });
     const top = Object.entries(byProd).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 12);
@@ -1827,8 +1824,6 @@
       <div class="sum-cards">
         <div class="sum-card solid"><div class="k-label">Pesanan masuk</div><div class="k-value">${num(orders.size)}</div><div class="k-sub">${num(live.reduce((s, x) => s + x.qty, 0))} pasang</div></div>
         <div class="sum-card solid"><div class="k-label">Omzet (setelah diskon)</div><div class="k-value">${money(live.reduce((s, x) => s + x.net, 0))}</div><div class="k-sub">AOV ${orders.size ? money(live.reduce((s, x) => s + x.net, 0) / orders.size) : '–'}</div></div>
-        <div class="sum-card solid"><div class="k-label">Dana cair</div><div class="k-value">${money(sett.reduce((s, x) => s + x.payout, 0))}</div><div class="k-sub">${num(sett.length)} transaksi income</div></div>
-        <div class="sum-card solid"><div class="k-label">Biaya marketplace</div><div class="k-value">${money(sett.reduce((s, x) => s + Math.abs(x.fees), 0))}</div><div class="k-sub">admin, layanan, afiliasi</div></div>
         <div class="sum-card solid"><div class="k-label">Batal · retur</div><div class="k-value">${num(cnt('cancelled'))} · ${num(cnt('returned'))}</div><div class="k-sub">pesanan</div></div>
       </div>
       <div class="grid-3" style="margin-top:0">
@@ -1842,8 +1837,8 @@
       <section class="panel solid" style="margin-top:14px">
         <div class="panel-head"><h2>Daftar pesanan</h2><span class="muted small">${num(rows.length)} baris</span></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Tanggal</th><th>Channel</th><th>No. pesanan</th><th>Produk</th><th>Variasi</th><th class="num">Qty</th><th class="num">Omzet</th><th class="num">Dana cair</th><th>Status</th></tr></thead>
-          <tbody>${rows.slice(0, ost.limit).map((x) => { const pay = payoutBy.get(`${x.channel}:${x.orderId}`); return `<tr><td>${fmtDate(x.date)}</td><td>${chBadge(SALES_CH, x.channel)}</td><td><button class="raw-link" type="button" data-raw="orders" data-key="${esc(x.key)}">${esc(x.orderId)}</button></td><td title="${esc(x.productName)}">${esc(x.productName.length > 42 ? `${x.productName.slice(0, 40)}…` : x.productName)}</td><td>${esc(x.variation)}</td><td class="num">${num(x.qty)}</td><td class="num">${money(x.net)}</td><td class="num">${pay != null ? money(pay) : '<span class="muted">–</span>'}</td><td><span class="badge ${x.state === 'completed' ? 'live' : x.state === 'pending' ? '' : x.state === 'returned' ? 'warn' : 'bad'}" title="${esc(x.status)}">${ORDER_STATE[x.state]}</span></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted" style="text-align:center;padding:30px">Belum ada pesanan di filter ini.</td></tr>'}</tbody>
+          <thead><tr><th>Tanggal</th><th>Channel</th><th>No. pesanan</th><th>Produk</th><th>Variasi</th><th class="num">Qty</th><th class="num">Omzet</th><th>Status</th></tr></thead>
+          <tbody>${rows.slice(0, ost.limit).map((x) => { return `<tr><td>${fmtDate(x.date)}</td><td>${chBadge(SALES_CH, x.channel)}</td><td><button class="raw-link" type="button" data-raw="orders" data-key="${esc(x.key)}">${esc(x.orderId)}</button></td><td title="${esc(x.productName)}">${esc(x.productName.length > 42 ? `${x.productName.slice(0, 40)}…` : x.productName)}</td><td>${esc(x.variation)}</td><td class="num">${num(x.qty)}</td><td class="num">${money(x.net)}</td><td><span class="badge ${x.state === 'completed' ? 'live' : x.state === 'pending' ? '' : x.state === 'returned' ? 'warn' : 'bad'}" title="${esc(x.status)}">${ORDER_STATE[x.state]}</span></td></tr>`; }).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:30px">Belum ada pesanan di filter ini.</td></tr>'}</tbody>
         </table></div>
         ${rows.length > ost.limit ? `<p style="text-align:center"><button class="btn sm" type="button" id="ordMore">Tampilkan lebih banyak</button></p>` : ''}
       </section>`;
@@ -1872,10 +1867,8 @@
         ${R.tiles([
           R.tile('Pesanan masuk', num(orders.size), `${num(live.reduce((s, x) => s + x.qty, 0))} pasang`, true),
           R.tile('Omzet (setelah diskon)', R.rp(omzet), `AOV ${orders.size ? R.rp(omzet / orders.size) : '–'}`),
-          R.tile('Omzet bersih (cair)', R.rp(sett.reduce((s, x) => s + x.payout, 0)), `${num(sett.length)} transaksi income`),
-          R.tile('Fee marketplace', R.rp(sett.reduce((s, x) => s + Math.abs(x.fees), 0)), 'admin, layanan, afiliasi'),
           R.tile('Batal · retur', `${num(cnt('cancelled'))} · ${num(cnt('returned'))}`, 'pesanan'),
-        ], 5)}
+        ], 3)}
         ${R.h2('Per channel')}
         ${R.table([['Channel'], ['Pesanan', 1], ['Selesai/diproses', 1], ['Batal', 1], ['Retur', 1], ['Unit', 1], ['Omzet', 1], ['Share', 1]],
           chs.map(([k, c]) => [`${R.dot(SALES_CH[k]?.color || '#888')}${esc(SALES_CH[k]?.label || k)}`, num(c.all.size), num(c.done.size), num(c.cancelled.size), num(c.returned.size), num(c.units), `<b>${R.rp(c.omzet)}</b>`, R.pct(omzet ? c.omzet / omzet : NaN)]),
