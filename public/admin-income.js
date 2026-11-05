@@ -44,6 +44,73 @@
     return t;
   }
   const g = (t, name) => t.groups[name]?.total || 0;
+
+  // ---------- RRP → ASP → … → NMV ----------
+  // RRP comes from the order export (price before any discount), matched by order number; ASP = product price on the
+  // income row (after the seller's discount). Subsidi = platform-funded discount, voucher = seller-funded voucher/cashback,
+  // ongkir = net shipping we bear, MP fee = every marketplace fee except affiliate, NMV = money released to the wallet.
+  const AFF = /affiliate|afiliasi|komisi ams/i;
+  const TOPUP = 'Biaya Isi Saldo Otomatis (dari Penghasilan)';
+  let rrpIdx = null, rrpLen = -1;
+  const rrpOf = () => {
+    if (rrpLen !== B.data.orders.length) {
+      rrpIdx = new Map();
+      B.data.orders.forEach((o) => { if (o.state === 'cancelled') return; rrpIdx.set(o.orderId, (rrpIdx.get(o.orderId) || 0) + (o.gross || o.unitPrice * o.qty || o.net || 0)); });
+      rrpLen = B.data.orders.length;
+    }
+    return rrpIdx;
+  };
+  function kpis(rows) {
+    const idx = rrpOf();
+    const k = { rrp: 0, asp: 0, subsidi: 0, voucher: 0, ongkir: 0, refund: 0, aff: 0, topup: 0, adj: 0, mp: 0, nmv: 0, orders: 0, matched: 0, mpLines: {}, affLines: {} };
+    rows.forEach((x) => {
+      k.nmv += x.payout || 0;
+      if (x.type === 'Penyesuaian') { k.adj += x.payout || 0; return; }
+      k.orders++; k.asp += x.productPrice || 0;
+      const o = idx.get(x.orderId);
+      if (o) { k.rrp += o; k.matched++; } else k.rrp += x.productPrice || 0;
+      Object.entries(detailOf(x)).forEach(([key, v]) => {
+        const grp = MI.feeGroup(key);
+        if (key === TOPUP) k.topup -= v;
+        else if (grp === 'Voucher & subsidi') { if (v > 0) k.subsidi += v; else k.voucher -= v; }
+        else if (grp === 'Biaya pengiriman') k.ongkir -= v;
+        else if (grp === 'Pengembalian dana') k.refund -= v;
+        else if (AFF.test(key)) { k.aff -= v; k.affLines[key] = (k.affLines[key] || 0) - v; }
+        else { k.mp -= v; k.mpLines[key] = (k.mpLines[key] || 0) - v; }
+      });
+    });
+    k.disc = k.rrp - k.asp; k.discPct = k.rrp ? k.disc / k.rrp : NaN;
+    k.mpPct = k.asp + k.subsidi ? k.mp / (k.asp + k.subsidi) : NaN;
+    // what the parts add up to; any gap means an unmapped column (should stay 0)
+    k.gap = k.nmv - (k.asp + k.subsidi - k.voucher - k.ongkir - k.mp - k.aff - k.topup - k.refund + k.adj);
+    return k;
+  }
+  const FEE_NAME = { 'Biaya Administrasi (termasuk PPN 11%)': 'Biaya administrasi', 'Platform commission fee': 'Komisi platform', 'Dynamic commission': 'Komisi dinamis', 'Mall service fee': 'Biaya layanan Mall', 'Order processing fee': 'Biaya proses pesanan', 'Biaya Proses Pesanan': 'Biaya proses pesanan', 'Biaya Pembayaran': 'Biaya pembayaran', 'Biaya Transaksi': 'Biaya transaksi', 'Growth Xtra Program service fee': 'Growth Xtra', 'Growth Xtra Program Super service fee': 'Growth Xtra Super', 'Article 22 Income Tax withheld': 'PPh 22', 'Biaya Layanan Promo XTRA': 'Promo XTRA', 'Biaya Layanan Shopee Video XTRA': 'Shopee Video XTRA' };
+  // fee lines with the same meaning on Shopee and TikTok are shown as one card
+  const feeName = (key) => (/^Biaya Gratis Ongkir XTRA/i.test(key) ? 'Gratis Ongkir XTRA' : FEE_NAME[key] || key);
+  const mpCards = (k) => { const m = {}; Object.entries(k.mpLines).forEach(([key, v]) => { const n = feeName(key); m[n] = (m[n] || 0) + v; }); return Object.entries(m).filter(([, v]) => Math.abs(v) >= 1).sort((a, b) => b[1] - a[1]); };
+  const kcard = (label, value, sub = '', cls = '') => `<div class="sum-card solid${cls ? ` ${cls}` : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div><div class="k-sub">${sub}</div></div>`;
+  const kpiCards = (k) => `
+      <div class="sum-cards inc-kpis">
+        ${kcard('RRP', money(k.rrp), `harga sebelum diskon${k.orders && k.matched < k.orders ? ` · ${num(k.orders - k.matched)} pesanan tanpa file order (pakai ASP)` : ''}`)}
+        ${kcard('ASP', money(k.asp), 'harga setelah diskon')}
+        ${kcard('Discount amount', money(k.disc), 'RRP − ASP')}
+        ${kcard('Discount (%)', pct(k.discPct), 'dari RRP')}
+        ${kcard('Subsidi', money(k.subsidi), 'ditanggung marketplace')}
+        ${kcard('Ongkir', money(k.ongkir), 'netto ditanggung penjual')}
+        ${kcard('Voucher', k.voucher ? money(k.voucher) : '–', 'voucher & cashback penjual')}
+        ${kcard('MP fee', money(k.mp), 'semua fee marketplace', 'neg')}
+        ${kcard('Komisi affiliate', money(k.aff), Object.keys(k.affLines).length ? esc(Object.keys(k.affLines).map(feeName).join(', ')) : 'AMS / affiliate')}
+        ${kcard('MP (%)', pct(k.mpPct), 'MP fee ÷ (ASP + subsidi)')}
+        ${kcard('NMV', money(k.nmv), `dana cair · ${num(k.orders)} pesanan`, 'hero')}
+        ${k.refund ? kcard('Refund', money(k.refund), 'dikembalikan ke pembeli') : ''}
+        ${k.topup ? kcard('Top-up saldo iklan', money(k.topup), 'dipotong dari penghasilan') : ''}
+        ${k.adj ? kcard('Penyesuaian', money(k.adj), 'kompensasi / koreksi') : ''}
+        ${Math.abs(k.gap) >= 1 ? kcard('Lainnya', money(k.gap), 'kolom yang belum terpetakan') : ''}
+      </div>
+      <div class="panel solid inc-fees"><div class="panel-head"><h2>Rincian MP fee</h2><span class="muted small">${money(k.mp)} · % dari ASP</span></div>
+        <div class="inc-fee-grid">${mpCards(k).map(([n, v]) => `<div class="inc-fee"><span>${esc(n)}</span><b>${money(v)}</b><small>${k.asp ? pct(v / k.asp) : '–'} dari ASP · ${k.mp ? pct(v / k.mp) : '–'} dari MP fee</small><i style="width:${k.mp ? Math.min(100, (v / k.mp) * 100) : 0}%"></i></div>`).join('') || '<p class="muted">Tidak ada fee di periode ini.</p>'}</div>
+      </div>`;
   const signed = (v) => `<span style="color:${v < 0 ? 'var(--danger)' : v > 0 ? 'var(--ok, #1baf7a)' : 'inherit'}">${v > 0 ? '+' : ''}${money(v)}</span>`;
 
   function render() {
@@ -54,6 +121,7 @@
     const inP = (s) => st.range === 'all' || (day(s) >= r.from && day(s) <= r.to);
     let rows = chRows.filter(inP);
     const t = sum(rows);
+    const K = kpis(rows);
     if (st.q) { const q = st.q.toLowerCase(); rows = rows.filter((s) => `${s.orderId} ${(s.items || []).map((x) => x.name).join(' ')} ${s.courier} ${s.payment} ${s.note}`.toLowerCase().includes(q)); }
     rows.sort((a, b) => day(b).localeCompare(day(a)) || b.orderId.localeCompare(a.orderId));
     const share = (x) => (t.price ? pct(Math.abs(x) / t.price) : '–');
@@ -78,7 +146,8 @@
         <button class="btn sm btn-export" type="button" id="incPdf">⬇ Export PDF</button><button class="btn sm" type="button" id="incExport">CSV</button>
       </div>
       ${chRows.length ? `
-      <div class="sum-cards">
+      ${kpiCards(K)}
+      <div class="sum-cards" hidden>
         <div class="sum-card solid"><div class="k-label">Omzet bersih</div><div class="k-value">${money(t.payout)}</div><div class="k-sub">${num(t.orders)} pesanan selesai · ${share(t.payout)} dari GMV kotor</div></div>
         <div class="sum-card solid"><div class="k-label">GMV kotor</div><div class="k-value">${money(t.price)}</div><div class="k-sub">sebelum voucher & potongan</div></div>
         <div class="sum-card solid"><div class="k-label">Total fee marketplace</div><div class="k-value" style="color:var(--danger)">${money(Math.abs(t.fees))}</div><div class="k-sub">${share(t.fees)} dari GMV kotor</div></div>
@@ -118,12 +187,21 @@
       const body = `
         ${R.h2(`Ringkasan income · ${esc(chLabel(st.ch))}`)}
         ${R.tiles([
-          R.tile('Omzet bersih', R.rp(t.payout), `${num(t.orders)} pesanan · ${share(t.payout)} dari GMV`, true),
-          R.tile('GMV kotor', R.rp(t.price), 'sebelum voucher & potongan'),
-          R.tile('Fee marketplace', R.rp(Math.abs(t.fees)), `${share(t.fees)} dari GMV kotor`),
-          R.tile('Voucher · ongkir', R.rp(Math.abs(g(t, 'Voucher & subsidi'))), `ongkir netto ${R.rp(g(t, 'Biaya pengiriman'))}`),
-          R.tile('Refund · penyesuaian', R.rp(g(t, 'Pengembalian dana')), `penyesuaian ${R.rp(g(t, 'Penyesuaian'))}`),
-        ], 5)}
+          R.tile('RRP', R.rp(K.rrp), 'harga sebelum diskon'),
+          R.tile('ASP', R.rp(K.asp), 'harga setelah diskon'),
+          R.tile('Discount', R.rp(K.disc), `${pct(K.discPct)} dari RRP`),
+          R.tile('Subsidi', R.rp(K.subsidi), 'ditanggung marketplace'),
+          R.tile('Ongkir', R.rp(K.ongkir), 'netto ditanggung penjual'),
+          R.tile('Voucher', K.voucher ? R.rp(K.voucher) : '–', 'voucher & cashback penjual'),
+          R.tile('MP fee', R.rp(K.mp), `${pct(K.mpPct)} dari ASP + subsidi`),
+          R.tile('Komisi affiliate', R.rp(K.aff)),
+          ...(K.refund ? [R.tile('Refund', R.rp(K.refund))] : []),
+          ...(K.topup ? [R.tile('Top-up saldo iklan', R.rp(K.topup))] : []),
+          ...(K.adj ? [R.tile('Penyesuaian', R.rp(K.adj))] : []),
+          R.tile('NMV', R.rp(K.nmv), `dana cair · ${num(K.orders)} pesanan`, true),
+        ], 4)}
+        ${R.h2('Rincian MP fee', `${R.rp(K.mp)} · ${pct(K.mpPct)} dari ASP + subsidi`)}
+        ${R.table([['Jenis fee'], ['Jumlah', 1], ['% dari ASP', 1], ['% dari MP fee', 1]], mpCards(K).map(([n, x]) => [esc(n), R.rp(x), K.asp ? pct(x / K.asp) : '–', K.mp ? pct(x / K.mp) : '–']), ['Total MP fee', R.rp(K.mp), K.asp ? pct(K.mp / K.asp) : '–', '100%'])}
         ${st.ch === 'all' ? `${R.h2('Per channel')}${R.table([['Channel'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Fee %', 1], ['Omzet bersih', 1]],
           CHANNELS.filter((c) => c !== 'all').map((c) => [c, sum(rows.filter((x) => x.channel === c))]).filter(([, x]) => x.orders || x.payout).map(([c, x]) => [`${R.dot(SALES_CH[c].color)}${SALES_CH[c].label}`, num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? pct(Math.abs(x.fees) / x.price) : '–', `<b>${R.rp(x.payout)}</b>`]),
           ['Total', num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(t.payout)])}` : ''}

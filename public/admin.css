@@ -993,3 +993,15 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .si-pop { max-width: 980px; }
 .si-date { display: inline-flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 12px; }
 .si-new { margin: 0; padding-left: 18px; font-size: 13px; }
+
+.inc-kpis { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.inc-kpis .sum-card.neg .k-value { color: var(--danger); }
+.inc-kpis .sum-card.hero { background: var(--ink); color: #fff; }
+.inc-kpis .sum-card.hero .k-label, .inc-kpis .sum-card.hero .k-sub { color: rgba(255,255,255,.7); }
+.inc-fees { margin: 0 0 14px; }
+.inc-fee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.inc-fee { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 14px; overflow: hidden; }
+.inc-fee span { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
+.inc-fee b { display: block; font-size: 18px; margin: 4px 0 2px; color: var(--danger); font-variant-numeric: tabular-nums; }
+.inc-fee small { font-size: 11px; color: var(--muted); }
+.inc-fee i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--danger); opacity: .55; }
