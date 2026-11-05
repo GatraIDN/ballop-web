@@ -75,7 +75,7 @@
       <div style="margin-top:16px">${B.rangeBar(st)}</div>
       <div class="filters-row">${tabs}<span class="spacer"></span>
         <input type="search" data-i="q" placeholder="Cari no. pesanan / produk…" value="${esc(st.q)}">
-        <button class="btn sm" type="button" id="incExport">⬇ Export</button>
+        <button class="btn sm btn-export" type="button" id="incPdf">⬇ Export PDF</button><button class="btn sm" type="button" id="incExport">CSV</button>
       </div>
       ${chRows.length ? `
       <div class="sum-cards">
@@ -112,6 +112,33 @@
     window.RawPopup.bind(v);
     $$('tr[data-k]', v).forEach((tr) => tr.addEventListener('click', () => { st.open = st.open === tr.dataset.k ? '' : tr.dataset.k; render(); }));
     $('#incMore')?.addEventListener('click', () => { st.limit += 300; render(); });
+    $('#incPdf').addEventListener('click', () => {
+      const R = window.PdfReport;
+      const list = rows.slice(0, 400);
+      const body = `
+        ${R.h2(`Ringkasan income · ${esc(chLabel(st.ch))}`)}
+        ${R.tiles([
+          R.tile('Omzet bersih', R.rp(t.payout), `${num(t.orders)} pesanan · ${share(t.payout)} dari GMV`, true),
+          R.tile('GMV kotor', R.rp(t.price), 'sebelum voucher & potongan'),
+          R.tile('Fee marketplace', R.rp(Math.abs(t.fees)), `${share(t.fees)} dari GMV kotor`),
+          R.tile('Voucher · ongkir', R.rp(Math.abs(g(t, 'Voucher & subsidi'))), `ongkir netto ${R.rp(g(t, 'Biaya pengiriman'))}`),
+          R.tile('Refund · penyesuaian', R.rp(g(t, 'Pengembalian dana')), `penyesuaian ${R.rp(g(t, 'Penyesuaian'))}`),
+        ], 5)}
+        ${st.ch === 'all' ? `${R.h2('Per channel')}${R.table([['Channel'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Fee %', 1], ['Omzet bersih', 1]],
+          CHANNELS.filter((c) => c !== 'all').map((c) => [c, sum(rows.filter((x) => x.channel === c))]).filter(([, x]) => x.orders || x.payout).map(([c, x]) => [`${R.dot(SALES_CH[c].color)}${SALES_CH[c].label}`, num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? pct(Math.abs(x.fees) / x.price) : '–', `<b>${R.rp(x.payout)}</b>`]),
+          ['Total', num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(t.payout)])}` : ''}
+        <div class="two">
+          <div>${R.h2('Rincian potongan', '% dari GMV kotor')}
+            ${R.table([['Komponen'], ['Jumlah', 1], ['%', 1]], [['<b>GMV kotor</b>', `<b>${R.rp(t.price)}</b>`, '100%'], ...groups.map((n) => [`${esc(n)}${MI.NOT_FEES.includes(n) ? '' : ' <span class="chip warn">fee</span>'}`, R.rp(t.groups[n].total), share(t.groups[n].total)])], ['Omzet bersih', R.rp(t.payout), share(t.payout)])}</div>
+          <div>${R.h2('Per bulan', 'tanggal dana cair')}
+            ${R.table([['Bulan'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1]], byMonth.map(([m, x]) => [monthLabel(m), num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), `<b>${R.rp(x.payout)}</b>`]))}</div>
+        </div>
+        ${R.h2('Daftar income', `${num(list.length)} dari ${num(rows.length)} baris`)}
+        ${R.table([['Dana cair'], ...(st.ch === 'all' ? [['Channel']] : []), ['No. pesanan'], ['Produk'], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1]],
+          list.map((s) => { const x = sum([s]); return [day(s) ? fmtDate(day(s)) : '–', ...(st.ch === 'all' ? [SALES_CH[s.channel].label] : []), `${esc(s.orderId)}${s.type === 'Penyesuaian' ? ' <span class="chip warn">penyesuaian</span>' : ''}`, esc(prod(s).length > 40 ? `${prod(s).slice(0, 38)}…` : prod(s)), R.rp(s.productPrice), R.rp(Math.abs(x.fees)), `<b>${R.rp(s.payout)}</b>`]; }))}`;
+      R.open({ title: 'Laporan Income', period: R.period(r.from, r.to), meta: [['Periode', st.range === 'all' ? 'Semua data' : R.period(r.from, r.to)], ['Channel', esc(chLabel(st.ch))]], body,
+        note: 'Income = pesanan selesai yang dananya sudah cair ke saldo penjual. Tanggal = tanggal dana dilepaskan. Omzet bersih = GMV kotor setelah semua fee, voucher, ongkir & refund.' });
+    });
     $('#incExport').addEventListener('click', () => {
       const cols = [...new Set(rows.flatMap((s) => Object.keys(detailOf(s))))];
       const head = ['Tanggal dana cair', 'Tanggal pesanan', 'Channel', 'No. pesanan', 'Tipe', 'Produk', 'Harga produk', ...cols, 'Total fee', 'Dana cair'];

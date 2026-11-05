@@ -971,3 +971,7 @@ td.ls-bad { color: var(--danger); font-weight: 900; }
 .tbar i { display: block; height: 6px; border-radius: 3px; }
 table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .btn.btn-export { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+.cs-sgroup { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; }
+.cs-sgroup > b { display: block; font-size: 12px; margin-bottom: 8px; color: var(--ink-2); }
+.cs-sum .panel-head { flex-wrap: wrap; gap: 8px; }
