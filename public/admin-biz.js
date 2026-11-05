@@ -1027,29 +1027,28 @@
       return t;
     };
     const c = on(S);
-    // short enough for one WhatsApp message: amounts in juta, one line per point
-    const jt = (n) => { const v = Math.round(n || 0); const a = Math.abs(v); const t = a >= 1e6 ? `${(a / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })}jt` : a >= 1e3 ? `${Math.round(a / 1e3)}rb` : String(a); return `${v < 0 ? '-' : ''}Rp${t}`; };
-    const pc = (x) => (Number.isFinite(x) ? `${(x * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–');
-    const rx = (x) => (Number.isFinite(x) && x > 0 ? `${x.toLocaleString('id-ID', { maximumFractionDigits: 2 })}×` : '–');
-    const saldo = (v) => { const n = Number(String(v || '').replace(/[^0-9]/g, '')); return /^[\s\d.,rpRP]*$/.test(v || '') && n ? jt(n) : (v || '-'); };
-    const short = (d) => { const x = parse(d); return `${x.getDate()} ${MONTHS[x.getMonth()]}`; };
-    const period = range.from === range.to ? longDate(range.from) : `${short(range.from)} – ${longDate(range.to)}`;
+    // numbered like the original daily report, full rupiah amounts, short enough for one WhatsApp message
+    const pc = (x) => (Number.isFinite(x) ? `${(x * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%` : '–');
+    const period = range.from === range.to ? longDate(range.from) : `${longDate(range.from)} – ${longDate(range.to)}`;
     const top = S.products.slice(0, 3);
-    const chName = { shopee: 'Shopee', tiktok: 'TikTok', tokopedia: 'Tokped' };
+    let n = 0;
+    const L = (txt) => `${++n}. ${txt}`;
     return [
-      `Selamat pagi mister, report Ballop E-Commerce ${period}:`, '',
-      '*Online (Shopee, TikTok, Tokped)*',
-      `• Omzet ${jt(c.omzet)} · ${num(c.orders)} pesanan · ${num(c.units)} psg`,
-      `• AOV ${jt(c.orders ? c.omzet / c.orders : 0)} · batal+retur ${pc(c.all ? (c.cancelled + c.returned) / c.all : NaN)}`,
-      `• GMV kotor ${jt(c.gmv)} · fee ${pc(c.gmv ? c.fees / c.gmv : NaN)}`,
-      `• Dana cair ${jt(c.net)}`,
-      `• Iklan ${jt(c.adSpend)} · GMV iklan ${jt(c.adRevenue)} · ROAS ${rx(c.adSpend ? c.adRevenue / c.adSpend : NaN)}`,
-      `• Laba bersih (est.) ${jt(c.profit)}`,
-      ...(S.live.sessions ? [`• LIVE ${jt(S.live.gmv)} (${num(S.live.sessions)} sesi)`] : []),
-      '', '*Per channel* (omzet · cair · iklan)',
-      ...c.chs.map((x) => `• ${chName[x.key] || x.label}: ${jt(x.omzet)} · ${jt(x.net)}${x.adSpend ? ` · ${jt(x.adSpend)} (ROAS ${rx(x.adRevenue / x.adSpend)})` : ''}`),
-      ...(top.length ? ['', `*Terlaris*: ${top.map((x) => `${x.name.replace(/^BALLOP\s+/i, '')} ${num(x.units)}`).join(', ')}`] : []),
-      '', `*Saldo iklan*: Shopee ${saldo(r.shopee)} · TikTok ${saldo(r.tiktok)} · CPAS ${saldo(r.cpas)}`,
+      `Selamat pagi mister, berikut report Ballop E-Commerce periode ${period} :`, '',
+      '*Ringkasan online (Shopee, TikTok Shop, Tokopedia)*',
+      L(`Omzet pesanan : ${repMoney(c.omzet)}`),
+      L(`Jumlah pesanan : ${num(c.orders)} pesanan (${num(c.units)} pasang)`),
+      L(`AOV : ${c.orders ? repMoney(c.omzet / c.orders) : '-'}`),
+      L(`GMV kotor : ${repMoney(c.gmv)}`),
+      L(`Fee marketplace : ${repMoney(c.fees)} (${pc(c.gmv ? c.fees / c.gmv : NaN)})`),
+      L(`Penghasilan bersih : ${repMoney(c.net)}`),
+      L(`Biaya iklan : ${repMoney(c.adSpend)}`),
+      L(`GMV iklan : ${repMoney(c.adRevenue)}`),
+      L(`ROAS iklan : ${repRatio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}`),
+      L(`Laba bersih (estimasi) : ${repMoney(c.profit)}`),
+      ...(S.live.sessions ? [L(`TikTok LIVE : ${repMoney(S.live.gmv)} (${num(S.live.sessions)} sesi)`)] : []),
+      ...SALDO.map(([k, l]) => L(`${l} : ${saldoText(r[k] || '') || '-'}`)),
+      ...(top.length ? ['', '*Produk terlaris*', ...top.map((x, i) => `${i + 1}. ${x.name} : ${num(x.units)} pasang`)] : []),
       '', r.footer ?? FOOTER,
     ].join('\n');
   }
