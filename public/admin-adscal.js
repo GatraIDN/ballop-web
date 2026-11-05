@@ -10,6 +10,53 @@
   const ratio = (n) => (Number.isFinite(n) && n > 0 ? `${n.toLocaleString('id-ID', { maximumFractionDigits: 2 })}×` : '–');
   const canEdit = () => window.A.can('ads') && !window.A.me?.readOnly;
   const st = { month: today().slice(0, 7) };
+  const est = { range: '7d', from: '', to: '', limit: 150 };
+
+  // ---------- PDF: one day (from the popup, may be unsaved) or a period ----------
+  function adsPdf(from, to, list) {
+    const P = window.PdfReport, CH = B.ADS_CH;
+    const rows = list || B.data.ads.filter((a) => a.date >= from && a.date <= to);
+    const agg = (key) => { const g = {}; rows.forEach((a) => { const k = key(a); const x = g[k] = g[k] || { spend: 0, revenue: 0, orders: 0, impressions: 0, clicks: 0, impWithClicks: 0, spendClicked: 0, ch: a.channel, n: 0 };
+      x.spend += a.spend || 0; x.revenue += a.revenue || 0; x.orders += a.orders || 0; x.n++;
+      if (a.impressions) { x.impressions += a.impressions; x.impWithClicks += a.clicks || 0; }
+      if (a.clicks) { x.clicks += a.clicks; x.spendClicked += a.spend || 0; } }); return g; };
+    const tot = Object.values(agg(() => 'all'))[0] || { spend: 0, revenue: 0, orders: 0, impressions: 0, clicks: 0, impWithClicks: 0, spendClicked: 0 };
+    const roas = (x) => ratio(x.spend ? x.revenue / x.spend : NaN);
+    const ctr = (x) => (x.impressions ? P.pct(x.impWithClicks / x.impressions) : '–');
+    const cpc = (x) => (x.clicks ? P.rp(x.spendClicked / x.clicks) : '–');
+    const cpo = (x) => (x.orders ? P.rp(x.spend / x.orders) : '–');
+    const chLabel = (k) => (CH[k] || CH.other).label, chColor = (k) => (CH[k] || CH.other).color;
+    const byCh = Object.entries(agg((a) => a.channel)).sort((a, b) => b[1].spend - a[1].spend);
+    const byCamp = Object.entries(agg((a) => `${a.channel}|${a.campaign || '(tanpa nama)'}`)).sort((a, b) => b[1].spend - a[1].spend);
+    const byDay = Object.entries(agg((a) => a.date)).sort((a, b) => a[0].localeCompare(b[0]));
+    const one = from === to;
+    const body = `
+      ${P.h2('Ringkasan iklan', 'revenue & order = atribusi dashboard iklan')}
+      ${P.tiles([
+        P.tile('Total spend', P.rp(tot.spend), `${num(byCamp.length)} campaign · ${num(byCh.length)} channel`, true),
+        P.tile('Revenue / GMV iklan', P.rp(tot.revenue), `${num(tot.orders)} order`),
+        P.tile('ROAS', roas(tot), 'revenue ÷ spend'),
+        P.tile('Cost per order', cpo(tot)),
+        P.tile('Impresi', num(tot.impressions)),
+        P.tile('Klik', num(tot.clicks), `CTR ${ctr(tot)}`),
+        P.tile('CPC', cpc(tot)),
+        P.tile('AOV iklan', tot.orders ? P.rp(tot.revenue / tot.orders) : '–'),
+      ])}
+      ${P.h2('Per channel')}
+      ${P.table([['Channel'], ['Spend', 1], ['Share', 1], ['Revenue', 1], ['ROAS', 1], ['Order', 1], ['Cost/order', 1], ['Impresi', 1], ['Klik', 1], ['CTR', 1], ['CPC', 1]],
+        byCh.map(([k, x]) => [`${P.dot(chColor(k))}${esc(chLabel(k))}`, `<b>${P.rp(x.spend)}</b>`, P.pct(tot.spend ? x.spend / tot.spend : NaN), P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x), cpc(x)]),
+        ['Total', P.rp(tot.spend), '100%', P.rp(tot.revenue), roas(tot), num(tot.orders), cpo(tot), num(tot.impressions), num(tot.clicks), ctr(tot), cpc(tot)], 'Belum ada spending iklan.')}
+      ${P.h2('Per campaign', 'urut spend')}
+      ${P.table([['Channel'], ['Campaign'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Order', 1], ['Cost/order', 1], ['Impresi', 1], ['Klik', 1], ['CTR', 1]],
+        byCamp.map(([k, x]) => { const [ch, name] = k.split('|'); return [`${P.dot(chColor(ch))}${esc(chLabel(ch))}`, esc(name), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x)]; }))}
+      ${one ? '' : `${P.h2('Per tanggal', 'akumulasi semua campaign')}
+      ${P.table([['Tanggal'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Order', 1], ['Cost/order', 1], ['Klik', 1]],
+        byDay.map(([d, x]) => [B.fmtDate(d), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.clicks)]),
+        ['Total', P.rp(tot.spend), P.rp(tot.revenue), roas(tot), num(tot.orders), cpo(tot), num(tot.clicks)])}`}`;
+    P.open({ title: one ? 'Laporan Iklan Harian' : 'Laporan Iklan', period: P.period(from, to), onePage: one || byDay.length <= 10,
+      meta: [[one ? 'Tanggal' : 'Periode', P.period(from, to)], ['Channel', esc(byCh.map(([k]) => chLabel(k)).join(', ') || '–')], ...(one ? [] : [['Hari diisi', `${num(byDay.length)} hari`]])],
+      body, note: 'Revenue, order, impresi & klik = angka atribusi dari dashboard iklan tiap platform (bisa termasuk pesanan yang nanti batal). CTR & CPC hanya dari campaign yang melaporkan impresi/klik.' });
+  }
   const NUMS = [['spend', 'Spend (Rp)'], ['impressions', 'Impresi'], ['clicks', 'Klik'], ['orders', 'Order'], ['revenue', 'Revenue / GMV (Rp)']];
 
   function mount(sel) {
@@ -33,6 +80,7 @@
       <div class="panel-head"><h2>Kalender spending iklan · ${MONTHS[m - 1]} ${y}</h2>
         <span class="muted small">${num(vals.length)}/${num(past)} hari diisi · spend ${money(tot)} · ROAS ${ratio(tot ? rev / tot : NaN)}</span>
         <span class="cal-nav"><button class="btn sm" type="button" data-acm="-1" aria-label="Bulan sebelumnya">‹</button><button class="btn sm" type="button" data-acm="0">Bulan ini</button><button class="btn sm" type="button" data-acm="1" aria-label="Bulan berikutnya">›</button></span></div>
+      <div class="ac-export"><b>Export laporan iklan</b>${B.rangeBar(est)}<button class="btn sm btn-export" type="button" id="acPdf">⬇ Export PDF</button></div>
       <div class="dc-grid dc-head">${['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'].map((h) => `<span>${h}</span>`).join('')}</div>
       <div class="dc-grid">${cells.join('')}</div>
       <div class="dc-legend"><span><i class="done"></i>Sudah input</span><span><i class="todo"></i>Belum input</span>${Object.entries(CH).filter(([k]) => k !== 'other').map(([, c]) => `<span><i style="background:${c.color};border-radius:50%"></i>${esc(c.label)}</span>`).join('')}<span class="muted">Klik tanggal untuk input / edit spending hari itu.</span></div>
@@ -43,6 +91,8 @@
       mount(sel);
     }));
     $$('[data-adday]', box).forEach((b) => b.addEventListener('click', () => dayPopup(b.dataset.adday)));
+    B.bindRangeBar(box.querySelector('.ac-export'), est, () => mount(sel));
+    $('#acPdf', box).addEventListener('click', () => { const r = B.periodOf(est); adsPdf(r.from, r.to); });
   }
 
   // all campaigns of one day; rows can be added, changed and removed, saved together
@@ -60,7 +110,7 @@
       <header><div><span class="muted small">Spending iklan</span><h2>${longDay(d)}</h2></div><div class="d-flowmini" id="acSum"></div><button class="btn sm" type="button" data-close>✕</button></header>
       <div class="raw-body"><div id="acNote"></div><div class="table-wrap"><table class="data ac-table"><thead><tr><th>Channel</th><th>Campaign</th>${NUMS.map(([, l]) => `<th class="num">${l}</th>`).join('')}<th class="num">ROAS</th><th></th></tr></thead><tbody id="acRows"></tbody></table></div>
         ${canEdit() ? `<div class="ac-add"><button class="btn sm" type="button" id="acAdd">+ Tambah campaign</button>${!had && prevDay ? `<button class="btn sm" type="button" id="acCopy">Salin daftar campaign dari ${longDay(prevDay)}</button>` : ''}</div>` : ''}</div>
-      <footer>${canEdit() && had ? '<button class="btn sm danger" type="button" id="acDel">🗑 Hapus semua input hari ini</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? '<button class="btn sm primary" type="button" id="acSave">Simpan</button>' : ''}</footer>
+      <footer>${canEdit() && had ? '<button class="btn sm danger" type="button" id="acDel">🗑 Hapus semua input hari ini</button>' : ''}<span class="spacer"></span><button class="btn sm btn-export" type="button" id="acDayPdf">⬇ PDF hari ini</button><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? '<button class="btn sm primary" type="button" id="acSave">Simpan</button>' : ''}</footer>
     </div><datalist id="acCamps">${camps.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>`;
     document.body.appendChild(box);
     const dis = canEdit() ? '' : 'disabled';
@@ -96,10 +146,11 @@
       put([...B.data.ads.filter((a) => a.date !== d), ...keep.map((r) => ({ ...r, date: d }))], `Spending ${longDay(d)} tersimpan`);
     });
     $('#acDel', box)?.addEventListener('click', () => { if (confirm(`Hapus semua input iklan ${longDay(d)}?`)) put(B.data.ads.filter((a) => a.date !== d), `Input iklan ${longDay(d)} dihapus`); });
+    $('#acDayPdf', box).addEventListener('click', () => adsPdf(d, d, rows.filter((r) => r.spend || r.revenue || r.impressions || r.clicks || r.orders).map((r) => ({ ...r, date: d }))));
     const close = () => { if (dirty && !confirm('Perubahan belum disimpan. Tutup?')) return; box.remove(); };
     box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) close(); });
     draw();
   }
 
-  window.AdsCal = { mount };
+  window.AdsCal = { mount, pdf: adsPdf };
 })();
