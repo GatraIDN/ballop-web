@@ -165,7 +165,7 @@ window.MarketImport = (() => {
       },
     },
     tiktokIncome: {
-      label: 'Income / dana cair TikTok Shop', target: 'settlements',
+      label: 'Income / penghasilan TikTok Shop', target: 'settlements',
       match: (h) => h.includes('ID Pesanan/Penyesuaian') || (h.some((x) => x.toLowerCase() === 'order/adjustment id') && h.includes('Total settlement amount')),
       map: (row) => {
         // Indonesian-language export: same columns in the same order, renamed; read it as the English one
@@ -194,7 +194,7 @@ window.MarketImport = (() => {
       },
     },
     shopeeIncome: {
-      label: 'Income / dana cair Shopee', target: 'settlements',
+      label: 'Income / penghasilan Shopee', target: 'settlements',
       match: (h) => h.includes('Lihat berdasarkan') && h.includes('No. Pesanan'),
       map: (r) => {
         const by = text(r['Lihat berdasarkan']).toLowerCase();

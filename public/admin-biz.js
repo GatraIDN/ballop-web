@@ -47,7 +47,7 @@
   const PLATFORM = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube', other: 'Lainnya' };
   const SHIP = { siap: 'Siap kirim', dikirim: 'Dikirim', diterima: 'Diterima', batal: 'Batal' };
   const CONTENT = { menunggu: 'Menunggu', brief: 'Brief dikirim', draft: 'Draft', revisi: 'Revisi', posted: 'Sudah posting', tidak: 'Tidak posting' };
-  const CASH_CATS = ['Penjualan offline', 'Pencairan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
+  const CASH_CATS = ['Penjualan offline', 'Penghasilan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
 
   const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'live', 'stockdaily', 'csdaily', 'flashsale', 'listings', 'offline', 'stock3pl', 'stockhist', 'kol', 'cashflow', 'contents', 'contentplans'];
   const extraViews = {}; // views added by other admin modules (admin-konten.js)
@@ -538,7 +538,7 @@
           <button class="btn sm" type="button" data-camp="${k}">${campHidden.has(k) ? '▾ Tampilkan' : '▴ Sembunyikan'}</button></div>
         ${campHidden.has(k) ? '' : campTable(Object.values(m.byCamp).filter((x) => x.channel === k).sort((a, b) => b.spend - a.spend))}
       </section>`).join('')}
-      <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di section Order, uang cair di Income. CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
+      <p class="muted small">Angka atribusi dari dashboard iklan (bisa termasuk pesanan yang nanti batal/retur); omzet real ada di section Order, penghasilan di Income. CTR, CPC & cost per order hanya dari iklan yang mengisi datanya (GMV Max tanpa impresi/klik). “–” = tidak ada data.</p>`;
     };
 
     // four separate sources: orders (what came in), income (money that reached the wallet), ads, LIVE
@@ -567,11 +567,11 @@
     const SP = dashTab === 'overview' ? summary(addDays(from, -len), addDays(from, -1)) : null;
     const SECTIONS = {
       overview: { label: 'Ringkasan', sub: 'semua channel digabung', color: '#111318', icon: '▦',
-        value: money(m.revenue), meta: `omzet bersih ${compact(inc.payout)} · iklan ${compact(m.adSpend)}`, d: delta(m.revenue, p.revenue) },
+        value: money(m.revenue), meta: `penghasilan bersih ${compact(inc.payout)} · iklan ${compact(m.adSpend)}`, d: delta(m.revenue, p.revenue) },
       order: { label: 'Order', sub: 'pesanan masuk dari export order', color: '#2a78d6', icon: '◈',
         value: money(m.revenue), meta: `${num(m.orders)} pesanan · ${num(m.units)} pasang`, d: delta(m.revenue, p.revenue) },
-      income: { label: 'Income', sub: 'dana cair ke saldo, setelah fee', color: '#0e8a4f', icon: '₪',
-        value: money(inc.payout), meta: `${num(inc.orders)} pesanan cair · fee ${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'}`, d: delta(inc.payout, incP.payout) },
+      income: { label: 'Income', sub: 'penghasilan bersih setelah fee', color: '#0e8a4f', icon: '₪',
+        value: money(inc.payout), meta: `${num(inc.orders)} pesanan selesai · fee ${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'}`, d: delta(inc.payout, incP.payout) },
       ads: { label: 'Iklan', sub: 'spending & atribusi platform iklan', color: '#e8552b', icon: '◎',
         value: money(m.adSpend), meta: `ROAS ${ratio(m.adRoas)} · GMV ${compact(m.adRevenue)}`, d: delta(m.adSpend, p.adSpend, true, true) },
       offline: { label: 'Offline', sub: 'toko, distributor, reseller, event', color: '#0e8a8a', icon: '⌂',
@@ -585,7 +585,7 @@
     const kpi = (label, value, d = '', hero = false) => `<div class="kpi solid${hero ? ' hero' : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div>${d}</div>`;
 
     const orderTab = () => `
-      ${secHead('Order', 'Semua pesanan yang masuk dari export order marketplace, offline & manual. Tanggal = tanggal pesanan dibuat. Belum dipotong fee — lihat Income untuk uang yang benar-benar cair.', ['online', 'Order data'])}
+      ${secHead('Order', 'Semua pesanan yang masuk dari export order marketplace, offline & manual. Tanggal = tanggal pesanan dibuat. Belum dipotong fee — lihat Income untuk penghasilan yang benar-benar masuk.', ['online', 'Order data'])}
       <div class="kpis">
         ${kpi('Omzet pesanan (selesai + diproses)', money(m.revenue), delta(m.revenue, p.revenue), true)}
         ${kpi('Pesanan · AOV', `${num(m.orders)} · ${compact(m.aov)}`, delta(m.orders, p.orders))}
@@ -636,17 +636,17 @@
       return `
       ${secHead('Income', 'Pesanan yang sudah selesai dan dananya sudah masuk ke saldo penjual setelah dipotong semua fee. Tanggal = tanggal dana dilepaskan.', ['income', 'Rincian income'])}
       <div class="kpis">
-        ${kpi('Omzet bersih (cair)', money(inc.payout), delta(inc.payout, incP.payout), true)}
+        ${kpi('Penghasilan bersih', money(inc.payout), delta(inc.payout, incP.payout), true)}
         ${kpi('GMV kotor', money(inc.price), delta(inc.price, incP.price))}
         ${kpi('Total fee marketplace', `${money(Math.abs(inc.fees))}`, `<div class="k-delta">${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'} dari harga produk</div>`)}
-        ${kpi('Pesanan cair', num(inc.orders), delta(inc.orders, incP.orders))}
+        ${kpi('Pesanan selesai', num(inc.orders), delta(inc.orders, incP.orders))}
         ${kpi('Voucher & subsidi', money(inc.groups['Voucher & subsidi'] || 0))}
         ${kpi('Ongkir netto', money(inc.groups['Biaya pengiriman'] || 0))}
         ${kpi('Refund · penyesuaian', `${compact(inc.groups['Pengembalian dana'] || 0)} · ${compact(inc.groups.Penyesuaian || 0)}`)}
-        ${kpi('Omzet bersih ÷ GMV kotor', inc.price ? pct(inc.payout / inc.price) : '–', delta(inc.price ? inc.payout / inc.price : NaN, incP.price ? incP.payout / incP.price : NaN))}
+        ${kpi('Penghasilan bersih ÷ GMV kotor', inc.price ? pct(inc.payout / inc.price) : '–', delta(inc.price ? inc.payout / inc.price : NaN, incP.price ? incP.payout / incP.price : NaN))}
       </div>
       <section class="panel solid">
-        <div class="panel-head"><h2>Omzet bersih per channel</h2>${legend(incSeries)}</div>
+        <div class="panel-head"><h2>Penghasilan bersih per channel</h2>${legend(incSeries)}</div>
         <div class="chart" id="chIncome"></div>
       </section>
       <div class="grid-3">
@@ -655,11 +655,11 @@
           <div class="hbar">${fg.map(([g, x]) => `<div class="hbar-row"><span class="hb-name">${esc(g)}</span><span class="hb-track"><i style="width:${(x / maxF) * 100}%;background:#e34948"></i></span><span class="hb-val">${compact(x)} · ${inc.price ? pct(x / inc.price) : '–'}</span></div>`).join('') || '<p class="muted">Belum ada income di periode ini.</p>'}</div>
         </section>
         <section class="panel solid">
-          <div class="panel-head"><h2>Laba rugi (basis dana cair)</h2></div>
+          <div class="panel-head"><h2>Laba rugi (basis penghasilan bersih)</h2></div>
           <table class="pl">
             <tr><td>Harga produk</td><td>${money(inc.price)}</td></tr>
             <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td>−${money(inc.price - inc.payout)}</td></tr>
-            <tr class="mid"><td>Dana cair</td><td>${money(inc.payout)}</td></tr>
+            <tr class="mid"><td>Penghasilan bersih</td><td>${money(inc.payout)}</td></tr>
             <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td>−${money(inc.cogs)}</td></tr>
             <tr class="sub"><td>Biaya iklan</td><td>−${money(ads)}</td></tr>${back ? `<tr class="sub"><td>Koreksi top-up iklan (sudah di spend)</td><td>+${money(back)}</td></tr>` : ''}
             <tr class="sub"><td>Biaya operasional</td><td>−${money(opex)}</td></tr>
@@ -671,7 +671,7 @@
       <section class="panel solid">
         <div class="panel-head"><h2>Income per channel</h2></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Channel</th><th class="num">Pesanan cair</th><th class="num">Harga produk</th><th class="num">Fee</th><th class="num">Fee %</th><th class="num">Dana cair</th></tr></thead>
+          <thead><tr><th>Channel</th><th class="num">Pesanan selesai</th><th class="num">Harga produk</th><th class="num">Fee</th><th class="num">Fee %</th><th class="num">Penghasilan bersih</th></tr></thead>
           <tbody>${['shopee', 'tiktok', 'tokopedia', 'lazada', 'blibli'].map((k) => { const x = inc.byCh[k]; return `<tr><td>${chBadge(SALES_CH, k)}</td>${x ? `<td class="num">${num(x.orders)}</td><td class="num">${money(x.price)}</td><td class="num">${money(Math.abs(x.fees))}</td><td class="num">${x.price ? pct(Math.abs(x.fees) / x.price) : '–'}</td><td class="num"><b>${money(x.payout)}</b></td>` : '<td colspan="5" class="muted">belum ada file income</td>'}</tr>`; }).slice(0, 3).join('')}</tbody>
         </table></div>
       </section>`;
@@ -764,7 +764,7 @@
     if (chartEl('chAds')) stackedBars(chartEl('chAds'), bks, adSeries.length ? adSeries : [{ key: '_', label: 'Iklan', color: '#6250d6' }],
       (b, key) => sumBy(m.adRows, b, (r) => r.channel === key, (r) => r.spend), money);
     if (chartEl('chIncome')) { const inc = computeIncome(from, to); const ser = Object.entries(SALES_CH).map(([key, c]) => ({ key, ...c })).filter((s) => inc.byCh[s.key]);
-      stackedBars(chartEl('chIncome'), bks, ser.length ? ser : [{ key: '_', label: 'Dana cair', color: '#0e8a4f' }], (b, key) => inc.rows.reduce((t, x) => (payDay(x) >= b.from && payDay(x) <= b.to && x.channel === key ? t + x.payout : t), 0), money); }
+      stackedBars(chartEl('chIncome'), bks, ser.length ? ser : [{ key: '_', label: 'Penghasilan bersih', color: '#0e8a4f' }], (b, key) => inc.rows.reduce((t, x) => (payDay(x) >= b.from && payDay(x) <= b.to && x.channel === key ? t + x.payout : t), 0), money); }
     if (chartEl('chOffline')) stackedBars(chartEl('chOffline'), bks, [{ key: 'off', label: 'Omzet offline', color: '#0e8a8a' }], (b) => data.offline.reduce((t, x) => (x.status === 'completed' && x.date >= b.from && x.date <= b.to ? t + x.qty * x.price - x.discount : t), 0), money);
     if (chartEl('chLive')) stackedBars(chartEl('chLive'), bks, [{ key: 'tiktok', label: 'GMV live', color: '#6250d6' }], (b) => (data.live || []).reduce((t, l) => (l.date >= b.from && l.date <= b.to ? t + l.gmv : t), 0), money);
     $$('[data-camp]', v).forEach((b) => b.addEventListener('click', () => {
@@ -869,11 +869,11 @@
     const maxT = Math.max(1, ...S.trend.map((t) => Math.max(t.omzet, t.net)));
     const maxP = Math.max(1, ...S.products.slice(0, 8).map((p) => p.units));
     return `
-      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p>Gabungan Shopee, TikTok Shop, Tokopedia, offline, iklan dan live untuk periode yang dipilih. Omzet pesanan = tanggal pesanan dibuat; omzet bersih = dana yang sudah cair (tanggal dana dilepas).</p></div></div>
+      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p>Gabungan Shopee, TikTok Shop, Tokopedia, offline, iklan dan live untuk periode yang dipilih. Omzet pesanan = tanggal pesanan dibuat; penghasilan bersih = uang yang sudah masuk ke saldo setelah semua potongan (tanggal dana dilepas).</p></div></div>
       <div class="kpis">
         ${kpi('Omzet pesanan', money(m.revenue), delta(m.revenue, P.m.revenue), true)}
-        ${kpi('GMV kotor (cair)', money(inc.price), delta(inc.price, P.inc.price))}
-        ${kpi('Omzet bersih (cair)', money(inc.payout), delta(inc.payout, P.inc.payout))}
+        ${kpi('GMV kotor', money(inc.price), delta(inc.price, P.inc.price))}
+        ${kpi('Penghasilan bersih', money(inc.payout), delta(inc.payout, P.inc.payout))}
         ${kpi('Fee marketplace', money(Math.abs(inc.fees)), `<div class="k-delta">${pct(S.feeRate)} dari GMV kotor</div>`)}
         ${kpi('Pesanan · unit', `${num(m.orders)} · ${num(m.units)}`, delta(m.orders, P.m.orders))}
         ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov))}
@@ -881,10 +881,10 @@
         ${kpi('Laba bersih (estimasi)', `<span style="color:${S.profit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(S.profit)}</span>`, delta(S.profit, P.profit))}
       </div>
       <section class="panel solid">
-        <div class="panel-head"><h2>Per channel</h2><span class="muted small">pesanan masuk · dana cair · iklan</span></div>
+        <div class="panel-head"><h2>Per channel</h2><span class="muted small">pesanan masuk · penghasilan bersih · iklan</span></div>
         <div class="mixbar">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}" title="${esc(c.label)} ${pct(c.omzet / totOmzet)}"></i>`).join('')}</div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Channel</th><th class="num">Omzet pesanan</th><th class="num">Share</th><th class="num">Pesanan</th><th class="num">Unit</th><th class="num">Batal+retur</th><th class="num">GMV kotor</th><th class="num">Fee</th><th class="num">Omzet bersih</th><th class="num">Iklan</th><th class="num">ROAS</th></tr></thead>
+          <thead><tr><th>Channel</th><th class="num">Omzet pesanan</th><th class="num">Share</th><th class="num">Pesanan</th><th class="num">Unit</th><th class="num">Batal+retur</th><th class="num">GMV kotor</th><th class="num">Fee</th><th class="num">Penghasilan bersih</th><th class="num">Iklan</th><th class="num">ROAS</th></tr></thead>
           <tbody>${S.channels.map((c) => `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num"><b>${money(c.omzet)}</b></td><td class="num">${pct(c.omzet / totOmzet)}</td><td class="num">${num(c.orders)}</td><td class="num">${num(c.units)}</td><td class="num">${c.all ? pct((c.cancelled + c.returned) / c.all) : '–'}</td><td class="num">${c.gmv ? money(c.gmv) : '–'}</td><td class="num">${c.gmv ? `${money(c.fees)} <small class="muted">${pct(c.fees / c.gmv)}</small>` : '–'}</td><td class="num"><b>${c.net ? money(c.net) : '–'}</b></td><td class="num">${c.adSpend ? money(c.adSpend) : '–'}</td><td class="num">${ratio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">Belum ada data di periode ini.</td></tr>'}
           ${S.channels.length > 1 ? `<tr class="tot"><td><b>Total</b></td><td class="num"><b>${money(m.revenue)}</b></td><td class="num">100%</td><td class="num">${num(m.orders)}</td><td class="num">${num(m.units)}</td><td class="num">${pct(S.cancelRate)}</td><td class="num">${money(inc.price)}</td><td class="num">${money(Math.abs(inc.fees))}</td><td class="num"><b>${money(inc.payout)}</b></td><td class="num">${money(m.adSpend)}</td><td class="num">${ratio(m.adRoas)}</td></tr>` : ''}</tbody>
         </table></div>
@@ -892,7 +892,7 @@
       <section class="panel solid">
         <div class="panel-head"><h2>Laba rugi per channel</h2><span class="muted small">margin kontribusi = uang masuk − HPP − iklan</span></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Channel</th><th class="num">GMV kotor</th><th class="num">Fee marketplace</th><th class="num">Omzet bersih</th><th class="num">HPP (est.)</th><th class="num">Iklan</th><th class="num">Margin kontribusi</th><th class="num">% dari GMV</th></tr></thead>
+          <thead><tr><th>Channel</th><th class="num">GMV kotor</th><th class="num">Fee marketplace</th><th class="num">Penghasilan bersih</th><th class="num">HPP (est.)</th><th class="num">Iklan</th><th class="num">Margin kontribusi</th><th class="num">% dari GMV</th></tr></thead>
           <tbody>${S.channels.map((c) => { const g = c.key === 'offline' || !c.gmv ? c.omzet : c.gmv; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num">${money(g)}</td><td class="num">${c.gmv ? money(c.fees) : '–'}</td><td class="num">${money(c.base)}</td><td class="num">−${money(c.hpp)}</td><td class="num">${c.adSpend ? `−${money(c.adSpend)}` : '–'}</td><td class="num"><b style="color:${c.margin < 0 ? 'var(--danger)' : 'var(--good)'}">${money(c.margin)}</b></td><td class="num">${g ? pct(c.margin / g) : '–'}</td></tr>`; }).join('')}
           <tr class="tot"><td>Total kontribusi</td><td></td><td></td><td></td><td></td><td></td><td class="num">${money(S.channels.reduce((s, c) => s + c.margin, 0))}</td><td></td></tr>
           ${S.adOnly.length ? `<tr><td colspan="6" class="muted">Iklan tanpa channel penjualan (${esc(S.adOnly.map((a) => a.label).join(', '))})</td><td class="num">−${money(S.adOnly.reduce((s, a) => s + a.spend, 0))}</td><td></td></tr>` : ''}
@@ -907,9 +907,9 @@
           <span class="tgt-val"><b>${pct(t.pct)}</b> · ${compact(t.value)} / ${compact(t.target)} · proyeksi ${compact(t.projected)}</span></div>`).join('')}
       </section>` : '<p class="muted small">Isi target per channel di Pengaturan untuk melihat progres target.</p>'}
       <section class="panel solid">
-        <div class="panel-head"><h2>Tren per ${S.trend.length && daysBetween(S.from, S.to) > 62 ? 'bulan' : daysBetween(S.from, S.to) > 14 ? 'minggu' : 'hari'}</h2><span class="legend"><span><i style="background:#2a78d6"></i>Omzet pesanan</span><span><i style="background:#0e8a4f"></i>Omzet bersih</span></span></div>
+        <div class="panel-head"><h2>Tren per ${S.trend.length && daysBetween(S.from, S.to) > 62 ? 'bulan' : daysBetween(S.from, S.to) > 14 ? 'minggu' : 'hari'}</h2><span class="legend"><span><i style="background:#2a78d6"></i>Omzet pesanan</span><span><i style="background:#0e8a4f"></i>Penghasilan bersih</span></span></div>
         <div class="table-wrap"><table class="data trend">
-          <thead><tr><th>Periode</th><th style="width:28%"></th><th class="num">Omzet pesanan</th><th class="num">Pesanan</th><th class="num">GMV kotor</th><th class="num">Omzet bersih</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Live</th><th class="num">Offline</th></tr></thead>
+          <thead><tr><th>Periode</th><th style="width:28%"></th><th class="num">Omzet pesanan</th><th class="num">Pesanan</th><th class="num">GMV kotor</th><th class="num">Penghasilan bersih</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Live</th><th class="num">Offline</th></tr></thead>
           <tbody>${S.trend.map((t) => `<tr><td>${esc(t.label)}</td><td><div class="tbar"><i style="width:${(t.omzet / maxT) * 100}%;background:#2a78d6"></i><i style="width:${(t.net / maxT) * 100}%;background:#0e8a4f"></i></div></td><td class="num"><b>${money(t.omzet)}</b></td><td class="num">${num(t.orders)}</td><td class="num">${money(t.gmv)}</td><td class="num">${money(t.net)}</td><td class="num">${money(t.ads)}</td><td class="num">${ratio(t.ads ? t.adRev / t.ads : NaN)}</td><td class="num">${t.live ? compact(t.live) : '–'}</td><td class="num">${t.offline ? compact(t.offline) : '–'}</td></tr>`).join('')}</tbody>
         </table></div>
       </section>
@@ -917,11 +917,11 @@
         <section class="panel solid"><div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">unit · omzet pesanan</span></div>
           <div class="hbar">${S.products.slice(0, 8).map((p) => `<div class="hbar-row"><span class="hb-name" title="${esc(p.name)}">${esc(p.name)}</span><span class="hb-track"><i style="width:${(p.units / maxP) * 100}%;background:${p.color || '#2a78d6'}"></i></span><span class="hb-val">${num(p.units)} · ${compact(p.revenue)}</span></div>`).join('') || '<p class="muted">Belum ada produk terjual.</p>'}</div>
         </section>
-        <section class="panel solid"><div class="panel-head"><h2>Laba rugi</h2><span class="muted small">basis dana cair</span></div>
+        <section class="panel solid"><div class="panel-head"><h2>Laba rugi</h2><span class="muted small">basis penghasilan bersih</span></div>
           <table class="pl">
             <tr><td>GMV kotor</td><td>${money(inc.price)}</td></tr>
             <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td>−${money(inc.price - inc.payout)}</td></tr>
-            <tr class="mid"><td>Omzet bersih</td><td>${money(inc.payout)}</td></tr>
+            <tr class="mid"><td>Penghasilan bersih</td><td>${money(inc.payout)}</td></tr>
             <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td>−${money(S.hpp)}</td></tr>
             <tr class="sub"><td>Biaya iklan</td><td>−${money(m.adSpend)}</td></tr>${S.back ? `<tr class="sub"><td>Koreksi top-up iklan (sudah di spend)</td><td>+${money(S.back)}</td></tr>` : ''}
             <tr class="sub"><td>Biaya operasional</td><td>−${money(m.expenses)}</td></tr>
@@ -951,8 +951,8 @@
   ${h2('Ringkasan utama', '▲▼ dibanding periode sebelumnya dengan panjang yang sama')}
   ${tiles([
     tile('Omzet pesanan', rp(m.revenue), `${num(m.orders)} pesanan ${chg(m.revenue, P.m.revenue)}`, true),
-    tile('GMV kotor (cair)', rp(inc.price), `${num(inc.orders)} cair ${chg(inc.price, P.inc.price)}`),
-    tile('Omzet bersih (cair)', rp(inc.payout), `${pct(inc.price ? inc.payout / inc.price : NaN)} dari GMV ${chg(inc.payout, P.inc.payout)}`),
+    tile('GMV kotor', rp(inc.price), `${num(inc.orders)} pesanan selesai ${chg(inc.price, P.inc.price)}`),
+    tile('Penghasilan bersih', rp(inc.payout), `${pct(inc.price ? inc.payout / inc.price : NaN)} dari GMV ${chg(inc.payout, P.inc.payout)}`),
     tile('Laba bersih (estimasi)', `<span class="${S.profit < 0 ? 'neg' : 'pos'}">${rp(S.profit)}</span>`, chg(S.profit, P.profit)),
     tile('Unit terjual', `${num(m.units)} pasang`, chg(m.units, P.m.units)),
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
@@ -964,31 +964,31 @@
     tile('Offline', rp(off.omzet), `${num(off.trx)} transaksi ${chg(off.omzet, P.off.omzet)}`),
   ])}
   <div class="avoid">
-  ${h2('Kinerja per channel', 'omzet pesanan = tanggal pesanan · omzet bersih = tanggal dana cair')}
+  ${h2('Kinerja per channel', 'omzet pesanan = tanggal pesanan · penghasilan bersih = tanggal penghasilan masuk')}
   <div class="mix">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}"></i>`).join('')}</div>
-  ${table([['Channel'], ['Omzet pesanan', 1], ['Share', 1], ['Pesanan', 1], ['Unit', 1], ['Batal+retur', 1], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1], ['Iklan', 1], ['ROAS', 1]],
+  ${table([['Channel'], ['Omzet pesanan', 1], ['Share', 1], ['Pesanan', 1], ['Unit', 1], ['Batal+retur', 1], ['GMV kotor', 1], ['Fee', 1], ['Penghasilan bersih', 1], ['Iklan', 1], ['ROAS', 1]],
     [...S.channels.map((c) => [`${dot(c.color)}${esc(c.label)}`, `<b>${rp(c.omzet)}</b>`, pct(c.omzet / totOmzet), num(c.orders), num(c.units), c.all ? pct((c.cancelled + c.returned) / c.all) : '–', c.gmv ? rp(c.gmv) : '–', c.gmv ? pct(c.fees / c.gmv) : '–', `<b>${c.net ? rp(c.net) : '–'}</b>`, c.adSpend ? rp(c.adSpend) : '–', ratio(c.adSpend ? c.adRevenue / c.adSpend : NaN)]),
       ...S.adOnly.map((a) => [`${dot('#999')}${esc(a.label)} <span class="muted">(iklan)</span>`, '–', '–', '–', '–', '–', '–', '–', '–', rp(a.spend), ratio(a.spend ? a.revenue / a.spend : NaN)])],
     ['Total', rp(m.revenue), '100%', num(m.orders), num(m.units), pct(S.cancelRate), rp(inc.price), pct(S.feeRate), rp(inc.payout), rp(m.adSpend), ratio(m.adRoas)])}
   </div>
   <div class="avoid">
   ${h2('Laba rugi per channel', 'margin kontribusi = uang masuk − HPP − iklan')}
-  ${table([['Channel'], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1], ['HPP (est.)', 1], ['Iklan', 1], ['Margin kontribusi', 1], ['% GMV', 1]],
+  ${table([['Channel'], ['GMV kotor', 1], ['Fee', 1], ['Penghasilan bersih', 1], ['HPP (est.)', 1], ['Iklan', 1], ['Margin kontribusi', 1], ['% GMV', 1]],
     S.channels.map((c) => { const g = c.key === 'offline' || !c.gmv ? c.omzet : c.gmv; return [`${dot(c.color)}${esc(c.label)}`, rp(g), c.gmv ? rp(c.fees) : '–', rp(c.base), `−${rp(c.hpp)}`, c.adSpend ? `−${rp(c.adSpend)}` : '–', `<b class="${c.margin < 0 ? 'neg' : 'pos'}">${rp(c.margin)}</b>`, g ? pct(c.margin / g) : '–']; }),
     ['Total kontribusi', '', '', '', '', '', rp(S.channels.reduce((s, c) => s + c.margin, 0)), ''])}
   </div>
   ${S.targets.length ? `${h2(`Target ${S.targetMonth}`, 'omzet pesanan bulan berjalan')}${table([['Channel'], ['Realisasi', 1], ['Target', 1], ['Capaian', 1], ['Proyeksi akhir bulan', 1]], S.targets.map((t) => [`${dot(t.color)}${esc(t.label)}`, rp(t.value), rp(t.target), `<b>${pct(t.pct)}</b>`, rp(t.projected)]))}` : ''}
-  ${h2(`Tren per ${unit}`, `${dot('#2a78d6')}omzet pesanan ${dot('#0e8a4f')}omzet bersih`)}
-  ${table([['Periode'], [''], ['Omzet pesanan', 1], ['Pesanan', 1], ['Unit', 1], ['GMV kotor', 1], ['Omzet bersih', 1], ['Iklan', 1], ['ROAS', 1], ['Live', 1], ['Offline', 1]],
+  ${h2(`Tren per ${unit}`, `${dot('#2a78d6')}omzet pesanan ${dot('#0e8a4f')}penghasilan bersih`)}
+  ${table([['Periode'], [''], ['Omzet pesanan', 1], ['Pesanan', 1], ['Unit', 1], ['GMV kotor', 1], ['Penghasilan bersih', 1], ['Iklan', 1], ['ROAS', 1], ['Live', 1], ['Offline', 1]],
     S.trend.map((t) => [esc(t.label), bars([[t.omzet, '#2a78d6'], [t.net, '#0e8a4f']], maxT), `<b>${rp(t.omzet)}</b>`, num(t.orders), num(t.units), rp(t.gmv), rp(t.net), rp(t.ads), ratio(t.ads ? t.adRev / t.ads : NaN), t.live ? rp(t.live) : '–', t.offline ? rp(t.offline) : '–']))}
   <div class="two">
     <div>${h2('Produk terlaris', 'urut unit terjual')}
       ${table([['Produk'], ['Unit', 1], ['Omzet', 1], ['Share', 1]], S.products.slice(0, 10).map((p, i) => [`<span class="rank">${i + 1}</span>${esc(p.name)}`, num(p.units), rp(p.revenue), pct(m.units ? p.units / m.units : NaN)]), null, 'Belum ada produk terjual.')}</div>
-    <div>${h2('Laba rugi', 'basis dana cair')}
+    <div>${h2('Laba rugi', 'basis penghasilan bersih')}
       <table class="pl"><tbody>
         <tr><td>GMV kotor</td><td class="n">${rp(inc.price)}</td></tr>
         <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td class="n">−${rp(inc.price - inc.payout)}</td></tr>
-        <tr class="mid"><td>Omzet bersih</td><td class="n">${rp(inc.payout)}</td></tr>
+        <tr class="mid"><td>Penghasilan bersih</td><td class="n">${rp(inc.payout)}</td></tr>
         <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td class="n">−${rp(S.hpp)}</td></tr>
         <tr class="sub"><td>Biaya iklan</td><td class="n">−${rp(m.adSpend)}</td></tr>${S.back ? `<tr class="sub"><td>Koreksi top-up iklan (sudah di spend)</td><td class="n">+${rp(S.back)}</td></tr>` : ''}
         <tr class="sub"><td>Biaya operasional</td><td class="n">−${rp(m.expenses)}</td></tr>
@@ -1086,7 +1086,7 @@
 
   function exportReport(m) {
     const rows = [['Laporan BALLOP', `${range.from} s/d ${range.to}`], [],
-      ['Ringkasan'], ['Penjualan kotor', m.gross], ['Diskon', m.discount], ['Omzet bersih', m.revenue], ['Fee marketplace', m.fees],
+      ['Ringkasan'], ['Penjualan kotor', m.gross], ['Diskon', m.discount], ['Penghasilan bersih', m.revenue], ['Fee marketplace', m.fees],
       ['Ongkir ditanggung', m.shipping], ['HPP', Math.round(m.cogs)], ['Laba kotor', Math.round(m.grossProfit)], ['Biaya iklan', m.adSpend],
       ['Biaya operasional', m.expenses], ['Laba bersih', Math.round(m.netProfit)], ['Unit terjual', m.units], ['Pesanan', m.orders],
       ['AOV', Math.round(m.aov)], ['ROAS', Number.isFinite(m.roas) ? m.roas.toFixed(2) : ''], [],
@@ -1387,7 +1387,7 @@
     },
 
     cashflow: {
-      title: 'Keuangan', sub: 'Uang masuk dan keluar. Dana cair marketplace dari file income ikut dihitung di ringkasan.',
+      title: 'Keuangan', sub: 'Uang masuk dan keluar. Penghasilan marketplace dari file income ikut dihitung di ringkasan.',
       add: '+ Catat transaksi',
       fields: [
         { k: 'date', label: 'Tanggal', type: 'date', half: 1 },
@@ -2065,7 +2065,7 @@
       <div class="sum-card solid"><div class="k-label">Uang masuk</div><div class="k-value" style="color:var(--good)">${money(cin)}</div></div>
       <div class="sum-card solid"><div class="k-label">Uang keluar</div><div class="k-value" style="color:var(--danger)">${money(cout)}</div></div>
       <div class="sum-card solid"><div class="k-label">Arus kas bersih</div><div class="k-value">${money(cin - cout)}</div></div>
-      <div class="sum-card solid"><div class="k-label">Dana cair marketplace</div><div class="k-value">${money(payout)}</div><div class="k-sub">dari file income (info)</div></div>
+      <div class="sum-card solid"><div class="k-label">Penghasilan marketplace</div><div class="k-value">${money(payout)}</div><div class="k-sub">dari file income (info)</div></div>
       <div class="sum-card solid"><div class="k-label">Spending iklan tercatat</div><div class="k-value">${money(ads)}</div><div class="k-sub">dari menu Iklan (info)</div></div>
     </div>${cats.length ? `<section class="panel solid" style="margin-bottom:14px"><div class="panel-head"><h2>Pengeluaran terbesar</h2></div><div class="hbar">${cats.map(([c, x]) => `<div class="hbar-row"><span class="hb-name">${esc(c)}</span><span class="hb-track"><i style="width:${(x / maxCat) * 100}%;background:#e34948"></i></span><span class="hb-val">${money(x)}</span></div>`).join('')}</div></section>` : ''}` });
   }
