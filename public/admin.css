@@ -989,3 +989,7 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 
 .btn.icon-only { padding-left: 12px; padding-right: 12px; }
 .rep-pop { max-width: 760px; }
+
+.si-pop { max-width: 980px; }
+.si-date { display: inline-flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 12px; }
+.si-new { margin: 0; padding-left: 18px; font-size: 13px; }

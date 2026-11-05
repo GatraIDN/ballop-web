@@ -122,7 +122,7 @@
 
     v.innerHTML = `
       <header class="bar"><div><h1>Stok gudang</h1><p class="muted">Stok terakhir per SKU di ${esc([...new Set(all.map((r) => r.warehouse))].join(', ') || 'gudang')}${dates.length ? ` · update terakhir ${fmtDate(dates[dates.length - 1].slice(0, 10))}` : ''}. ${canEdit() ? 'Ubah angka langsung di tabel, lalu tekan Simpan.' : 'Hanya bisa dilihat.'}</p></div>
-        <div class="bar-actions">${canEdit() ? '<button class="btn sm primary" type="button" id="stAdd">+ SKU baru</button>' : ''}<button class="btn sm" type="button" id="stExport">⬇ Export</button></div></header>
+        <div class="bar-actions">${canEdit() ? '<label class="btn sm btn-export" title="File export stock balance 3PL (Item, W/H, Opening … Ending)">⬆ Import stock harian<input type="file" id="stImport" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sm primary" type="button" id="stAdd">+ SKU baru</button>' : ''}<button class="btn sm" type="button" id="stExport">⬇ Export</button></div></header>
       <div class="st-cards">
         <div class="st-card hero"><span>Total stok</span><b>${num(good + dmg)}</b><small>pasang / pcs di filter ini</small></div>
         <div class="st-card"><span>Good</span><b>${num(good)}</b><small>siap jual</small></div>
@@ -163,6 +163,7 @@
     $$('[data-grp]', v).forEach((tr) => tr.addEventListener('click', () => { const k = tr.dataset.grp; if (openGroups.has(k)) openGroups.delete(k); else openGroups.add(k); render(); }));
     $$('[data-edit]', v).forEach((b) => b.addEventListener('click', () => openForm(B.data.stock3pl.find((x) => x.id === b.dataset.edit))));
     $('#stAdd')?.addEventListener('click', () => openForm(null));
+    $('#stImport')?.addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importDaily(f); });
     $('#stExport').addEventListener('click', () => {
       const head = ['Kategori', 'Produk', 'Warna', 'Size KR', 'Size EU', 'Kode SKU', 'Item pickpack', 'Good', 'Damaged', 'Total', 'Status', 'Gudang', 'Update'];
       window.A.download(`ballop-stok-${today()}.csv`, new Blob([`﻿${toCsv([head, ...rows.map((r) => [r.category, r.product, r.color, r.sizeKr, r.size, r.sku, r.note, val(r, 'available'), val(r, 'damaged'), total(r), STATUS[status(val(r, 'available'))], r.warehouse, r.updatedAt || r.date])])}`], { type: 'text/csv' }));
@@ -174,6 +175,55 @@
     $('#stDo').addEventListener('click', saveEdits);
     pendingBar();
     if (st.tab === 'daily') bindDaily(v);
+  }
+
+  // ---------- daily import of the 3PL stock balance export ----------
+  async function importDaily(file) {
+    const SI = window.StockImport;
+    let items;
+    try {
+      const XLSX = await window.MarketImport.loadXlsx();
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      items = wb.SheetNames.map((n) => SI.parse(XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }))).find(Boolean);
+    } catch (e) { toast(e.message, true); return; }
+    if (!items) { toast('Bukan file stock balance: kolom Item, W/H dan Ending tidak ditemukan.', true); return; }
+    let date = SI.dateFromName(file.name, today()) || today();
+    const box = document.createElement('div');
+    box.className = 'raw-pop';
+    const stamp = () => { const d = new Date(); return `${today()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    const draw = () => {
+      const { stats } = SI.apply(B.data.stock3pl, items, { date, at: stamp(), by: '' });
+      const last = B.data.stock3pl.map((r) => r.date).filter(Boolean).sort().pop();
+      box.innerHTML = `<div class="raw-card si-pop">
+        <header><div><span class="muted small">Import stock harian · ${esc(file.name)}</span><h2>Stok per ${fmtDate(date)}</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
+        <div class="raw-body">
+          <label class="si-date">Tanggal stok<input type="date" id="siDate" value="${date}"></label>
+          ${last && date < last ? `<div class="d-note"><b>Tanggal ini lebih lama dari data sekarang (${fmtDate(last)})</b><span>Stok akan kembali ke kondisi ${fmtDate(date)}. Pastikan file-nya benar.</span></div>` : ''}
+          <div class="st-cards">
+            <div class="st-card hero"><span>Item di file</span><b>${num(items.size)}</b><small>${num(stats.updated)} di-update · ${num(stats.added)} baru</small></div>
+            <div class="st-card"><span>Good</span><b>${num(stats.goodAfter)}</b><small>sebelumnya ${num(stats.goodBefore)} (${stats.goodAfter - stats.goodBefore >= 0 ? '+' : ''}${num(stats.goodAfter - stats.goodBefore)})</small></div>
+            <div class="st-card"><span>Damaged</span><b>${num(stats.dmgAfter)}</b><small>sebelumnya ${num(stats.dmgBefore)}</small></div>
+            <div class="st-card${stats.missing ? ' warn' : ''}"><span>Tidak ada di file</span><b>${num(stats.missing)}</b><small>SKU lama, angkanya tidak diubah</small></div>
+          </div>
+          <h3 class="cs-h">${num(stats.changes.length)} SKU berubah</h3>
+          <div class="table-wrap"><table class="data"><thead><tr><th>Item</th><th class="num">Good sebelum</th><th class="num">Good sesudah</th><th class="num">Selisih</th><th class="num">Damaged</th></tr></thead>
+          <tbody>${stats.changes.map((c) => `<tr><td>${esc(c.item)}</td><td class="num">${num(c.before)}</td><td class="num"><b>${num(c.after)}</b></td><td class="num" style="color:${c.after < c.before ? 'var(--danger)' : 'var(--good)'}">${c.after - c.before > 0 ? '+' : ''}${num(c.after - c.before)}</td><td class="num">${c.dmgBefore !== c.dmgAfter ? `${num(c.dmgBefore)} → ${num(c.dmgAfter)}` : num(c.dmgAfter)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">Tidak ada perubahan stok.</td></tr>'}</tbody></table></div>
+          ${stats.newItems.length ? `<h3 class="cs-h">${num(stats.newItems.length)} item baru</h3><ul class="si-new">${stats.newItems.map((i) => `<li>${esc(i)}</li>`).join('')}</ul><p class="muted small">Item baru masuk kategori "Lainnya"; atur kategorinya lewat edit SKU.</p>` : ''}
+        </div>
+        <footer><span class="spacer"></span><button class="btn sm" type="button" data-close>Batal</button><button class="btn sm primary" type="button" id="siSave">Simpan stok ${fmtDate(date)}</button></footer>
+      </div>`;
+      $('#siDate', box).addEventListener('change', (e) => { if (e.target.value) { date = e.target.value; draw(); } });
+      $('#siSave', box).addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        const who = window.A.me?.user?.name || window.A.me?.user?.username || 'admin';
+        const { list } = SI.apply(B.data.stock3pl, items, { date, at: stamp(), by: `Import ${file.name} · ${who}` });
+        try { B.data.stock3pl = await api('/api/stock3pl', json('PUT', list)); edits.clear(); box.remove(); toast(`Stok ${fmtDate(date)} tersimpan (${num(items.size)} item)`); render(); }
+        catch (err) { e.target.disabled = false; toast(err.message, true); }
+      });
+    };
+    box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) box.remove(); });
+    document.body.appendChild(box);
+    draw();
   }
 
   // product · colour groups start folded; a search opens them all

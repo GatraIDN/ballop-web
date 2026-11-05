@@ -318,5 +318,5 @@ window.MarketImport = (() => {
     XLSX.writeFile(wb, 'template-penjualan-ballop.xlsx');
   }
 
-  return { readFiles, template, KINDS, toNum, toDate, feeGroup, GROUP_ORDER, NOT_FEES };
+  return { loadXlsx, readFiles, template, KINDS, toNum, toDate, feeGroup, GROUP_ORDER, NOT_FEES };
 })();

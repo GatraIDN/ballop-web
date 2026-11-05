@@ -1016,8 +1016,7 @@
   // WhatsApp report = the Ringkasan numbers for the selected period, online channels only (offline left out)
   function reportText() {
     const r = repGet();
-    const len = daysBetween(range.from, range.to);
-    const S = summary(range.from, range.to), P = summary(addDays(range.from, -len), addDays(range.from, -1));
+    const S = summary(range.from, range.to);
     const on = (X) => {
       const chs = X.channels.filter((c) => c.key !== 'offline');
       const t = chs.reduce((o, c) => { ['omzet', 'orders', 'units', 'all', 'cancelled', 'returned', 'gmv', 'net', 'fees', 'adSpend', 'adRevenue', 'margin'].forEach((k) => { o[k] += c[k] || 0; }); return o; },
@@ -1027,8 +1026,7 @@
       t.chs = chs; t.profit = t.margin - X.m.expenses;
       return t;
     };
-    const c = on(S), p = on(P);
-    const chg = (x, y) => { if (!y || !Number.isFinite(x) || !Number.isFinite(y)) return ''; const d = (x - y) / Math.abs(y); return ` (${d >= 0 ? '▲' : '▼'} ${(Math.abs(d) * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%)`; };
+    const c = on(S);
     const pc = (x) => (Number.isFinite(x) ? `${(x * 100).toLocaleString('en-US', { maximumFractionDigits: 1 })}%` : '–');
     const period = range.from === range.to ? longDate(range.from) : `${longDate(range.from)} – ${longDate(range.to)}`;
     const top = S.products.slice(0, 3);
@@ -1037,14 +1035,14 @@
     return [
       `Selamat pagi mister, berikut ini report Ballop E-Commerce periode ${period} :`, '',
       '*Ringkasan online (Shopee, TikTok Shop, Tokopedia)*',
-      L(`Omzet pesanan : ${repMoney(c.omzet)}${chg(c.omzet, p.omzet)}`),
-      L(`Jumlah pesanan : ${num(c.orders)} pesanan · ${num(c.units)} pasang${chg(c.orders, p.orders)}`),
+      L(`Omzet pesanan : ${repMoney(c.omzet)}`),
+      L(`Jumlah pesanan : ${num(c.orders)} pesanan · ${num(c.units)} pasang`),
       L(`AOV : ${c.orders ? repMoney(c.omzet / c.orders) : '-'}`),
       L(`Batal + retur : ${pc(c.all ? (c.cancelled + c.returned) / c.all : NaN)} (${num(c.cancelled + c.returned)} dari ${num(c.all)} pesanan)`),
       L(`GMV kotor (dana cair) : ${repMoney(c.gmv)}`),
       L(`Fee marketplace : ${repMoney(c.fees)} (${pc(c.gmv ? c.fees / c.gmv : NaN)} dari GMV)`),
-      L(`Omzet bersih (dana cair) : ${repMoney(c.net)}${chg(c.net, p.net)}`),
-      L(`Total pengeluaran iklan : ${repMoney(c.adSpend)}${chg(c.adSpend, p.adSpend)}`),
+      L(`Omzet bersih (dana cair) : ${repMoney(c.net)}`),
+      L(`Total pengeluaran iklan : ${repMoney(c.adSpend)}`),
       L(`GMV dari iklan : ${repMoney(c.adRevenue)}`),
       L(`ROAS iklan : ${repRatio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}`),
       L(`Laba bersih online (estimasi) : ${repMoney(c.profit)}`),
@@ -1054,7 +1052,7 @@
       ...(top.length ? ['', '*Produk terlaris*', ...top.map((x, i) => `${i + 1}. ${x.name} : ${num(x.units)} pasang · ${repMoney(x.revenue)}`)] : []),
       '', '*Saldo iklan*',
       ...SALDO.map(([k, l]) => `- ${l} : ${saldoText(r[k] || '') || '-'}`),
-      '', `▲▼ = dibanding ${longDate(P.from)} – ${longDate(P.to)}. Omzet bersih & GMV kotor = dana yang sudah cair di periode ini.`,
+      '', 'Omzet bersih & GMV kotor = dana yang sudah cair di periode ini.',
       '', r.footer ?? FOOTER,
     ].join('\n');
   }
