@@ -30,15 +30,17 @@ function readXlsx(file) {
   return [...wb.matchAll(/<sheet [^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g)].map(([, name, rid]) => {
     const t = rels.match(new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`)) || rels.match(new RegExp(`Target="([^"]+)"[^>]*Id="${rid}"`));
     const xml = z[`xl/${t[1].replace(/^\/?xl\//, '')}`].toString();
-    const rows = [...xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map((r) => {
-      const row = [];
-      for (const c of r[1].matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-        let col = 0; for (const ch of c[1].match(/r="([A-Z]+)/)[1]) col = col * 26 + ch.charCodeAt(0) - 64;
-        const ty = (c[1].match(/t="(\w+)"/) || [])[1], v = ((c[2] || '').match(/<v>([\s\S]*?)<\/v>/) || [])[1];
-        row[col - 1] = ty === 's' ? ss[Number(v)] : ty === 'inlineStr' ? dec(((c[2] || '').match(/<t[^>]*>([\s\S]*?)<\/t>/) || [])[1] || '') : v === undefined ? '' : (ty === 'str' || isNaN(v) ? dec(v) : Number(v));
-      }
-      return Array.from(row, (x) => (x === undefined ? '' : x));
-    });
+    // place every cell by its own address (A1, B7 …): some exports (TikTok) write one <row> block per cell
+    const grid = [];
+    for (const c of xml.matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const ref = c[1].match(/r="([A-Z]+)(\d+)"/);
+      if (!ref) continue;
+      let col = 0; for (const ch of ref[1]) col = col * 26 + ch.charCodeAt(0) - 64;
+      const ty = (c[1].match(/t="(\w+)"/) || [])[1], v = ((c[2] || '').match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      const row = grid[Number(ref[2]) - 1] = grid[Number(ref[2]) - 1] || [];
+      row[col - 1] = ty === 's' ? ss[Number(v)] : ty === 'inlineStr' ? dec(((c[2] || '').match(/<t[^>]*>([\s\S]*?)<\/t>/) || [])[1] || '') : v === undefined ? '' : (ty === 'str' || isNaN(v) ? dec(v) : Number(v));
+    }
+    const rows = Array.from(grid, (r) => Array.from(r || [], (x) => (x === undefined ? '' : x)));
     return { name, rows };
   });
 }
@@ -68,7 +70,8 @@ function readSheet(aoa) {
   return null;
 }
 
-(async () => {
+module.exports = { readXlsx, readSheet };
+if (require.main === module) (async () => {
   const [file, flag] = process.argv.slice(2);
   const write = flag === '--write';
   for (const sh of readXlsx(file)) {

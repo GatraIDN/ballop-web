@@ -110,7 +110,8 @@ window.MarketImport = (() => {
           variation: text(r.Variation), size: sizeOf(r.Variation), qty, returnedQty: ret,
           unitPrice: toNum(r['SKU Unit Original Price']), gross: toNum(r['SKU Subtotal Before Discount']),
           platformDiscount: toNum(r['SKU Platform Discount']), sellerDiscount: toNum(r['SKU Seller Discount']),
-          net: toNum(r['SKU Subtotal After Discount']), buyerPaid: toNum(r['Order Amount']),
+          // omzet = after the seller's own discount; the platform discount is funded by TikTok/Tokopedia and paid to us
+          net: toNum(r['SKU Subtotal After Discount']) + toNum(r['SKU Platform Discount']), buyerPaid: toNum(r['Order Amount']),
           province: text(r.Province), city: text(r['Regency and City']), courier: text(r['Shipping Provider Name']), payment: text(r['Payment Method']),
         };
       },

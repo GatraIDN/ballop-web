@@ -434,6 +434,7 @@
     f.email.value = settings.email || '';
     f.tiktokShop.value = settings.tiktokShop || '';
     f.monthlyTarget.value = settings.monthlyTarget || '';
+    ["targetShopee","targetTiktok","targetTokopedia","targetOffline"].forEach((k) => { f[k].value = settings[k] || ''; });
     f.lowStock.value = settings.lowStock || 5;
     f.cogsPct.value = Math.round((settings.cogsRate ?? 0.35) * 100);
   }
@@ -442,7 +443,7 @@
     const f = e.target.elements;
     try {
       const body = {};
-      ['brand', 'currency', 'whatsapp', 'instagram', 'tiktok', 'shopee', 'tiktokShop', 'tokopedia', 'email', 'monthlyTarget', 'lowStock'].forEach((k) => { body[k] = f[k].value.trim(); });
+      ['brand', 'currency', 'whatsapp', 'instagram', 'tiktok', 'shopee', 'tiktokShop', 'tokopedia', 'email', 'monthlyTarget', 'lowStock', 'targetShopee', 'targetTiktok', 'targetTokopedia', 'targetOffline'].forEach((k) => { body[k] = f[k].value.trim(); });
       body.cogsRate = (Number(f.cogsPct.value) || 0) / 100;
       settings = await api('/api/settings', json('PUT', body));
       fillSettings();

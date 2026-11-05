@@ -243,16 +243,22 @@
 
   // income = finished orders whose money reached the wallet, dated by release date; never mixed with orders
   const payDay = (s) => s.releaseDate || s.date || '';
+  const TOPUP = 'Biaya Isi Saldo Otomatis (dari Penghasilan)';
+  // the payout is already net of the ad top-up; when that channel's ad spend is also in the Iklan menu, add the
+  // top-up back so the same money is not counted twice (once inside the payout, once as ad spend)
+  const topupBack = (inc, m) => Object.entries(inc.byCh).reduce((s, [k, c]) => s + (m.byAd[k]?.spend ? -c.topup : 0), 0);
   function computeIncome(from, to) {
     const MI = window.MarketImport;
     const rows = data.settlements.filter((s) => payDay(s) >= from && payDay(s) <= to);
-    const t = { rows, payout: 0, price: 0, fees: 0, orders: 0, groups: {}, byCh: {} };
+    const t = { rows, payout: 0, price: 0, fees: 0, orders: 0, topup: 0, groups: {}, byCh: {} };
     rows.forEach((s) => {
-      const c = t.byCh[s.channel] = t.byCh[s.channel] || { payout: 0, price: 0, fees: 0, orders: 0 };
+      const c = t.byCh[s.channel] = t.byCh[s.channel] || { payout: 0, price: 0, fees: 0, orders: 0, topup: 0 };
       t.payout += s.payout; c.payout += s.payout;
       if (s.type !== 'Penyesuaian') { t.price += s.productPrice || 0; c.price += s.productPrice || 0; t.orders++; c.orders++; }
       const detail = s.detail && Object.keys(s.detail).length ? s.detail : { 'Biaya marketplace': -Math.abs(s.fees || 0), ...(s.shipping ? { Ongkir: s.shipping } : {}) };
       Object.entries(detail).forEach(([k, v]) => {
+        // Shopee ad-balance top-up taken from earnings is ad spend, not a marketplace fee
+        if (k === TOPUP) { t.topup += v; c.topup += v; t.groups['Top-up saldo iklan'] = (t.groups['Top-up saldo iklan'] || 0) + v; return; }
         const g = s.type === 'Penyesuaian' ? 'Penyesuaian' : MI.feeGroup(k);
         t.groups[g] = (t.groups[g] || 0) + v;
         if (!MI.NOT_FEES.includes(g)) { t.fees += v; c.fees += v; }
@@ -624,7 +630,8 @@
       const fg = MI.GROUP_ORDER.filter((g) => inc.groups[g] && !MI.NOT_FEES.includes(g)).map((g) => [g, Math.abs(inc.groups[g])]).sort((a, b) => b[1] - a[1]);
       const maxF = Math.max(1, ...fg.map(([, x]) => x));
       const ads = m.adSpend, opex = m.expenses;
-      const profit = inc.payout - inc.cogs - ads - opex;
+      const back = topupBack(inc, m);
+      const profit = inc.payout + back - inc.cogs - ads - opex;
       const incSeries = Object.entries(SALES_CH).map(([key, c]) => ({ key, ...c })).filter((s) => inc.byCh[s.key]);
       return `
       ${secHead('Income', 'Pesanan yang sudah selesai dan dananya sudah masuk ke saldo penjual setelah dipotong semua fee. Tanggal = tanggal dana dilepaskan.', ['income', 'Rincian income'])}
@@ -654,11 +661,11 @@
             <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td>−${money(inc.price - inc.payout)}</td></tr>
             <tr class="mid"><td>Dana cair</td><td>${money(inc.payout)}</td></tr>
             <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td>−${money(inc.cogs)}</td></tr>
-            <tr class="sub"><td>Biaya iklan</td><td>−${money(ads)}</td></tr>
+            <tr class="sub"><td>Biaya iklan</td><td>−${money(ads)}</td></tr>${back ? `<tr class="sub"><td>Koreksi top-up iklan (sudah di spend)</td><td>+${money(back)}</td></tr>` : ''}
             <tr class="sub"><td>Biaya operasional</td><td>−${money(opex)}</td></tr>
             <tr class="total"><td>Laba bersih</td><td style="color:${profit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(profit)}</td></tr>
           </table>
-          <p class="muted small">"Biaya Isi Saldo Otomatis" Shopee sudah ikut di fee; kalau spending yang sama juga tercatat di menu Iklan, angkanya dobel.</p>
+          <p class="muted small">Top-up saldo iklan Shopee yang dipotong dari penghasilan (${money(Math.abs(inc.topup))}) dihitung sebagai biaya iklan, bukan fee${back ? `; karena spend iklan Shopee sudah tercatat di menu Iklan, ${money(back)} ditambahkan kembali supaya tidak dobel` : ''}.</p>
         </section>
       </div>
       <section class="panel solid">
@@ -820,9 +827,14 @@
     const channels = [...MARKET_CH, 'website', 'offline', 'other'].map((k) => {
       const o = m.byCh[k], s = m.byState[k], i = inc.byCh[k], a = m.byAd[k];
       if (!o && !s && !i && !a) return null;
-      return { key: k, label: SALES_CH[k]?.label || k, color: SALES_CH[k]?.color || '#888', omzet: o?.revenue || 0, units: o?.units || 0, orders: o?.orders || 0,
+      const c = { key: k, label: SALES_CH[k]?.label || k, color: SALES_CH[k]?.color || '#888', omzet: o?.revenue || 0, units: o?.units || 0, orders: o?.orders || 0,
         all: s?.all || 0, cancelled: s?.cancelled || 0, returned: s?.returned || 0, gmv: i?.price || 0, net: i?.payout || 0, fees: Math.abs(i?.fees || 0),
-        adSpend: a?.spend || 0, adRevenue: a?.revenue || 0 };
+        adSpend: a?.spend || 0, adRevenue: a?.revenue || 0, topup: Math.abs(i?.topup || 0) };
+      // contribution margin: money in (payout, or omzet for channels without a payout file) − HPP − ad spend
+      const base = k === 'offline' || !i ? c.omzet : c.net + (c.adSpend ? c.topup : 0);
+      c.base = base; c.hpp = (k === 'offline' || !i ? c.omzet : c.gmv) * cogsRate();
+      c.margin = base - c.hpp - c.adSpend;
+      return c;
     }).filter(Boolean);
     const adOnly = Object.entries(m.byAd).filter(([k]) => !channels.some((c) => c.key === k)).map(([k, a]) => ({ key: k, label: ADS_CH[k]?.label || k, spend: a.spend, revenue: a.revenue }));
     const trend = periodRows(from, to).map((b) => {
@@ -838,8 +850,15 @@
     });
     const products = Object.values(prod).sort((a, b) => b.units - a.units || b.revenue - a.revenue);
     const hpp = inc.price * cogsRate();
-    const profit = inc.payout - hpp - m.adSpend - m.expenses;
-    return { from, to, m, inc, live, off, allOrders, channels, adOnly, trend, products, hpp, profit,
+    const td = parse(today()), mStart = iso(new Date(td.getFullYear(), td.getMonth(), 1)), mDays = new Date(td.getFullYear(), td.getMonth() + 1, 0).getDate();
+    const mtd = compute(mStart, today()), mtdOff = offlineOf(mStart, today()).omzet;
+    const st = window.A.settings || {};
+    const targets = [['shopee', st.targetShopee], ['tiktok', st.targetTiktok], ['tokopedia', st.targetTokopedia], ['offline', st.targetOffline]].filter(([, t]) => t > 0)
+      .map(([k, t]) => { const v = k === 'offline' ? mtdOff : (mtd.byCh[k]?.revenue || 0); return { key: k, label: SALES_CH[k]?.label || k, color: SALES_CH[k]?.color || '#888', target: t, value: v, pct: v / t, projected: (v / td.getDate()) * mDays }; });
+    const targetMonth = `${MONTHS_LONG[td.getMonth()]} ${td.getFullYear()}`, dayPct = td.getDate() / mDays;
+    const back = topupBack(inc, m);
+    const profit = inc.payout + back - hpp - m.adSpend - m.expenses;
+    return { from, to, m, inc, live, off, allOrders, channels, adOnly, trend, products, hpp, profit, back, targets, targetMonth, dayPct,
       cancelRate: allOrders ? (m.cancelled + m.returnOrders) / allOrders : NaN, feeRate: inc.price ? Math.abs(inc.fees) / inc.price : NaN };
   }
 
@@ -871,6 +890,23 @@
         </table></div>
       </section>
       <section class="panel solid">
+        <div class="panel-head"><h2>Laba rugi per channel</h2><span class="muted small">margin kontribusi = uang masuk − HPP − iklan</span></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Channel</th><th class="num">GMV kotor</th><th class="num">Fee marketplace</th><th class="num">Omzet bersih</th><th class="num">HPP (est.)</th><th class="num">Iklan</th><th class="num">Margin kontribusi</th><th class="num">% dari GMV</th></tr></thead>
+          <tbody>${S.channels.map((c) => { const g = c.key === 'offline' || !c.gmv ? c.omzet : c.gmv; return `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num">${money(g)}</td><td class="num">${c.gmv ? money(c.fees) : '–'}</td><td class="num">${money(c.base)}</td><td class="num">−${money(c.hpp)}</td><td class="num">${c.adSpend ? `−${money(c.adSpend)}` : '–'}</td><td class="num"><b style="color:${c.margin < 0 ? 'var(--danger)' : 'var(--good)'}">${money(c.margin)}</b></td><td class="num">${g ? pct(c.margin / g) : '–'}</td></tr>`; }).join('')}
+          <tr class="tot"><td>Total kontribusi</td><td></td><td></td><td></td><td></td><td></td><td class="num">${money(S.channels.reduce((s, c) => s + c.margin, 0))}</td><td></td></tr>
+          ${S.adOnly.length ? `<tr><td colspan="6" class="muted">Iklan tanpa channel penjualan (${esc(S.adOnly.map((a) => a.label).join(', '))})</td><td class="num">−${money(S.adOnly.reduce((s, a) => s + a.spend, 0))}</td><td></td></tr>` : ''}
+          <tr><td colspan="6" class="muted">Biaya operasional</td><td class="num">−${money(m.expenses)}</td><td></td></tr></tbody>
+        </table></div>
+        <p class="muted small">HPP estimasi ${pct(cogsRate())} dari GMV (atur di Pengaturan). Channel tanpa file income (mis. offline) memakai omzet pesanan.</p>
+      </section>
+      ${S.targets.length ? `<section class="panel solid">
+        <div class="panel-head"><h2>Target ${S.targetMonth}</h2><span class="muted small">omzet pesanan bulan berjalan · garis = posisi hari ini</span></div>
+        ${S.targets.map((t) => `<div class="tgt-row"><span class="ch"><i style="background:${t.color}"></i>${esc(t.label)}</span>
+          <div class="track"><i style="width:${Math.min(100, t.pct * 100)}%;background:${t.color}"></i><em style="left:${S.dayPct * 100}%"></em></div>
+          <span class="tgt-val"><b>${pct(t.pct)}</b> · ${compact(t.value)} / ${compact(t.target)} · proyeksi ${compact(t.projected)}</span></div>`).join('')}
+      </section>` : '<p class="muted small">Isi target per channel di Pengaturan untuk melihat progres target.</p>'}
+      <section class="panel solid">
         <div class="panel-head"><h2>Tren per ${S.trend.length && daysBetween(S.from, S.to) > 62 ? 'bulan' : daysBetween(S.from, S.to) > 14 ? 'minggu' : 'hari'}</h2><span class="legend"><span><i style="background:#2a78d6"></i>Omzet pesanan</span><span><i style="background:#0e8a4f"></i>Omzet bersih</span></span></div>
         <div class="table-wrap"><table class="data trend">
           <thead><tr><th>Periode</th><th style="width:28%"></th><th class="num">Omzet pesanan</th><th class="num">Pesanan</th><th class="num">GMV kotor</th><th class="num">Omzet bersih</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Live</th><th class="num">Offline</th></tr></thead>
@@ -887,7 +923,7 @@
             <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td>−${money(inc.price - inc.payout)}</td></tr>
             <tr class="mid"><td>Omzet bersih</td><td>${money(inc.payout)}</td></tr>
             <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td>−${money(S.hpp)}</td></tr>
-            <tr class="sub"><td>Biaya iklan</td><td>−${money(m.adSpend)}</td></tr>
+            <tr class="sub"><td>Biaya iklan</td><td>−${money(m.adSpend)}</td></tr>${S.back ? `<tr class="sub"><td>Koreksi top-up iklan (sudah di spend)</td><td>+${money(S.back)}</td></tr>` : ''}
             <tr class="sub"><td>Biaya operasional</td><td>−${money(m.expenses)}</td></tr>
             <tr class="total"><td>Laba bersih</td><td style="color:${S.profit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(S.profit)}</td></tr>
           </table>
@@ -935,6 +971,13 @@
       ...S.adOnly.map((a) => [`${dot('#999')}${esc(a.label)} <span class="muted">(iklan)</span>`, '–', '–', '–', '–', '–', '–', '–', '–', rp(a.spend), ratio(a.spend ? a.revenue / a.spend : NaN)])],
     ['Total', rp(m.revenue), '100%', num(m.orders), num(m.units), pct(S.cancelRate), rp(inc.price), pct(S.feeRate), rp(inc.payout), rp(m.adSpend), ratio(m.adRoas)])}
   </div>
+  <div class="avoid">
+  ${h2('Laba rugi per channel', 'margin kontribusi = uang masuk − HPP − iklan')}
+  ${table([['Channel'], ['GMV kotor', 1], ['Fee', 1], ['Omzet bersih', 1], ['HPP (est.)', 1], ['Iklan', 1], ['Margin kontribusi', 1], ['% GMV', 1]],
+    S.channels.map((c) => { const g = c.key === 'offline' || !c.gmv ? c.omzet : c.gmv; return [`${dot(c.color)}${esc(c.label)}`, rp(g), c.gmv ? rp(c.fees) : '–', rp(c.base), `−${rp(c.hpp)}`, c.adSpend ? `−${rp(c.adSpend)}` : '–', `<b class="${c.margin < 0 ? 'neg' : 'pos'}">${rp(c.margin)}</b>`, g ? pct(c.margin / g) : '–']; }),
+    ['Total kontribusi', '', '', '', '', '', rp(S.channels.reduce((s, c) => s + c.margin, 0)), ''])}
+  </div>
+  ${S.targets.length ? `${h2(`Target ${S.targetMonth}`, 'omzet pesanan bulan berjalan')}${table([['Channel'], ['Realisasi', 1], ['Target', 1], ['Capaian', 1], ['Proyeksi akhir bulan', 1]], S.targets.map((t) => [`${dot(t.color)}${esc(t.label)}`, rp(t.value), rp(t.target), `<b>${pct(t.pct)}</b>`, rp(t.projected)]))}` : ''}
   ${h2(`Tren per ${unit}`, `${dot('#2a78d6')}omzet pesanan ${dot('#0e8a4f')}omzet bersih`)}
   ${table([['Periode'], [''], ['Omzet pesanan', 1], ['Pesanan', 1], ['Unit', 1], ['GMV kotor', 1], ['Omzet bersih', 1], ['Iklan', 1], ['ROAS', 1], ['Live', 1], ['Offline', 1]],
     S.trend.map((t) => [esc(t.label), bars([[t.omzet, '#2a78d6'], [t.net, '#0e8a4f']], maxT), `<b>${rp(t.omzet)}</b>`, num(t.orders), num(t.units), rp(t.gmv), rp(t.net), rp(t.ads), ratio(t.ads ? t.adRev / t.ads : NaN), t.live ? rp(t.live) : '–', t.offline ? rp(t.offline) : '–']))}
@@ -947,7 +990,7 @@
         <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td class="n">−${rp(inc.price - inc.payout)}</td></tr>
         <tr class="mid"><td>Omzet bersih</td><td class="n">${rp(inc.payout)}</td></tr>
         <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td class="n">−${rp(S.hpp)}</td></tr>
-        <tr class="sub"><td>Biaya iklan</td><td class="n">−${rp(m.adSpend)}</td></tr>
+        <tr class="sub"><td>Biaya iklan</td><td class="n">−${rp(m.adSpend)}</td></tr>${S.back ? `<tr class="sub"><td>Koreksi top-up iklan (sudah di spend)</td><td class="n">+${rp(S.back)}</td></tr>` : ''}
         <tr class="sub"><td>Biaya operasional</td><td class="n">−${rp(m.expenses)}</td></tr>
         <tr class="total"><td>Laba bersih</td><td class="n ${S.profit < 0 ? 'neg' : 'pos'}">${rp(S.profit)}</td></tr>
       </tbody></table></div>
