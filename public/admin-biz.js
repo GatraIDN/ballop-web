@@ -1790,6 +1790,9 @@
     if (ost.q) { const q = ost.q.toLowerCase(); rows = rows.filter((x) => `${x.orderId} ${x.productName} ${x.variation} ${x.sku} ${x.city}`.toLowerCase().includes(q)); }
     rows.sort((a, b) => b.date.localeCompare(a.date));
     const live = rows.filter((x) => x.state === 'completed' || x.state === 'pending');
+    // RRP = price before any discount, ASP = price after discount (what the buyer pays for the item, platform subsidy included)
+    const T = live.reduce((t, x) => ({ rrp: t.rrp + (x.gross || x.unitPrice * x.qty || x.net), asp: t.asp + x.net, qty: t.qty + x.qty }), { rrp: 0, asp: 0, qty: 0 });
+    const rrpOf = (x) => x.gross || x.unitPrice * x.qty || x.net;
     const orders = new Set(live.map((x) => `${x.channel}:${x.orderId}`));
     const byProd = {};
     live.forEach((x) => { const k = x.productName; const p = byProd[k] = byProd[k] || { units: 0, revenue: 0, sizes: {} }; p.units += x.qty; p.revenue += x.net; if (x.size) p.sizes[x.size] = (p.sizes[x.size] || 0) + x.qty; });
@@ -1822,8 +1825,10 @@
       ${(() => { const miss = ['shopee', 'tiktok', 'tokopedia', 'lazada'].filter((k) => (!ost.channel || ost.channel === k) && !data.orders.some((x) => x.channel === k && inR(x)) && data.settlements.some((s) => s.channel === k && (s.releaseDate || s.date) >= r.from && (s.releaseDate || s.date) <= r.to));
         return miss.length ? `<div class="demo-note glass"><span class="badge warn">Data order belum lengkap</span> Ada income ${miss.map((k) => SALES_CH[k].label).join(', ')} di periode ini tapi file order-nya belum di-import, jadi pesanan & omzet tampil 0. Import file export order (Pesanan Saya › Export) untuk ${esc(R_period(r))} di kotak import di atas.</div>` : ''; })()}
       <div class="sum-cards">
-        <div class="sum-card solid"><div class="k-label">Pesanan masuk</div><div class="k-value">${num(orders.size)}</div><div class="k-sub">${num(live.reduce((s, x) => s + x.qty, 0))} pasang</div></div>
-        <div class="sum-card solid"><div class="k-label">Omzet (setelah diskon)</div><div class="k-value">${money(live.reduce((s, x) => s + x.net, 0))}</div><div class="k-sub">AOV ${orders.size ? money(live.reduce((s, x) => s + x.net, 0) / orders.size) : '–'}</div></div>
+        <div class="sum-card solid"><div class="k-label">Pesanan masuk</div><div class="k-value">${num(orders.size)}</div><div class="k-sub">selesai + diproses</div></div>
+        <div class="sum-card solid"><div class="k-label">RRP · harga sebelum diskon</div><div class="k-value">${money(T.rrp)}</div><div class="k-sub">rata-rata ${T.qty ? money(T.rrp / T.qty) : '–'} / pasang</div></div>
+        <div class="sum-card solid"><div class="k-label">ASP · harga setelah diskon</div><div class="k-value">${money(T.asp)}</div><div class="k-sub">rata-rata ${T.qty ? money(T.asp / T.qty) : '–'} / pasang · diskon ${T.rrp ? pct(1 - T.asp / T.rrp) : '–'}</div></div>
+        <div class="sum-card solid"><div class="k-label">QTY</div><div class="k-value">${num(T.qty)} pasang</div><div class="k-sub">pasang terjual</div></div>
         <div class="sum-card solid"><div class="k-label">Batal · retur</div><div class="k-value">${num(cnt('cancelled'))} · ${num(cnt('returned'))}</div><div class="k-sub">pesanan</div></div>
       </div>
       <div class="grid-3" style="margin-top:0">
@@ -1837,8 +1842,8 @@
       <section class="panel solid" style="margin-top:14px">
         <div class="panel-head"><h2>Daftar pesanan</h2><span class="muted small">${num(rows.length)} baris</span></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Tanggal</th><th>Channel</th><th>No. pesanan</th><th>Produk</th><th>Variasi</th><th class="num">Qty</th><th class="num">Omzet</th><th>Status</th></tr></thead>
-          <tbody>${rows.slice(0, ost.limit).map((x) => { return `<tr><td>${fmtDate(x.date)}</td><td>${chBadge(SALES_CH, x.channel)}</td><td><button class="raw-link" type="button" data-raw="orders" data-key="${esc(x.key)}">${esc(x.orderId)}</button></td><td title="${esc(x.productName)}">${esc(x.productName.length > 42 ? `${x.productName.slice(0, 40)}…` : x.productName)}</td><td>${esc(x.variation)}</td><td class="num">${num(x.qty)}</td><td class="num">${money(x.net)}</td><td><span class="badge ${x.state === 'completed' ? 'live' : x.state === 'pending' ? '' : x.state === 'returned' ? 'warn' : 'bad'}" title="${esc(x.status)}">${ORDER_STATE[x.state]}</span></td></tr>`; }).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:30px">Belum ada pesanan di filter ini.</td></tr>'}</tbody>
+          <thead><tr><th>Tanggal</th><th>Channel</th><th>No. pesanan</th><th>Produk</th><th>Variasi</th><th class="num">QTY</th><th class="num">RRP</th><th class="num">ASP</th><th>Status</th></tr></thead>
+          <tbody>${rows.slice(0, ost.limit).map((x) => { return `<tr><td>${fmtDate(x.date)}</td><td>${chBadge(SALES_CH, x.channel)}</td><td><button class="raw-link" type="button" data-raw="orders" data-key="${esc(x.key)}">${esc(x.orderId)}</button></td><td title="${esc(x.productName)}">${esc(x.productName.length > 42 ? `${x.productName.slice(0, 40)}…` : x.productName)}</td><td>${esc(x.variation)}</td><td class="num">${num(x.qty)}</td><td class="num muted">${money(rrpOf(x))}</td><td class="num"><b>${money(x.net)}</b></td><td><span class="badge ${x.state === 'completed' ? 'live' : x.state === 'pending' ? '' : x.state === 'returned' ? 'warn' : 'bad'}" title="${esc(x.status)}">${ORDER_STATE[x.state]}</span></td></tr>`; }).join('') || '<tr><td colspan="9" class="muted" style="text-align:center;padding:30px">Belum ada pesanan di filter ini.</td></tr>'}</tbody>
         </table></div>
         ${rows.length > ost.limit ? `<p style="text-align:center"><button class="btn sm" type="button" id="ordMore">Tampilkan lebih banyak</button></p>` : ''}
       </section>`;
@@ -1854,35 +1859,37 @@
       const R = window.PdfReport;
       const omzet = live.reduce((s, x) => s + x.net, 0);
       const byCh = {};
-      rows.forEach((x) => { const c = byCh[x.channel] = byCh[x.channel] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0 };
-        c.all.add(x.orderId); if (x.state === 'completed' || x.state === 'pending') { c.done.add(x.orderId); c.omzet += x.net; c.units += x.qty; } if (x.state === 'cancelled') c.cancelled.add(x.orderId); if (x.state === 'returned') c.returned.add(x.orderId); });
+      rows.forEach((x) => { const c = byCh[x.channel] = byCh[x.channel] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0, rrp: 0 };
+        c.all.add(x.orderId); if (x.state === 'completed' || x.state === 'pending') { c.done.add(x.orderId); c.omzet += x.net; c.units += x.qty; c.rrp += rrpOf(x); } if (x.state === 'cancelled') c.cancelled.add(x.orderId); if (x.state === 'returned') c.returned.add(x.orderId); });
       const chs = Object.entries(byCh).sort((a, b) => b[1].omzet - a[1].omzet);
       const filt = [ost.channel ? SALES_CH[ost.channel].label : 'Semua marketplace', ost.state ? ORDER_STATE[ost.state] : 'Semua status', ost.q ? `cari "${esc(ost.q)}"` : ''].filter(Boolean).join(' · ');
       const dayMap = {};
-      rows.forEach((x) => { const c = dayMap[x.date] = dayMap[x.date] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0 }; const k = `${x.channel}:${x.orderId}`;
-        c.all.add(k); if (x.state === 'completed' || x.state === 'pending') { c.done.add(k); c.omzet += x.net; c.units += x.qty; } if (x.state === 'cancelled') c.cancelled.add(k); if (x.state === 'returned') c.returned.add(k); });
+      rows.forEach((x) => { const c = dayMap[x.date] = dayMap[x.date] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0, rrp: 0 }; const k = `${x.channel}:${x.orderId}`;
+        c.all.add(k); if (x.state === 'completed' || x.state === 'pending') { c.done.add(k); c.omzet += x.net; c.units += x.qty; c.rrp += rrpOf(x); } if (x.state === 'cancelled') c.cancelled.add(k); if (x.state === 'returned') c.returned.add(k); });
       const perDay = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0]));
       const body = `
         ${R.h2('Ringkasan pesanan')}
         ${R.tiles([
-          R.tile('Pesanan masuk', num(orders.size), `${num(live.reduce((s, x) => s + x.qty, 0))} pasang`, true),
-          R.tile('Omzet (setelah diskon)', R.rp(omzet), `AOV ${orders.size ? R.rp(omzet / orders.size) : '–'}`),
+          R.tile('Pesanan masuk', num(orders.size), 'selesai + diproses'),
+          R.tile('RRP · sebelum diskon', R.rp(T.rrp), `rata-rata ${T.qty ? R.rp(T.rrp / T.qty) : '–'} / pasang`),
+          R.tile('ASP · setelah diskon', R.rp(T.asp), `rata-rata ${T.qty ? R.rp(T.asp / T.qty) : '–'} / pasang · diskon ${T.rrp ? R.pct(1 - T.asp / T.rrp) : '–'}`, true),
+          R.tile('QTY', `${num(T.qty)} pasang`, 'pasang terjual'),
           R.tile('Batal · retur', `${num(cnt('cancelled'))} · ${num(cnt('returned'))}`, 'pesanan'),
-        ], 3)}
+        ], 5)}
         ${R.h2('Per channel')}
-        ${R.table([['Channel'], ['Pesanan', 1], ['Selesai/diproses', 1], ['Batal', 1], ['Retur', 1], ['Unit', 1], ['Omzet', 1], ['Share', 1]],
-          chs.map(([k, c]) => [`${R.dot(SALES_CH[k]?.color || '#888')}${esc(SALES_CH[k]?.label || k)}`, num(c.all.size), num(c.done.size), num(c.cancelled.size), num(c.returned.size), num(c.units), `<b>${R.rp(c.omzet)}</b>`, R.pct(omzet ? c.omzet / omzet : NaN)]),
-          ['Total', num(chs.reduce((s, [, c]) => s + c.all.size, 0)), num(orders.size), num(cnt('cancelled')), num(cnt('returned')), num(live.reduce((s, x) => s + x.qty, 0)), R.rp(omzet), '100%'])}
+        ${R.table([['Channel'], ['QTY', 1], ['RRP', 1], ['ASP', 1], ['Diskon', 1], ['ASP / pasang', 1], ['Share ASP', 1]],
+          chs.map(([k, c]) => [`${R.dot(SALES_CH[k]?.color || '#888')}${esc(SALES_CH[k]?.label || k)}`, num(c.units), R.rp(c.rrp), `<b>${R.rp(c.omzet)}</b>`, c.rrp ? R.pct(1 - c.omzet / c.rrp) : '–', c.units ? R.rp(c.omzet / c.units) : '–', R.pct(omzet ? c.omzet / omzet : NaN)]),
+          ['Total', num(T.qty), R.rp(T.rrp), R.rp(T.asp), T.rrp ? R.pct(1 - T.asp / T.rrp) : '–', T.qty ? R.rp(T.asp / T.qty) : '–', '100%'])}
         <div class="two">
-          <div>${R.h2('Produk terlaris', 'omzet · pasang')}${R.table([['Produk'], ['Pasang', 1], ['Omzet', 1]], top.slice(0, 10).map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, num(x.units), R.rp(x.revenue)]))}</div>
+          <div>${R.h2('Produk terlaris', 'QTY · ASP')}${R.table([['Produk'], ['QTY', 1], ['ASP', 1]], top.slice(0, 10).map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, num(x.units), R.rp(x.revenue)]))}</div>
           <div>${R.h2('Provinsi teratas', 'pasang')}${R.table([['Provinsi'], ['Pasang', 1]], cities.map(([c, q]) => [esc(c), num(q)]))}</div>
         </div>
         ${R.h2('Pesanan per tanggal', 'akumulasi per tanggal pesanan dibuat')}
-        ${R.table([['Tanggal'], ['Pesanan masuk', 1], ['Selesai/diproses', 1], ['Batal', 1], ['Retur', 1], ['Pasang', 1], ['Omzet', 1]],
-          perDay.map(([d, x]) => [fmtDate(d), num(x.all.size), num(x.done.size), num(x.cancelled.size), num(x.returned.size), num(x.units), `<b>${R.rp(x.omzet)}</b>`]),
-          ['Total', num(perDay.reduce((s, [, x]) => s + x.all.size, 0)), num(orders.size), num(cnt('cancelled')), num(cnt('returned')), num(live.reduce((s, x) => s + x.qty, 0)), R.rp(omzet)])}`;
+        ${R.table([['Tanggal'], ['QTY', 1], ['RRP', 1], ['ASP', 1], ['Diskon', 1]],
+          perDay.map(([d, x]) => [fmtDate(d), num(x.units), R.rp(x.rrp), `<b>${R.rp(x.omzet)}</b>`, x.rrp ? R.pct(1 - x.omzet / x.rrp) : '–']),
+          ['Total', num(T.qty), R.rp(T.rrp), R.rp(T.asp), T.rrp ? R.pct(1 - T.asp / T.rrp) : '–'])}`;
       R.open({ title: 'Laporan Order', period: R.period(r.from, r.to), meta: [['Periode', R.period(r.from, r.to)], ['Filter', filt]], body,
-        note: 'Tanggal = tanggal pesanan dibuat. Omzet = subtotal setelah diskon, belum dipotong fee marketplace.' });
+        note: 'Pesanan selesai + diproses (batal & retur tidak dihitung). Tanggal = tanggal pesanan dibuat. RRP = harga sebelum diskon; ASP = harga setelah diskon, belum dipotong fee marketplace.' });
     });
     $('#ordExport').addEventListener('click', () => {
       const head = ['date', 'channel', 'orderId', 'status', 'sku', 'productName', 'variation', 'size', 'qty', 'unitPrice', 'sellerDiscount', 'platformDiscount', 'net', 'province', 'city', 'courier'];
