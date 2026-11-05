@@ -740,7 +740,7 @@
       <header class="dash-head glass">
         <img class="dh-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
         <div class="dh-title"><h1>Dashboard Report</h1><p>${sec.label} · ${from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)} · ${len} hari`}</p></div>
-        <span class="dh-actions"><button class="btn btn-export" id="expPdf" type="button">⬇ Export PDF report</button><button class="btn" id="expReport" type="button">CSV</button></span>
+        <span class="dh-actions"><button class="btn" id="reportCopy" type="button">⧉ Copy teks report</button><button class="btn icon-only" id="reportEdit" type="button" title="Atur saldo iklan & kalimat penutup" aria-label="Atur teks report">✎</button><button class="btn btn-export" id="expPdf" type="button">⬇ PDF report</button><button class="btn" id="expReport" type="button">CSV</button></span>
       </header>
       <div class="toolbar">
         <div class="seg glass">${RANGES.map(([k, l]) => `<button type="button" data-r="${k}" class="${range.key === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -756,7 +756,7 @@
           ${s.d}
         </button>`).join('')}</div>
       <div class="sec-body">${dashTab === 'overview' ? overviewTab(S, SP) : dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : dashTab === 'offline' ? offlineTab() : orderTab()}</div>
-      ${reportPanel()}`;
+`;
 
     const chartEl = (id) => document.getElementById(id);
     if (chartEl('chSales')) stackedBars(chartEl('chSales'), bks, salesSeries.length ? salesSeries : [{ key: '_', label: 'Omzet', color: '#2a78d6' }],
@@ -1025,28 +1025,36 @@
       '', '', r.footer ?? FOOTER,
     ].join('\n');
   }
-  function reportPanel() {
+  const copyReport = async () => { try { await navigator.clipboard.writeText(reportText()); toast('Teks report disalin'); } catch { toast('Tidak bisa menyalin', true); } };
+  // saldo iklan + closing line live in a small popup instead of a panel on the page
+  function reportPopup() {
     const r = repGet();
-    return `
-      <section class="panel solid report-panel">
-        <div class="panel-head"><h2>Teks daily report</h2><span class="muted small">angka iklan bulan berjalan s/d tanggal akhir periode yang dipilih; saldo & kalimat penutup diisi manual (tersimpan di browser ini)</span></div>
+    const box = document.createElement('div');
+    box.className = 'raw-pop';
+    box.innerHTML = `<div class="raw-card rep-pop">
+      <header><div><span class="muted small">Teks daily report</span><h2>Atur saldo & penutup</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
+      <div class="raw-body">
+        <p class="muted small" style="margin-top:0">Angka iklan = bulan berjalan s/d tanggal akhir periode yang dipilih. Saldo & kalimat penutup tersimpan di browser ini.</p>
         <div class="row three">${SALDO.map(([k, l]) => `<label>${l}<input type="text" inputmode="numeric" data-rep="${k}" value="${esc(r[k] || '')}" placeholder="mis. 1500000"></label>`).join('')}</div>
         <label>Kalimat penutup<textarea data-rep="footer" rows="2">${esc(r.footer ?? FOOTER)}</textarea></label>
         <pre class="report-text" id="reportText"></pre>
-        <button class="btn report-copy" id="reportCopy" type="button">⧉ Copy teks report</button>
-      </section>`;
-  }
-  function bindReport() {
-    const show = () => { $('#reportText').textContent = reportText(); };
+      </div>
+      <footer><span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button><button class="btn sm btn-export" type="button" id="repCopy2">⧉ Copy teks report</button></footer>
+    </div>`;
+    document.body.appendChild(box);
+    const show = () => { $('#reportText', box).textContent = reportText(); };
     show();
-    $$('[data-rep]').forEach((el) => el.addEventListener('input', () => {
-      const r = repGet(); r[el.dataset.rep] = el.value;
-      try { localStorage.setItem('ballopReport', JSON.stringify(r)); } catch {}
+    $$('[data-rep]', box).forEach((el) => el.addEventListener('input', () => {
+      const x = repGet(); x[el.dataset.rep] = el.value;
+      try { localStorage.setItem('ballopReport', JSON.stringify(x)); } catch {}
       show();
     }));
-    $('#reportCopy').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(reportText()); toast('Teks report disalin'); } catch { toast('Tidak bisa menyalin', true); }
-    });
+    $('#repCopy2', box).addEventListener('click', copyReport);
+    box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) box.remove(); });
+  }
+  function bindReport() {
+    $('#reportCopy').addEventListener('click', copyReport);
+    $('#reportEdit').addEventListener('click', reportPopup);
   }
 
   function exportReport(m) {

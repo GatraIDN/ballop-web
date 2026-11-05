@@ -986,3 +986,6 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .ac-export { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin: 4px 0 14px; border: 1px solid var(--line); border-radius: 14px; }
 .ac-export > b { font-size: 13px; }
 .ac-export .toolbar { margin: 0; }
+
+.btn.icon-only { padding-left: 12px; padding-right: 12px; }
+.rep-pop { max-width: 760px; }
