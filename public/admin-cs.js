@@ -1,4 +1,4 @@
-// BALLOP admin: customer service. Daily report per marketplace (chat, complaints, returns, reviews, shop
+// BALLOP admin: customer service. Daily report per marketplace (chat analytics, checklist, notes
 // performance + the daily SOP checklist) and the Shopee shop flash sale submitted every day.
 (() => {
   const { $, $$, api, json, toast } = window.A;
@@ -12,12 +12,8 @@
   const chTag = (k) => `<span class="ch"><i style="background:${CH[k]?.color || '#888'}"></i>${esc(CH[k]?.label || k)}</span>`;
   // daily SOP; flash sale only exists on Shopee
   const TASKS = {
-    shopee: [['chat', 'Balas semua chat masuk (jaga response rate)'], ['orders', 'Cek pesanan perlu dikirim & yang terlambat'], ['returns', 'Proses pengajuan retur / refund'],
-      ['complaints', 'Follow up komplain sampai selesai'], ['reviews', 'Balas ulasan pembeli (terutama bintang 1–3)'], ['cancel', 'Tangani permintaan pembatalan'],
-      ['perf', 'Cek Performa Toko & poin penalti'], ['flash', 'Submit Flash Sale toko untuk besok']],
-    tiktok: [['chat', 'Balas semua chat masuk (jaga response rate)'], ['orders', 'Cek pesanan perlu dikirim & yang terlambat'], ['returns', 'Proses pengajuan retur / refund'],
-      ['complaints', 'Follow up komplain sampai selesai'], ['reviews', 'Balas ulasan pembeli (terutama bintang 1–3)'], ['cancel', 'Tangani permintaan pembatalan'],
-      ['perf', 'Cek Shop Performance Score (SPS) & pelanggaran']],
+    shopee: [['chat', 'Balas semua chat masuk (jaga response rate)'], ['orders', 'Cek pesanan perlu dikirim & yang terlambat'], ['flash', 'Submit Flash Sale toko untuk besok']],
+    tiktok: [['chat', 'Balas semua chat masuk (jaga response rate)'], ['orders', 'Cek pesanan perlu dikirim & yang terlambat']],
   };
   // copied by hand from Shopee Seller Centre > Data > Layanan > Chat, and Tokopedia/TikTok Seller > Analitik layanan > Ringkasan
   // kind: n = count, p = percent, rp = rupiah, t = duration (typed 00:15:48 or minutes, stored as minutes)
@@ -46,10 +42,7 @@
   const statVal = (kind, v) => (kind === 'p' ? (v || v === 0 ? `${Number(v).toLocaleString('id-ID', { maximumFractionDigits: 2 })}%` : '–') : kind === 'rp' ? money(v || 0) : kind === 't' ? fmtMin(v) : num(v || 0));
   // response rate kept on the record for the monthly cards: Shopee = replied / chats, TikTok = respons ≤ 12 jam
   const syncRate = (k, r) => { r.responseRate = isShopee(k) ? (r.chats ? Math.round(((r.replied || 0) / r.chats) * 1000) / 10 : 0) : (r.resp12h || 0); };
-  const FIELDS = [
-    ['complaints', 'Komplain masuk'], ['complaintsDone', 'Komplain selesai'], ['returns', 'Retur / refund masuk'], ['returnsDone', 'Retur / refund diproses'],
-    ['reviews', 'Ulasan dibalas'], ['badReviews', 'Ulasan bintang 1–3'], ['cancels', 'Permintaan batal'], ['lateOrders', 'Pesanan telat di-follow up'],
-  ];
+  const FIELDS = []; // operational counts (komplain, retur, ulasan …) are no longer reported
   const FS_STATUS = { diajukan: 'Diajukan', disetujui: 'Disetujui', ditolak: 'Ditolak', live: 'Live', selesai: 'Selesai' };
   const FS_BADGE = { diajukan: '', disetujui: 'live', ditolak: 'bad', live: 'live', selesai: 'warn' };
   const SESSIONS = ['00:00–09:00', '09:00–12:00', '12:00–15:00', '15:00–18:00', '18:00–21:00', '21:00–24:00'];
@@ -65,7 +58,8 @@
 
   function monthStats(rows, fs) {
     const t = { days: new Set(rows.map((r) => r.date)).size, chats: 0, replied: 0, rr: [], complaints: 0, complaintsDone: 0, returns: 0, returnsDone: 0, reviews: 0, badReviews: 0, fsDays: new Set(fs.map((x) => x.date)).size, fsItems: fs.length, fsOk: fs.filter((x) => ['disetujui', 'live', 'selesai'].includes(x.status)).length, fsSold: fs.reduce((s, x) => s + x.sold, 0) };
-    rows.forEach((r) => { ['chats', 'replied', 'complaints', 'complaintsDone', 'returns', 'returnsDone', 'reviews', 'badReviews'].forEach((k) => { t[k] += r[k]; }); if (r.responseRate) t.rr.push(r.responseRate); });
+    t.orders = 0; t.sales = 0;
+    rows.forEach((r) => { ['chats', 'replied', 'orders', 'sales'].forEach((k) => { t[k] += Number(r[k]) || 0; }); if (r.responseRate) t.rr.push(r.responseRate); });
     t.rate = t.rr.length ? t.rr.reduce((a, b) => a + b, 0) / t.rr.length : NaN;
     return t;
   }
@@ -110,8 +104,8 @@
           ${sst.ch !== 'tiktok' ? card('⚡ Penjualan flash sale', money(t.fsSales), `${num(t.fsOrders)} pesanan · ${num(t.fsViews)} produk dilihat`) : ''}
         </div>
         <div class="table-wrap" style="margin-top:12px"><table class="data">
-          <thead><tr><th>Tanggal</th><th>Channel</th><th class="num">Pengunjung</th><th class="num">Chat</th><th class="num">Dibalas</th><th class="num">Waktu respon</th><th class="num">CSAT</th><th class="num">Pesanan</th><th class="num">Penjualan</th><th class="num">Konversi</th><th class="num">Komplain</th><th class="num">Retur</th><th></th></tr></thead>
-          <tbody>${days.flatMap((d) => CHS.filter((k) => sst.ch === 'all' || sst.ch === k).map((k) => rep(d, k)).filter(Boolean)).map((x) => `<tr data-csday="${x.date}" style="cursor:pointer"><td>${fmtDate(x.date)}</td><td>${chTag(x.channel)}</td><td class="num">${x.visitors ? num(x.visitors) : '–'}</td><td class="num">${num(x.chats)}</td><td class="num">${pctTxt(x.responseRate)}</td><td class="num">${fmtMin(x.responseTime)}</td><td class="num">${x.csat ? pctTxt(x.csat) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.sales || 0)}</td><td class="num">${x.chatConv ? pctTxt(x.chatConv) : '–'}</td><td class="num">${num(x.complaintsDone)}/${num(x.complaints)}</td><td class="num">${num(x.returnsDone)}/${num(x.returns)}</td><td><button class="btn sm" type="button" data-cspdf="${x.date}">PDF</button></td></tr>`).join('') || '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Belum ada laporan di periode ini.</td></tr>'}</tbody>
+          <thead><tr><th>Tanggal</th><th>Channel</th><th class="num">Pengunjung</th><th class="num">Chat</th><th class="num">Dibalas</th><th class="num">Waktu respon</th><th class="num">CSAT</th><th class="num">Pesanan</th><th class="num">Penjualan</th><th class="num">Konversi</th><th></th></tr></thead>
+          <tbody>${days.flatMap((d) => CHS.filter((k) => sst.ch === 'all' || sst.ch === k).map((k) => rep(d, k)).filter(Boolean)).map((x) => `<tr data-csday="${x.date}" style="cursor:pointer"><td>${fmtDate(x.date)}</td><td>${chTag(x.channel)}</td><td class="num">${x.visitors ? num(x.visitors) : '–'}</td><td class="num">${num(x.chats)}</td><td class="num">${pctTxt(x.responseRate)}</td><td class="num">${fmtMin(x.responseTime)}</td><td class="num">${x.csat ? pctTxt(x.csat) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.sales || 0)}</td><td class="num">${x.chatConv ? pctTxt(x.chatConv) : '–'}</td><td><button class="btn sm" type="button" data-cspdf="${x.date}">PDF</button></td></tr>`).join('') || '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">Belum ada laporan di periode ini.</td></tr>'}</tbody>
         </table></div>
       </section>`;
   }
@@ -132,13 +126,12 @@
         tile(isShopee(k) ? 'CSAT' : 'Tingkat kepuasan', r.csat || r.csat === 0 ? pctTxt(r.csat) : '–'),
         tile('Pesanan dari chat', num(r.orders), `konversi ${r.chatConv ? pctTxt(r.chatConv) : '–'}`),
         tile('Penjualan dari chat', money(r.sales || 0), isShopee(k) ? `${num(r.buyers)} pembeli · ${num(r.products)} produk` : ''),
-        tile('Komplain selesai', `${num(r.complaintsDone)}/${num(r.complaints)}`, `retur ${num(r.returnsDone)}/${num(r.returns)}`),
-        tile(isShopee(k) ? 'Performa toko' : (r.riskSessions ? 'Risiko chat' : 'Shop Performance'), !isShopee(k) && r.riskSessions ? `${num(r.riskSessions)} sesi` : esc(r.score || '–'), `ulasan buruk ${num(r.badReviews)}`),
+        tile(isShopee(k) ? 'Konversi chat dibalas' : 'Konversi penjualan', r.chatConv ? pctTxt(r.chatConv) : '–', ''),
+        tile(isShopee(k) ? 'Pengunjung bertanya' : 'Risiko chat', isShopee(k) ? num(r.askers) : `${num(r.riskSessions)} sesi`, isShopee(k) ? `pertanyaan diajukan ${r.askRate ? pctTxt(r.askRate) : '–'}` : `${r.riskPct ? pctTxt(r.riskPct) : '0%'} dari chat`),
       ])}
       <div class="two" style="margin-top:8px">
         <div>${table([['Metrik'], ['Nilai', 1]], groups.flatMap(([g, l]) => [[`<b>${esc(g)}</b>`, ''], ...l.map(([fk, lab, kind]) => [`<span class="muted">${esc(lab)}</span>`, statVal(kind, r[fk])])]), null, 'Data analitik belum diisi.')}</div>
-        <div>${table([['Operasional'], ['Jumlah', 1]], FIELDS.map(([fk, l]) => [esc(l), num(r[fk] || 0)]))}
-          <div class="box" style="margin-top:8px"><p><b>Jobdesk</b></p>${TASKS[k].map(([tk, l]) => `<p>${(r.tasks || []).includes(tk) ? '<span class="chip ok">✓</span>' : '<span class="chip">–</span>'} ${esc(l)}</p>`).join('')}</div>
+        <div><div class="box"><p><b>Jobdesk</b></p>${TASKS[k].map(([tk, l]) => `<p>${(r.tasks || []).includes(tk) ? '<span class="chip ok">✓</span>' : '<span class="chip">–</span>'} ${esc(l)}</p>`).join('')}</div>
           ${r.note ? `<div class="box" style="margin-top:8px"><p><b>Catatan</b></p><p>${esc(r.note)}</p></div>` : ''}</div>
       </div>`;
   }
@@ -185,16 +178,14 @@
         R.tile('Kepuasan / CSAT', pctTxt(all.csat)),
         R.tile('Pesanan dari chat', num(all.orders), `konversi ${Number.isFinite(all.conv) ? pct(all.conv) : '–'}`),
         R.tile('Penjualan dari chat', money(all.sales)),
-        R.tile('Komplain selesai', `${num(all.complaintsDone)}/${num(all.complaints)}`),
-        R.tile('Retur diproses', `${num(all.returnsDone)}/${num(all.returns)}`, `ulasan buruk ${num(all.badReviews)}`),
-      ])}
+      ], 3)}
       ${sst.ch !== 'tiktok' && all.fsSales ? R.tiles([R.tile('⚡ Penjualan flash sale', money(all.fsSales), '', true), R.tile('Pesanan flash sale', num(all.fsOrders)), R.tile('Pembeli flash sale', num(all.fsBuyers)), R.tile('Produk dilihat', num(all.fsViews))]) : ''}
-      ${chs.length > 1 ? `${R.h2('Per channel')}${R.table([['Channel'], ['Hari', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Konversi', 1], ['Komplain', 1], ['Retur', 1]],
-        per.map(([k, x]) => [`${R.dot(CH[k].color)}${CH[k].label}`, num(x.days), num(x.chats), pctTxt(x.rate), fmtMin(x.responseTime), pctTxt(x.csat), num(x.orders), money(x.sales), Number.isFinite(x.conv) ? pct(x.conv) : '–', `${num(x.complaintsDone)}/${num(x.complaints)}`, `${num(x.returnsDone)}/${num(x.returns)}`]),
-        ['Total', num(all.days), num(all.chats), pctTxt(all.rate), fmtMin(all.responseTime), pctTxt(all.csat), num(all.orders), money(all.sales), Number.isFinite(all.conv) ? pct(all.conv) : '–', `${num(all.complaintsDone)}/${num(all.complaints)}`, `${num(all.returnsDone)}/${num(all.returns)}`])}` : ''}
+      ${chs.length > 1 ? `${R.h2('Per channel')}${R.table([['Channel'], ['Hari', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Konversi', 1]],
+        per.map(([k, x]) => [`${R.dot(CH[k].color)}${CH[k].label}`, num(x.days), num(x.chats), pctTxt(x.rate), fmtMin(x.responseTime), pctTxt(x.csat), num(x.orders), money(x.sales), Number.isFinite(x.conv) ? pct(x.conv) : '–']),
+        ['Total', num(all.days), num(all.chats), pctTxt(all.rate), fmtMin(all.responseTime), pctTxt(all.csat), num(all.orders), money(all.sales), Number.isFinite(all.conv) ? pct(all.conv) : '–'])}` : ''}
       ${R.h2('Harian')}
-      ${R.table([['Tanggal'], ['Channel'], ['Pengunjung', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Komplain', 1], ['Retur', 1]],
-        days.flatMap((d) => chs.map((k) => rep(d, k)).filter(Boolean)).map((x) => [fmtDate(x.date), CH[x.channel].label, x.visitors ? num(x.visitors) : '–', num(x.chats), pctTxt(x.responseRate), fmtMin(x.responseTime), x.csat ? pctTxt(x.csat) : '–', num(x.orders), money(x.sales || 0), `${num(x.complaintsDone)}/${num(x.complaints)}`, `${num(x.returnsDone)}/${num(x.returns)}`]), null, 'Belum ada laporan di periode ini.')}`;
+      ${R.table([['Tanggal'], ['Channel'], ['Pengunjung', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Konversi', 1]],
+        days.flatMap((d) => chs.map((k) => rep(d, k)).filter(Boolean)).map((x) => [fmtDate(x.date), CH[x.channel].label, x.visitors ? num(x.visitors) : '–', num(x.chats), pctTxt(x.responseRate), fmtMin(x.responseTime), x.csat ? pctTxt(x.csat) : '–', num(x.orders), money(x.sales || 0), x.chatConv ? pctTxt(x.chatConv) : '–']), null, 'Belum ada laporan di periode ini.')}`;
     R.open({ title: 'Laporan Customer Service', period: R.period(r.from, r.to), onePage: days.length <= 14,
       meta: [['Periode', R.period(r.from, r.to)], ['Channel', sst.ch === 'all' ? 'Gabungan semua channel' : CH[sst.ch].label]],
       body, sign: ['Customer Service', 'Mengetahui'], note: 'Rata-rata waktu respon & kepuasan ditimbang jumlah chat per hari. Sumber: input harian CS dari Seller Centre.' });
@@ -219,8 +210,7 @@
     }
     const chCard = (k, x) => `<div class="cs-ch" style="--c:${CH[k].color}"><b>${CH[k].label}</b>
       <span>Chat <strong>${num(x.chats)}</strong></span><span>Response rate <strong>${Number.isFinite(x.rate) ? `${x.rate.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–'}</strong></span>
-      <span>Komplain selesai <strong>${num(x.complaintsDone)}/${num(x.complaints)}</strong></span><span>Retur diproses <strong>${num(x.returnsDone)}/${num(x.returns)}</strong></span>
-      <span>Ulasan dibalas <strong>${num(x.reviews)}</strong> · buruk ${num(x.badReviews)}</span></div>`;
+      <span>Pesanan dari chat <strong>${num(x.orders)}</strong></span><span>Penjualan dari chat <strong>${money(x.sales)}</strong></span></div>`;
 
     v.innerHTML = `
       <header class="bar"><div><h1>Customer service</h1><p class="muted">Daily report CS Shopee Official, Shopee Global & TikTok Shop, dan submit Flash Sale Shopee Official setiap hari. Klik tanggal di kalender untuk isi atau lihat laporan.</p></div>
@@ -229,7 +219,7 @@
         <div class="st-card hero"><span>Laporan ${MONTHS[m - 1]}</span><b>${num(s.days)}/${num(past)}</b><small>hari sudah diisi</small></div>
         <div class="st-card"><span>Chat masuk</span><b>${num(s.chats)}</b><small>${s.chats ? pct(s.replied / s.chats) : '–'} dibalas</small></div>
         <div class="st-card"><span>Response rate rata-rata</span><b>${Number.isFinite(s.rate) ? `${s.rate.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–'}</b><small>dari laporan harian</small></div>
-        <div class="st-card"><span>Komplain selesai</span><b>${num(s.complaintsDone)}/${num(s.complaints)}</b><small>retur ${num(s.returnsDone)}/${num(s.returns)}</small></div>
+        <div class="st-card"><span>Penjualan dari chat</span><b>${money(s.sales)}</b><small>${num(s.orders)} pesanan</small></div>
         <div class="st-card warn"><span>Flash sale</span><b>${num(s.fsDays)} hari</b><small>${num(s.fsItems)} produk · ${num(s.fsOk)} disetujui</small></div>
         <div class="st-card"><span>Terjual di flash sale</span><b>${num(s.fsSold)}</b><small>pcs</small></div>
       </div>
@@ -307,14 +297,12 @@
         const rows = keys.map((key) => [key, statDef(key)]).filter(([, def]) => def);
         return `<tr class="cs-sec"><td colspan="${CHS.length + 1}">${esc(title)}</td></tr>${rows.map(([key, def]) => `<tr><th>${esc(def.label)}${unit(def.kind) ? ` <small>${unit(def.kind)}</small>` : ''}</th>${CHS.map((k) => cell(k, key, def.kind)).join('')}</tr>`).join('')}`;
       }).join('');
-      const opRows = FIELDS.map(([fk, l]) => `<tr><th>${esc(l)}</th>${CHS.map((k) => `<td><input type="number" class="cs-in" min="0" inputmode="numeric" data-ch="${k}" data-fk="${fk}" value="${draft[k][fk] || ''}" placeholder="0" tabindex="${ti(k)}" ${dis}></td>`).join('')}</tr>`).join('')
-        + `<tr><th>Performa toko / SPS</th>${CHS.map((k) => `<td><input type="text" class="cs-in" data-ch="${k}" data-fk="score" value="${esc(draft[k].score || '')}" placeholder="${isShopee(k) ? '0 poin' : '4.8'}" tabindex="${ti(k)}" ${dis}></td>`).join('')}</tr>`
-        + `<tr><th>Catatan / kendala</th>${CHS.map((k) => `<td><textarea class="cs-in" rows="2" data-ch="${k}" data-fk="note" placeholder="Komplain penting, eskalasi…" tabindex="${ti(k)}" ${dis}>${esc(draft[k].note || '')}</textarea></td>`).join('')}</tr>`;
+      const opRows = `<tr><th>Catatan / kendala</th>${CHS.map((k) => `<td><textarea class="cs-in" rows="2" data-ch="${k}" data-fk="note" placeholder="Komplain penting, eskalasi…" tabindex="${ti(k)}" ${dis}>${esc(draft[k].note || '')}</textarea></td>`).join('')}</tr>`;
       const tasks = [...new Map(CHS.flatMap((k) => TASKS[k]).map(([tk, l]) => [tk, l])).entries()];
       const taskRows = tasks.map(([tk, l]) => `<tr><th>${esc(l)}</th>${CHS.map((k) => (TASKS[k].some(([x]) => x === tk) ? `<td class="cs-chk"><input type="checkbox" data-ch="${k}" data-task="${tk}" ${(draft[k].tasks || []).includes(tk) ? 'checked' : ''} ${dis}></td>` : '<td class="na">–</td>')).join('')}</tr>`).join('');
       return `
         <div class="table-wrap cs-mx-wrap"><table class="cs-mx">${head}<tbody>${statRows}
-          <tr class="cs-sec"><td colspan="${CHS.length + 1}">Operasional</td></tr>${opRows}
+          <tr class="cs-sec"><td colspan="${CHS.length + 1}">Catatan</td></tr>${opRows}
           <tr class="cs-sec"><td colspan="${CHS.length + 1}">Checklist jobdesk <span class="cs-allbtns">${canEdit() ? CHS.map((k) => `<button type="button" class="btn sm" data-allt="${k}">✓ semua ${esc(CH[k].label)}</button>`).join('') : ''}</span></td></tr>${taskRows}
         </tbody></table></div>
         <p class="muted small">Kosongkan saja angka yang tidak ada. Tekan Tab untuk pindah ke kolom bawahnya (satu channel dulu sampai selesai). Channel yang tidak diisi sama sekali tidak ikut disimpan.</p>
@@ -386,9 +374,6 @@
       if (!r.date && !Object.keys(r).some((x) => FIELDS.some(([f]) => f === x) || statKeys(k).some(([f]) => f === x))) return [`*${CH[k].label}*`, '- belum diisi'];
       return [`*${CH[k].label}*`,
         ...statKeys(k).filter(([fk]) => r[fk]).map(([fk, l, kind]) => `- ${l}: ${statVal(kind, r[fk])}`),
-        `- Komplain ${num(r.complaints || 0)} (selesai ${num(r.complaintsDone || 0)}), retur/refund ${num(r.returns || 0)} (diproses ${num(r.returnsDone || 0)})`,
-        `- Ulasan dibalas ${num(r.reviews || 0)}, ulasan bintang 1–3: ${num(r.badReviews || 0)}`,
-        `- Permintaan batal ${num(r.cancels || 0)}, pesanan telat di-follow up ${num(r.lateOrders || 0)}${r.score ? `, ${isShopee(k) ? 'performa toko' : 'SPS'}: ${r.score}` : ''}`,
         ...(r.note ? [`- Catatan: ${r.note}`] : [])];
     };
     const fs = draft.fs.filter((x) => x.product.trim());
