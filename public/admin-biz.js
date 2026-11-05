@@ -90,6 +90,20 @@
   function setRange(key, from, to) {
     range = key === 'custom' ? { key, from, to } : { key, ...resolveRange(key) };
   }
+  // same period bar as the dashboard, for any page: st holds {range, from, to}
+  const periodOf = (st) => (st.range === 'custom' ? { from: st.from, to: st.to } : resolveRange(st.range));
+  function rangeBar(st) {
+    const r = periodOf(st);
+    return `<div class="toolbar"><div class="seg glass">${RANGES.map(([k, l]) => `<button type="button" data-pr="${k}" class="${st.range === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <span class="range-custom">dari <input type="date" data-pf="from" value="${r.from}"> s/d <input type="date" data-pf="to" value="${r.to}"></span></div>`;
+  }
+  function bindRangeBar(root, st, rerender) {
+    root.querySelectorAll('[data-pr]').forEach((b) => b.addEventListener('click', () => { st.range = b.dataset.pr; st.limit = 150; rerender(); }));
+    root.querySelectorAll('[data-pf]').forEach((el) => el.addEventListener('change', () => {
+      const f = root.querySelector('[data-pf="from"]').value, t = root.querySelector('[data-pf="to"]').value;
+      if (f && t && f <= t) { Object.assign(st, { range: 'custom', from: f, to: t, limit: 150 }); rerender(); }
+    }));
+  }
 
   // ---------- products / cost / stock ----------
   const product = (id) => window.A.products.find((p) => p.id === id);
@@ -560,7 +574,7 @@
     const kpi = (label, value, d = '', hero = false) => `<div class="kpi solid${hero ? ' hero' : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div>${d}</div>`;
 
     const orderTab = () => `
-      ${secHead('Order', 'Semua pesanan yang masuk dari export order marketplace, offline & manual. Tanggal = tanggal pesanan dibuat. Belum dipotong fee — lihat Income untuk uang yang benar-benar cair.', ['online', 'Penjualan online'])}
+      ${secHead('Order', 'Semua pesanan yang masuk dari export order marketplace, offline & manual. Tanggal = tanggal pesanan dibuat. Belum dipotong fee — lihat Income untuk uang yang benar-benar cair.', ['online', 'Order data'])}
       <div class="kpis">
         ${kpi('Omzet pesanan (selesai + diproses)', money(m.revenue), delta(m.revenue, p.revenue), true)}
         ${kpi('Pesanan · AOV', `${num(m.orders)} · ${compact(m.aov)}`, delta(m.orders, p.orders))}
@@ -710,7 +724,7 @@
           <thead><tr><th>Tanggal</th><th>Jam</th><th>Judul</th><th class="num">Durasi</th><th class="num">GMV</th><th class="num">Order</th><th class="num">Views</th><th class="num">Klik produk</th><th class="num">CTR</th><th class="num">Like</th><th class="num">Follower</th></tr></thead>
           <tbody>${top.map((l) => `<tr><td>${fmtDate(l.date)}</td><td>${esc(l.start)}–${esc(l.end)}</td><td>${esc(l.title)}</td><td class="num">${hours(l.minutes)}</td><td class="num"><b>${l.gmv ? money(l.gmv) : '–'}</b></td><td class="num">${num(l.orders)}</td><td class="num">${num(l.views)}</td><td class="num">${num(l.productClicks)}</td><td class="num">${l.productImpressions ? pct(l.productClicks / l.productImpressions) : '–'}</td><td class="num">${compact(l.likes)}</td><td class="num">${num(l.followers)}</td></tr>`).join('')}</tbody>
         </table></div>
-      </section>` : '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Belum ada sesi live di periode ini. Import file Creator Live Performance di menu Penjualan online.</p></section>'}`;
+      </section>` : '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Belum ada sesi live di periode ini. Import file Creator Live Performance di menu Order data.</p></section>'}`;
     };
 
     v.innerHTML = `
@@ -723,7 +737,7 @@
         <div class="seg glass">${RANGES.map(([k, l]) => `<button type="button" data-r="${k}" class="${range.key === k ? 'on' : ''}">${l}</button>`).join('')}</div>
         <span class="range-custom">dari <input type="date" id="rFrom" value="${from}"> s/d <input type="date" id="rTo" value="${to}"></span>
       </div>
-      ${!hasData ? `<div class="demo-note glass"><b>Belum ada data penjualan / iklan.</b> Import data di menu Penjualan online & Iklan, atau coba dengan data contoh dulu. <button class="btn sm blue" id="demoFill" type="button">Isi data contoh</button></div>` : ''}
+      ${!hasData ? `<div class="demo-note glass"><b>Belum ada data penjualan / iklan.</b> Import data di menu Order data & Iklan, atau coba dengan data contoh dulu. <button class="btn sm blue" id="demoFill" type="button">Isi data contoh</button></div>` : ''}
       ${hasDemo ? `<div class="demo-note glass"><span class="badge warn">Data contoh</span> Angka di bawah memakai data contoh. <button class="btn sm danger" id="demoClear" type="button">Hapus data contoh</button></div>` : ''}
       <div class="ov-grid">${Object.entries(SECTIONS).map(([k, s]) => `
         <button type="button" class="ov-card${dashTab === k ? ' on' : ''}" data-tab="${k}" style="--sec:${s.color}">
@@ -1515,7 +1529,7 @@
   let pending = null; // parsed files waiting for the Import button
   function renderOnline() {
     const v = $('#view-online');
-    const r = ost.range === 'all' ? { from: '0000-00-00', to: '9999-12-31' } : resolveRange(ost.range);
+    const r = periodOf(ost);
     const inR = (x) => x.date >= r.from && x.date <= r.to;
     let rows = data.orders.filter(inR);
     if (ost.channel) rows = rows.filter((x) => x.channel === ost.channel);
@@ -1537,7 +1551,7 @@
     const cnt = (st) => new Set(rows.filter((x) => x.state === st).map((x) => `${x.channel}:${x.orderId}`)).size;
 
     v.innerHTML = `
-      <header class="bar"><div><h1>Penjualan online</h1><p class="muted">Import file export Shopee, TikTok Shop, dan Lazada (Tokopedia & Blibli lewat rekap / input manual). Order yang sama di-import ulang akan di-update, tidak dobel.</p></div></header>
+      <header class="bar"><div><h1>Order data</h1><p class="muted">Import file export Shopee, TikTok Shop, dan Lazada (Tokopedia & Blibli lewat rekap / input manual). Order yang sama di-import ulang akan di-update, tidak dobel.</p></div></header>
       <section class="panel solid import-panel">
         <div class="panel-head"><h2>Import file marketplace</h2><button class="btn sm" type="button" id="impTpl">⬇ Template 4 sheet</button></div>
         <label class="drop" id="impDrop">
@@ -1547,8 +1561,8 @@
         </label>
         <div id="impPreview"></div>
       </section>
-      <div class="filters-row" style="margin-top:16px">
-        <select data-o="range">${[['7d', '7 hari'], ['30d', '30 hari'], ['90d', '90 hari'], ['mtd', 'Bulan ini'], ['lastm', 'Bulan lalu'], ['ytd', 'Tahun ini'], ['all', 'Semua']].map(([k, l]) => `<option value="${k}"${ost.range === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <div style="margin-top:16px">${rangeBar(ost)}</div>
+      <div class="filters-row">
         <select data-o="channel"><option value="">Semua marketplace</option>${['shopee', 'tiktok', 'tokopedia', 'lazada', 'blibli'].map((k) => `<option value="${k}"${ost.channel === k ? ' selected' : ''}>${SALES_CH[k].label}</option>`).join('')}</select>
         <select data-o="state"><option value="">Semua status</option>${Object.entries(ORDER_STATE).map(([k, l]) => `<option value="${k}"${ost.state === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
         <input type="search" data-o="q" placeholder="Cari order / produk / kota…" value="${esc(ost.q)}">
@@ -1583,6 +1597,7 @@
       ost[el.dataset.o] = el.value; ost.limit = 150;
       if (el.tagName === 'INPUT') { clearTimeout(ost.t); ost.t = setTimeout(renderOnline, 250); } else renderOnline();
     }));
+    bindRangeBar(v, ost, renderOnline);
     window.RawPopup.bind(v);
     $('#ordMore')?.addEventListener('click', () => { ost.limit += 300; renderOnline(); });
     $('#ordExport').addEventListener('click', () => {
@@ -1765,7 +1780,7 @@
   // shared with other admin modules
   window.Biz = {
     data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge, SALES_CH, ADS_CH, ADS_CAMPAIGNS,
-    fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv,
+    fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv, rangeBar, bindRangeBar, periodOf,
     get loaded() { return loaded; },
     registerView(name, fn) { extraViews[name] = fn; },
   };
