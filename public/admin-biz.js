@@ -1023,7 +1023,6 @@
       ...(S.live.sessions ? [L(`TikTok LIVE : ${repMoney(S.live.gmv)} (${num(S.live.sessions)} sesi)`)] : []),
       ...SALDO.map(([k, l]) => L(`${l} : ${saldoText(r[k] || '') || '-'}`)),
       ...(top.length ? ['', '*Produk terlaris*', ...top.map((x, i) => `${i + 1}. ${x.name} : ${num(x.units)} pasang`)] : []),
-      '', r.footer ?? FOOTER,
     ].join('\n');
   }
   const copyReport = async () => { try { await navigator.clipboard.writeText(reportText()); toast('Teks report disalin'); } catch { toast('Tidak bisa menyalin', true); } };
@@ -1037,7 +1036,6 @@
       <div class="raw-body">
         <p class="muted small" style="margin-top:0">Angka = data Ringkasan untuk periode yang dipilih di atas, hanya channel online (offline tidak ikut). Saldo & kalimat penutup tersimpan di browser ini.</p>
         <div class="row three">${SALDO.map(([k, l]) => `<label>${l}<input type="text" inputmode="numeric" data-rep="${k}" value="${esc(r[k] || '')}" placeholder="mis. 1500000"></label>`).join('')}</div>
-        <label>Kalimat penutup<textarea data-rep="footer" rows="2">${esc(r.footer ?? FOOTER)}</textarea></label>
         <pre class="report-text" id="reportText"></pre>
       </div>
       <footer><span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button><button class="btn sm btn-export" type="button" id="repCopy2">⧉ Copy teks report</button></footer>
