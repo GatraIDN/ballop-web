@@ -1708,6 +1708,7 @@
   const ORDER_STATE = { completed: 'Selesai', pending: 'Diproses', cancelled: 'Batal', returned: 'Retur' };
   const ost = { range: '30d', channel: '', state: '', q: '', limit: 150 };
   let pending = null; // parsed files waiting for the Import button
+  const R_period = (r) => (window.PdfReport ? window.PdfReport.period(r.from, r.to) : `${r.from} – ${r.to}`);
   function renderOnline() {
     const v = $('#view-online');
     const r = periodOf(ost);
@@ -1750,6 +1751,8 @@
         <span class="spacer"></span>
         <button class="btn sm btn-export" type="button" id="ordPdf">⬇ Export PDF</button><button class="btn sm" type="button" id="ordExport">CSV</button>
       </div>
+      ${(() => { const miss = ['shopee', 'tiktok', 'tokopedia', 'lazada'].filter((k) => (!ost.channel || ost.channel === k) && !data.orders.some((x) => x.channel === k && inR(x)) && data.settlements.some((s) => s.channel === k && (s.releaseDate || s.date) >= r.from && (s.releaseDate || s.date) <= r.to));
+        return miss.length ? `<div class="demo-note glass"><span class="badge warn">Data order belum lengkap</span> Ada income ${miss.map((k) => SALES_CH[k].label).join(', ')} di periode ini tapi file order-nya belum di-import, jadi pesanan & omzet tampil 0. Import file export order (Pesanan Saya › Export) untuk ${esc(R_period(r))} di kotak import di atas.</div>` : ''; })()}
       <div class="sum-cards">
         <div class="sum-card solid"><div class="k-label">Pesanan masuk</div><div class="k-value">${num(orders.size)}</div><div class="k-sub">${num(live.reduce((s, x) => s + x.qty, 0))} pasang</div></div>
         <div class="sum-card solid"><div class="k-label">Omzet (setelah diskon)</div><div class="k-value">${money(live.reduce((s, x) => s + x.net, 0))}</div><div class="k-sub">AOV ${orders.size ? money(live.reduce((s, x) => s + x.net, 0) / orders.size) : '–'}</div></div>
