@@ -5,7 +5,11 @@
   const B = window.Biz;
   const { esc, num, money, pct, today, fmtDate } = B;
 
-  const CH = { shopee: { label: 'Shopee', color: '#eb6834' }, tiktok: { label: 'TikTok Shop', color: '#2a78d6' } };
+  // shopee = official brand store, shopeeglobal = Shopee Global (cross-border) store; flash sale only on the official store
+  const CH = { shopee: { label: 'Shopee Official', short: 'S', color: '#eb6834' }, shopeeglobal: { label: 'Shopee Global', short: 'G', color: '#b23c17' }, tiktok: { label: 'TikTok Shop', short: 'T', color: '#2a78d6' } };
+  const CHS = Object.keys(CH);
+  const isShopee = (k) => k !== 'tiktok';
+  const chTag = (k) => `<span class="ch"><i style="background:${CH[k]?.color || '#888'}"></i>${esc(CH[k]?.label || k)}</span>`;
   // daily SOP; flash sale only exists on Shopee
   const TASKS = {
     shopee: [['chat', 'Balas semua chat masuk (jaga response rate)'], ['orders', 'Cek pesanan perlu dikirim & yang terlambat'], ['returns', 'Proses pengajuan retur / refund'],
@@ -31,6 +35,8 @@
       ['Risiko chat', [['riskSessions', 'Risiko chat (sesi)', 'n'], ['riskAgents', 'Agen yang terpengaruh', 'n'], ['riskPct', 'Persentase risiko', 'p']]],
     ],
   };
+  TASKS.shopeeglobal = TASKS.shopee.filter(([k]) => k !== 'flash');
+  STATS.shopeeglobal = STATS.shopee;
   const statKeys = (k) => STATS[k].flatMap(([, list]) => list);
   // Shopee > Promosi > Flash Sale Toko Saya > Kriteria Utama (periode Kemarin / per hari); saved on the Shopee record
   const FS_PERF = [['fsSales', 'Penjualan', 'rp'], ['fsOrders', 'Pesanan', 'n'], ['fsBuyers', 'Total pembeli', 'n'], ['fsClick', 'Persentase klik', 'p'], ['fsViews', 'Jumlah produk dilihat', 'n']];
@@ -39,7 +45,7 @@
   const fmtMin = (m) => { if (!m) return '–'; const t = Math.round(m * 60); const h = Math.floor(t / 3600), mi = Math.floor((t % 3600) / 60), se = t % 60; return h ? `${h}j ${mi}m` : `${mi}m ${String(se).padStart(2, '0')}d`; };
   const statVal = (kind, v) => (kind === 'p' ? (v || v === 0 ? `${Number(v).toLocaleString('id-ID', { maximumFractionDigits: 2 })}%` : '–') : kind === 'rp' ? money(v || 0) : kind === 't' ? fmtMin(v) : num(v || 0));
   // response rate kept on the record for the monthly cards: Shopee = replied / chats, TikTok = respons ≤ 12 jam
-  const syncRate = (k, r) => { r.responseRate = k === 'shopee' ? (r.chats ? Math.round(((r.replied || 0) / r.chats) * 1000) / 10 : 0) : (r.resp12h || 0); };
+  const syncRate = (k, r) => { r.responseRate = isShopee(k) ? (r.chats ? Math.round(((r.replied || 0) / r.chats) * 1000) / 10 : 0) : (r.resp12h || 0); };
   const FIELDS = [
     ['complaints', 'Komplain masuk'], ['complaintsDone', 'Komplain selesai'], ['returns', 'Retur / refund masuk'], ['returnsDone', 'Retur / refund diproses'],
     ['reviews', 'Ulasan dibalas'], ['badReviews', 'Ulasan bintang 1–3'], ['cancels', 'Permintaan batal'], ['lateOrders', 'Pesanan telat di-follow up'],
@@ -80,7 +86,7 @@
     t.conv = t.chats ? t.orders / t.chats : NaN;
     return t;
   }
-  const chRows = (ch, from, to) => B.data.csdaily.filter((r) => r.date >= from && r.date <= to && (ch === 'all' ? ['shopee', 'tiktok'].includes(r.channel) : r.channel === ch));
+  const chRows = (ch, from, to) => B.data.csdaily.filter((r) => r.date >= from && r.date <= to && (ch === 'all' ? CHS.includes(r.channel) : r.channel === ch));
   const pctTxt = (v) => (Number.isFinite(v) ? `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–');
 
   function summaryPanel() {
@@ -91,7 +97,7 @@
     return `
       <section class="panel solid cs-sum">
         <div class="panel-head"><h2>Ringkasan analitik chat</h2>
-          <span class="dh-actions"><span class="seg glass">${[['all', 'Gabungan'], ['shopee', 'Shopee'], ['tiktok', 'TikTok Shop']].map(([k, l]) => `<button type="button" data-sch="${k}" class="${sst.ch === k ? 'on' : ''}">${l}</button>`).join('')}</span>
+          <span class="dh-actions"><span class="seg glass">${[['all', 'Gabungan'], ...CHS.map((k) => [k, CH[k].label])].map(([k, l]) => `<button type="button" data-sch="${k}" class="${sst.ch === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           <button class="btn sm btn-export" type="button" id="csPdfPeriod">⬇ Export PDF</button></span></div>
         ${B.rangeBar(sst)}
         <div class="st-cards" style="margin-top:12px">
@@ -105,7 +111,7 @@
         </div>
         <div class="table-wrap" style="margin-top:12px"><table class="data">
           <thead><tr><th>Tanggal</th><th>Channel</th><th class="num">Pengunjung</th><th class="num">Chat</th><th class="num">Dibalas</th><th class="num">Waktu respon</th><th class="num">CSAT</th><th class="num">Pesanan</th><th class="num">Penjualan</th><th class="num">Konversi</th><th class="num">Komplain</th><th class="num">Retur</th><th></th></tr></thead>
-          <tbody>${days.flatMap((d) => ['shopee', 'tiktok'].filter((k) => sst.ch === 'all' || sst.ch === k).map((k) => rep(d, k)).filter(Boolean)).map((x) => `<tr data-csday="${x.date}" style="cursor:pointer"><td>${fmtDate(x.date)}</td><td>${B.chBadge(B.SALES_CH, x.channel)}</td><td class="num">${x.visitors ? num(x.visitors) : '–'}</td><td class="num">${num(x.chats)}</td><td class="num">${pctTxt(x.responseRate)}</td><td class="num">${fmtMin(x.responseTime)}</td><td class="num">${x.csat ? pctTxt(x.csat) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.sales || 0)}</td><td class="num">${x.chatConv ? pctTxt(x.chatConv) : '–'}</td><td class="num">${num(x.complaintsDone)}/${num(x.complaints)}</td><td class="num">${num(x.returnsDone)}/${num(x.returns)}</td><td><button class="btn sm" type="button" data-cspdf="${x.date}">PDF</button></td></tr>`).join('') || '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Belum ada laporan di periode ini.</td></tr>'}</tbody>
+          <tbody>${days.flatMap((d) => CHS.filter((k) => sst.ch === 'all' || sst.ch === k).map((k) => rep(d, k)).filter(Boolean)).map((x) => `<tr data-csday="${x.date}" style="cursor:pointer"><td>${fmtDate(x.date)}</td><td>${chTag(x.channel)}</td><td class="num">${x.visitors ? num(x.visitors) : '–'}</td><td class="num">${num(x.chats)}</td><td class="num">${pctTxt(x.responseRate)}</td><td class="num">${fmtMin(x.responseTime)}</td><td class="num">${x.csat ? pctTxt(x.csat) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.sales || 0)}</td><td class="num">${x.chatConv ? pctTxt(x.chatConv) : '–'}</td><td class="num">${num(x.complaintsDone)}/${num(x.complaints)}</td><td class="num">${num(x.returnsDone)}/${num(x.returns)}</td><td><button class="btn sm" type="button" data-cspdf="${x.date}">PDF</button></td></tr>`).join('') || '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px">Belum ada laporan di periode ini.</td></tr>'}</tbody>
         </table></div>
       </section>`;
   }
@@ -120,14 +126,14 @@
     return `
       ${h2(`${P().dot(CH[k].color)}${CH[k].label}`, `jobdesk ${done}/${all} · ${r.updatedBy ? `diisi ${esc(r.updatedBy)}` : ''}`)}
       ${tiles([
-        tile('Jumlah chat', num(r.chats), k === 'shopee' ? `${num(r.visitors)} pengunjung` : `AI ${num(r.chatAI)} · agen ${num(r.chatAgent)} · AI→agen ${num(r.chatAIAgent)}`, true),
-        tile(k === 'shopee' ? 'Chat dibalas' : 'Respons ≤ 12 jam', pctTxt(r.responseRate), k === 'shopee' ? `${num(r.replied)} dibalas · ${num(r.unreplied)} belum` : ''),
+        tile('Jumlah chat', num(r.chats), isShopee(k) ? `${num(r.visitors)} pengunjung` : `AI ${num(r.chatAI)} · agen ${num(r.chatAgent)} · AI→agen ${num(r.chatAIAgent)}`, true),
+        tile(isShopee(k) ? 'Chat dibalas' : 'Respons ≤ 12 jam', pctTxt(r.responseRate), isShopee(k) ? `${num(r.replied)} dibalas · ${num(r.unreplied)} belum` : ''),
         tile('Waktu respon rata-rata', fmtMin(r.responseTime)),
-        tile(k === 'shopee' ? 'CSAT' : 'Tingkat kepuasan', r.csat || r.csat === 0 ? pctTxt(r.csat) : '–'),
+        tile(isShopee(k) ? 'CSAT' : 'Tingkat kepuasan', r.csat || r.csat === 0 ? pctTxt(r.csat) : '–'),
         tile('Pesanan dari chat', num(r.orders), `konversi ${r.chatConv ? pctTxt(r.chatConv) : '–'}`),
-        tile('Penjualan dari chat', money(r.sales || 0), k === 'shopee' ? `${num(r.buyers)} pembeli · ${num(r.products)} produk` : ''),
+        tile('Penjualan dari chat', money(r.sales || 0), isShopee(k) ? `${num(r.buyers)} pembeli · ${num(r.products)} produk` : ''),
         tile('Komplain selesai', `${num(r.complaintsDone)}/${num(r.complaints)}`, `retur ${num(r.returnsDone)}/${num(r.returns)}`),
-        tile(k === 'shopee' ? 'Performa toko' : (r.riskSessions ? 'Risiko chat' : 'Shop Performance'), k === 'tiktok' && r.riskSessions ? `${num(r.riskSessions)} sesi` : esc(r.score || '–'), `ulasan buruk ${num(r.badReviews)}`),
+        tile(isShopee(k) ? 'Performa toko' : (r.riskSessions ? 'Risiko chat' : 'Shop Performance'), !isShopee(k) && r.riskSessions ? `${num(r.riskSessions)} sesi` : esc(r.score || '–'), `ulasan buruk ${num(r.badReviews)}`),
       ])}
       <div class="two" style="margin-top:8px">
         <div>${table([['Metrik'], ['Nilai', 1]], groups.flatMap(([g, l]) => [[`<b>${esc(g)}</b>`, ''], ...l.map(([fk, lab, kind]) => [`<span class="muted">${esc(lab)}</span>`, statVal(kind, r[fk])])]), null, 'Data analitik belum diisi.')}</div>
@@ -138,13 +144,13 @@
   }
   function dayPdf(d, draft) {
     const R = P();
-    const a = draft ? (draft.shopee.date || Object.keys(draft.shopee).length > 1 ? draft.shopee : null) : rep(d, 'shopee');
-    const b = draft ? (draft.tiktok.date || Object.keys(draft.tiktok).length > 1 ? draft.tiktok : null) : rep(d, 'tiktok');
-    [['shopee', a], ['tiktok', b]].forEach(([k, r]) => { if (r) syncRate(k, r); });
-    const t = chatTotals([a, b].filter(Boolean));
+    const recs = Object.fromEntries(CHS.map((k) => [k, draft ? (draft[k].date || Object.keys(draft[k]).length > 1 ? draft[k] : null) : rep(d, k)]));
+    Object.entries(recs).forEach(([k, r]) => { if (r) syncRate(k, r); });
+    const a = recs.shopee;
+    const t = chatTotals(Object.values(recs).filter(Boolean));
     const fsl = (draft ? draft.fs : fsOf(d)).filter((x) => (x.product || '').trim());
     const body = `
-      ${R.h2('Gabungan Shopee + TikTok Shop', 'rata-rata waktu respon & kepuasan ditimbang jumlah chat')}
+      ${R.h2('Gabungan Shopee Official + Shopee Global + TikTok Shop', 'rata-rata waktu respon & kepuasan ditimbang jumlah chat')}
       ${R.tiles([
         R.tile('Total chat', num(t.chats), `${num(t.reports)} channel dilaporkan`, true),
         R.tile('Chat dibalas', pctTxt(t.rate)),
@@ -153,21 +159,20 @@
         R.tile('Pesanan dari chat', num(t.orders), `konversi ${Number.isFinite(t.conv) ? pct(t.conv) : '–'}`),
         R.tile('Penjualan dari chat', money(t.sales)),
       ], 6)}
-      ${chBlock('shopee', a)}
-      ${chBlock('tiktok', b)}
+      ${CHS.map((k) => chBlock(k, recs[k])).join('')}
       ${a && FS_PERF.some(([k]) => a[k]) ? `${R.h2('⚡ Performa flash sale Shopee', 'Promosi › Flash Sale Toko Saya')}${R.tiles([
         R.tile('Penjualan', money(a.fsSales || 0), '', true), R.tile('Pesanan', num(a.fsOrders)), R.tile('Total pembeli', num(a.fsBuyers)),
         R.tile('Penjualan / pembeli', a.fsBuyers ? money((a.fsSales || 0) / a.fsBuyers) : '–'), R.tile('Persentase klik', pctTxt(a.fsClick)), R.tile('Produk dilihat', num(a.fsViews)),
       ], 6)}` : ''}
       ${fsl.length ? `${R.h2('⚡ Produk flash sale Shopee', `${num(fsl.length)} produk`)}${R.table([['Sesi'], ['Produk'], ['Harga normal', 1], ['Harga FS', 1], ['Stok', 1], ['Terjual', 1], ['Status']], fsl.map((x) => [esc(x.session), `${esc(x.product)} <span class="muted">${esc(x.variant || '')}</span>`, money(x.normalPrice), `<b>${money(x.price)}</b>`, num(x.stock), num(x.sold), FS_STATUS[x.status || 'diajukan']]))}` : ''}`;
     R.open({ title: 'Daily Report Customer Service', period: longDay(d), onePage: true,
-      meta: [['Tanggal', longDay(d)], ['Channel', 'Shopee · TikTok Shop / Tokopedia'], ['Disusun oleh', esc(a?.updatedBy || b?.updatedBy || who())]],
+      meta: [['Tanggal', longDay(d)], ['Channel', 'Shopee Official · Shopee Global · TikTok Shop / Tokopedia'], ['Disusun oleh', esc(Object.values(recs).find((x) => x?.updatedBy)?.updatedBy || who())]],
       body, sign: ['Customer Service', 'Mengetahui'], note: 'Angka analitik disalin dari Shopee Seller Centre (Layanan › Chat) dan Seller Center TikTok/Tokopedia (Analitik layanan). Waktu: GMT+7.' });
   }
   function periodPdf() {
     const R = P();
     const r = B.periodOf(sst);
-    const chs = sst.ch === 'all' ? ['shopee', 'tiktok'] : [sst.ch];
+    const chs = sst.ch === 'all' ? CHS : [sst.ch];
     const per = chs.map((k) => [k, chatTotals(chRows(k, r.from, r.to))]);
     const all = chatTotals(chRows(sst.ch, r.from, r.to));
     const days = [...new Set(chRows(sst.ch, r.from, r.to).map((x) => x.date))].sort();
@@ -191,7 +196,7 @@
       ${R.table([['Tanggal'], ['Channel'], ['Pengunjung', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Komplain', 1], ['Retur', 1]],
         days.flatMap((d) => chs.map((k) => rep(d, k)).filter(Boolean)).map((x) => [fmtDate(x.date), CH[x.channel].label, x.visitors ? num(x.visitors) : '–', num(x.chats), pctTxt(x.responseRate), fmtMin(x.responseTime), x.csat ? pctTxt(x.csat) : '–', num(x.orders), money(x.sales || 0), `${num(x.complaintsDone)}/${num(x.complaints)}`, `${num(x.returnsDone)}/${num(x.returns)}`]), null, 'Belum ada laporan di periode ini.')}`;
     R.open({ title: 'Laporan Customer Service', period: R.period(r.from, r.to), onePage: days.length <= 14,
-      meta: [['Periode', R.period(r.from, r.to)], ['Channel', sst.ch === 'all' ? 'Gabungan Shopee + TikTok Shop' : CH[sst.ch].label]],
+      meta: [['Periode', R.period(r.from, r.to)], ['Channel', sst.ch === 'all' ? 'Gabungan semua channel' : CH[sst.ch].label]],
       body, sign: ['Customer Service', 'Mengetahui'], note: 'Rata-rata waktu respon & kepuasan ditimbang jumlah chat per hari. Sumber: input harian CS dari Seller Centre.' });
   }
 
@@ -201,15 +206,16 @@
     const len = new Date(y, m, 0).getDate(), lead = (new Date(y, m - 1, 1).getDay() + 6) % 7, t = today();
     const inM = (r) => r.date.startsWith(st.month);
     const rows = B.data.csdaily.filter(inM), fs = B.data.flashsale.filter(inM);
-    const s = monthStats(rows, fs), sh = monthStats(rows.filter((r) => r.channel === 'shopee'), []), tt = monthStats(rows.filter((r) => r.channel === 'tiktok'), []);
+    const s = monthStats(rows, fs);
     const past = Math.min(len, t.slice(0, 7) === st.month ? Number(t.slice(8)) : t > st.month ? len : 0);
     const cells = [...Array(lead)].map(() => '<div class="dc empty"></div>');
     for (let n = 1; n <= len; n++) {
       const d = `${st.month}-${String(n).padStart(2, '0')}`, future = d > t;
-      const a = rep(d, 'shopee'), b = rep(d, 'tiktok'), f = fsOf(d);
-      const done = [a, b, f.length].filter(Boolean).length;
-      cells.push(`<button type="button" class="dc ${future ? 'future' : done === 3 ? 'done' : done ? 'part' : 'todo'}${d === t ? ' today' : ''}" data-csday="${d}" ${future ? 'disabled' : ''}>
-        <span class="dc-n">${n}</span>${future ? '' : `<span class="cs-pills"><i class="${a ? 'on' : ''}" style="--c:${CH.shopee.color}">S</i><i class="${b ? 'on' : ''}" style="--c:${CH.tiktok.color}">T</i><i class="${f.length ? 'on' : ''}" style="--c:#e8a200">⚡${f.length || ''}</i></span>`}</button>`);
+      const f = fsOf(d);
+      const has = CHS.map((k) => !!rep(d, k));
+      const done = [...has, f.length].filter(Boolean).length;
+      cells.push(`<button type="button" class="dc ${future ? 'future' : done === CHS.length + 1 ? 'done' : done ? 'part' : 'todo'}${d === t ? ' today' : ''}" data-csday="${d}" ${future ? 'disabled' : ''}>
+        <span class="dc-n">${n}</span>${future ? '' : `<span class="cs-pills">${CHS.map((k, i) => `<i class="${has[i] ? 'on' : ''}" style="--c:${CH[k].color}">${CH[k].short}</i>`).join('')}<i class="${f.length ? 'on' : ''}" style="--c:#e8a200">⚡${f.length || ''}</i></span>`}</button>`);
     }
     const chCard = (k, x) => `<div class="cs-ch" style="--c:${CH[k].color}"><b>${CH[k].label}</b>
       <span>Chat <strong>${num(x.chats)}</strong></span><span>Response rate <strong>${Number.isFinite(x.rate) ? `${x.rate.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : '–'}</strong></span>
@@ -217,7 +223,7 @@
       <span>Ulasan dibalas <strong>${num(x.reviews)}</strong> · buruk ${num(x.badReviews)}</span></div>`;
 
     v.innerHTML = `
-      <header class="bar"><div><h1>Customer service</h1><p class="muted">Daily report CS Shopee & TikTok Shop dan submit Flash Sale Shopee setiap hari. Klik tanggal di kalender untuk isi atau lihat laporan.</p></div>
+      <header class="bar"><div><h1>Customer service</h1><p class="muted">Daily report CS Shopee Official, Shopee Global & TikTok Shop, dan submit Flash Sale Shopee Official setiap hari. Klik tanggal di kalender untuk isi atau lihat laporan.</p></div>
         <div class="bar-actions"><button class="btn sm btn-export" type="button" data-cspdf="${t}">⬇ PDF hari ini</button>${canEdit() ? `<button class="btn sm primary" type="button" data-csday="${t}">+ Laporan hari ini</button>` : ''}</div></header>
       <div class="st-cards">
         <div class="st-card hero"><span>Laporan ${MONTHS[m - 1]}</span><b>${num(s.days)}/${num(past)}</b><small>hari sudah diisi</small></div>
@@ -227,14 +233,14 @@
         <div class="st-card warn"><span>Flash sale</span><b>${num(s.fsDays)} hari</b><small>${num(s.fsItems)} produk · ${num(s.fsOk)} disetujui</small></div>
         <div class="st-card"><span>Terjual di flash sale</span><b>${num(s.fsSold)}</b><small>pcs</small></div>
       </div>
-      <div class="cs-chs">${chCard('shopee', sh)}${chCard('tiktok', tt)}</div>
+      <div class="cs-chs">${CHS.map((k) => chCard(k, monthStats(rows.filter((r) => r.channel === k), []))).join('')}</div>
       ${summaryPanel()}
       <section class="panel solid d-cal">
         <div class="panel-head"><h2>Kalender laporan · ${MONTHS[m - 1]} ${y}</h2>
           <span class="cal-nav"><button class="btn sm" type="button" data-csm="-1" aria-label="Bulan sebelumnya">‹</button><button class="btn sm" type="button" data-csm="0">Bulan ini</button><button class="btn sm" type="button" data-csm="1" aria-label="Bulan berikutnya">›</button></span></div>
         <div class="dc-grid dc-head">${['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'].map((h) => `<span>${h}</span>`).join('')}</div>
         <div class="dc-grid">${cells.join('')}</div>
-        <div class="dc-legend"><span><i class="done"></i>Lengkap (Shopee + TikTok + flash sale)</span><span><i class="part"></i>Sebagian</span><span><i class="todo"></i>Belum ada</span><span class="muted">S = Shopee · T = TikTok · ⚡ = produk flash sale</span></div>
+        <div class="dc-legend"><span><i class="done"></i>Lengkap (semua channel + flash sale)</span><span><i class="part"></i>Sebagian</span><span><i class="todo"></i>Belum ada</span><span class="muted">S = Shopee Official · G = Shopee Global · T = TikTok · ⚡ = produk flash sale</span></div>
       </section>
       <div class="grid-3">
         <section class="panel solid"><div class="panel-head"><h2>Flash sale ${MONTHS[m - 1]}</h2><span class="muted small">${num(fs.length)} produk</span></div>
@@ -260,8 +266,8 @@
 
   // one popup per date: Shopee / TikTok report + flash sale list, all saved together
   function dayPopup(d) {
-    const draft = { shopee: { ...(rep(d, 'shopee') || { tasks: [] }) }, tiktok: { ...(rep(d, 'tiktok') || { tasks: [] }) }, fs: fsOf(d).map((x) => ({ ...x })) };
-    const had = { shopee: !!rep(d, 'shopee'), tiktok: !!rep(d, 'tiktok') };
+    const draft = { ...Object.fromEntries(CHS.map((k) => [k, { ...(rep(d, k) || { tasks: [] }) }])), fs: fsOf(d).map((x) => ({ ...x })) };
+    const had = Object.fromEntries(CHS.map((k) => [k, !!rep(d, k)]));
     let tab = 'shopee', dirty = false;
     const names = [...new Set(B.data.stock3pl.map((r) => r.product).filter(Boolean))].sort();
     const box = document.createElement('div');
@@ -276,21 +282,21 @@
     const dis = canEdit() ? '' : 'disabled';
     const drawTabs = () => {
       const mark = (k) => (k === 'fs' ? (draft.fs.length ? ` <i class="cs-dot on">${draft.fs.length}</i>` : ' <i class="cs-dot"></i>') : (had[k] || dirtyCh[k] ? ' <i class="cs-dot on">✓</i>' : ' <i class="cs-dot"></i>'));
-      $('#csTabs', box).innerHTML = [['shopee', 'Shopee'], ['tiktok', 'TikTok Shop'], ['fs', '⚡ Flash sale Shopee']].map(([k, l]) => `<button type="button" data-cstab="${k}" class="${tab === k ? 'on' : ''}">${l}${mark(k)}</button>`).join('');
+      $('#csTabs', box).innerHTML = [...CHS.map((k) => [k, CH[k].label]), ['fs', '⚡ Flash sale Shopee Official']].map(([k, l]) => `<button type="button" data-cstab="${k}" class="${tab === k ? 'on' : ''}">${l}${mark(k)}</button>`).join('');
       $$('[data-cstab]', box).forEach((b) => b.addEventListener('click', () => { tab = b.dataset.cstab; draw(); }));
     };
-    const dirtyCh = { shopee: false, tiktok: false };
+    const dirtyCh = Object.fromEntries(CHS.map((k) => [k, false]));
     const chForm = (k) => {
       const r = draft[k];
       const status = had[k] ? `<div class="d-note ok"><b>✓ Laporan ${CH[k].label} tanggal ini sudah diisi</b><span>${r.updatedBy ? `oleh ${esc(r.updatedBy)} · ${esc(r.updatedAt)}` : ''} · ubah angka di bawah lalu Simpan untuk edit</span></div>` : `<div class="d-note"><b>Belum ada laporan ${CH[k].label}</b><span>Isi checklist & angka hari ini.</span></div>`;
       return `${status}
         <h3 class="cs-h">Checklist jobdesk</h3>
         <div class="cs-tasks">${TASKS[k].map(([tk, l]) => `<label class="cs-task${(r.tasks || []).includes(tk) ? ' on' : ''}"><input type="checkbox" data-task="${tk}" ${(r.tasks || []).includes(tk) ? 'checked' : ''} ${dis}><span>${esc(l)}</span></label>`).join('')}</div>
-        <h3 class="cs-h">Data analitik chat <span class="muted small">salin dari ${k ==='shopee' ? 'Shopee Seller Centre › Data › Layanan › Chat (Per Hari)' : 'Seller Center › Analitik layanan › Ringkasan pesan'}</span></h3>
+        <h3 class="cs-h">Data analitik chat <span class="muted small">salin dari ${isShopee(k) ? 'Shopee Seller Centre › Data › Layanan › Chat (Per Hari)' : 'Seller Center › Analitik layanan › Ringkasan pesan'}</span></h3>
         ${STATS[k].map(([g, list]) => `<div class="cs-sgroup"><b>${esc(g)}</b><div class="cs-grid">${list.map(([fk, l, kind]) => `<label>${esc(l)}${kind === 'p' ? ' (%)' : kind === 'rp' ? ' (Rp)' : ''}<input ${kind === 't' ? 'type="text" placeholder="00:15:48"' : `type="number" min="0" step="${kind === 'p' ? '0.01' : '1'}" inputmode="decimal" placeholder="0"`} data-sk="${fk}" data-kind="${kind}" value="${kind === 't' ? (r[fk] ? fmtClock(r[fk]) : '') : (r[fk] ?? '')}" ${dis}></label>`).join('')}</div></div>`).join('')}
         <h3 class="cs-h">Operasional hari ini</h3>
         <div class="cs-grid">${FIELDS.map(([fk, l]) => `<label>${l}<input type="number" min="0" step="${fk === 'responseRate' || fk === 'responseTime' ? '0.1' : '1'}" inputmode="decimal" data-fk="${fk}" value="${r[fk] ?? ''}" placeholder="0" ${dis}></label>`).join('')}
-          <label>${k === 'shopee' ? 'Poin penalti / performa toko' : 'Shop Performance Score'}<input type="text" data-fk="score" value="${esc(r.score || '')}" placeholder="${k === 'shopee' ? 'mis. 0 poin' : 'mis. 4.8'}" ${dis}></label></div>
+          <label>${isShopee(k) ? 'Poin penalti / performa toko' : 'Shop Performance Score'}<input type="text" data-fk="score" value="${esc(r.score || '')}" placeholder="${isShopee(k) ? 'mis. 0 poin' : 'mis. 4.8'}" ${dis}></label></div>
         <label class="cs-note">Catatan / kendala hari ini<textarea data-fk="note" rows="3" placeholder="Komplain penting, pesanan bermasalah, eskalasi…" ${dis}>${esc(r.note || '')}</textarea></label>`;
     };
     const fsForm = () => `
@@ -353,8 +359,8 @@
     $('#csPdfDay', box).addEventListener('click', () => dayPdf(d, draft));
     $('#csSave', box)?.addEventListener('click', async () => {
       const at = stamp(), by = who();
-      let daily = B.data.csdaily.filter((r) => r.date !== d || !['shopee', 'tiktok'].some((k) => r.channel === k && (had[k] || dirtyCh[k])));
-      ['shopee', 'tiktok'].forEach((k) => { if (had[k] || dirtyCh[k]) syncRate(k, draft[k]); daily.push({ ...draft[k], id: draft[k].id || '', date: d, channel: k, updatedAt: dirtyCh[k] ? at : draft[k].updatedAt, updatedBy: dirtyCh[k] ? by : draft[k].updatedBy }); });
+      let daily = B.data.csdaily.filter((r) => r.date !== d || !CHS.some((k) => r.channel === k && (had[k] || dirtyCh[k])));
+      CHS.forEach((k) => { if (had[k] || dirtyCh[k]) syncRate(k, draft[k]); daily.push({ ...draft[k], id: draft[k].id || '', date: d, channel: k, updatedAt: dirtyCh[k] ? at : draft[k].updatedAt, updatedBy: dirtyCh[k] ? by : draft[k].updatedBy }); });
       const fsRows = [...B.data.flashsale.filter((x) => x.date !== d), ...draft.fs.filter((x) => x.product.trim()).map((x) => ({ ...x, date: d, updatedAt: at, updatedBy: by }))];
       try {
         B.data.csdaily = await api('/api/csdaily', json('PUT', daily));
@@ -373,12 +379,12 @@
         ...statKeys(k).filter(([fk]) => r[fk]).map(([fk, l, kind]) => `- ${l}: ${statVal(kind, r[fk])}`),
         `- Komplain ${num(r.complaints || 0)} (selesai ${num(r.complaintsDone || 0)}), retur/refund ${num(r.returns || 0)} (diproses ${num(r.returnsDone || 0)})`,
         `- Ulasan dibalas ${num(r.reviews || 0)}, ulasan bintang 1–3: ${num(r.badReviews || 0)}`,
-        `- Permintaan batal ${num(r.cancels || 0)}, pesanan telat di-follow up ${num(r.lateOrders || 0)}${r.score ? `, ${k === 'shopee' ? 'performa toko' : 'SPS'}: ${r.score}` : ''}`,
+        `- Permintaan batal ${num(r.cancels || 0)}, pesanan telat di-follow up ${num(r.lateOrders || 0)}${r.score ? `, ${isShopee(k) ? 'performa toko' : 'SPS'}: ${r.score}` : ''}`,
         ...(r.note ? [`- Catatan: ${r.note}`] : [])];
     };
     const fs = draft.fs.filter((x) => x.product.trim());
     const p = draft.shopee;
-    return [`Daily report Customer Service BALLOP · ${longDay(d)}`, '', ...line('shopee'), '', ...line('tiktok'), '', '*Flash sale Shopee*',
+    return [`Daily report Customer Service BALLOP · ${longDay(d)}`, '', ...CHS.flatMap((k) => [...line(k), '']), '*Flash sale Shopee Official*',
       ...(FS_PERF.some(([k]) => p[k]) ? [`- Penjualan ${money(p.fsSales || 0)} · ${num(p.fsOrders || 0)} pesanan · ${num(p.fsBuyers || 0)} pembeli · klik ${p.fsClick || 0}% · ${num(p.fsViews || 0)} produk dilihat`] : []),
       ...(fs.length ? fs.map((x) => `- ${x.session ? `${x.session} · ` : ''}${x.product}${x.variant ? ` ${x.variant}` : ''}: ${money(x.price)}${x.normalPrice ? ` (normal ${money(x.normalPrice)})` : ''}, stok ${num(x.stock)} · ${FS_STATUS[x.status || 'diajukan']}`) : ['- belum ada yang diajukan'])].join('\n');
   }
