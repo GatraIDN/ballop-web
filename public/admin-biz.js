@@ -1052,7 +1052,6 @@
       ...(top.length ? ['', '*Produk terlaris*', ...top.map((x, i) => `${i + 1}. ${x.name} : ${num(x.units)} pasang · ${repMoney(x.revenue)}`)] : []),
       '', '*Saldo iklan*',
       ...SALDO.map(([k, l]) => `- ${l} : ${saldoText(r[k] || '') || '-'}`),
-      '', 'GMV kotor & dana cair dihitung dari pesanan yang dananya cair di periode ini. Dana cair = GMV kotor dikurangi fee marketplace, voucher, ongkir & refund.',
       '', r.footer ?? FOOTER,
     ].join('\n');
   }
