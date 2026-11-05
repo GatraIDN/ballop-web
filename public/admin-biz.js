@@ -440,8 +440,8 @@
   // ad channels whose campaign table is collapsed (remembered in this browser)
   let campHidden = new Set();
   try { campHidden = new Set(JSON.parse(localStorage.getItem('ballopCampHidden') || '[]')); } catch {}
-  let dashTab = 'order';
-  try { dashTab = localStorage.getItem('ballopDashTab') || 'order'; } catch {}
+  let dashTab = 'overview';
+  try { dashTab = localStorage.getItem('ballopDashTab2') || 'overview'; } catch {}
   function renderDashboard() {
     const v = $('#view-dashboard');
     if (!loaded) { v.innerHTML = '<p class="muted">Memuat…</p>'; return; }
@@ -556,7 +556,11 @@
     const allUnpaid = data.offline.filter((x) => x.status === 'completed' && x.payment !== 'lunas');
     const overdue = allUnpaid.filter((x) => x.dueDate && x.dueDate < today());
     const hours = (min) => `${Math.floor(min / 60)}j ${String(min % 60).padStart(2, '0')}m`;
+    const S = dashTab === 'overview' ? summary(from, to) : null;
+    const SP = dashTab === 'overview' ? summary(addDays(from, -len), addDays(from, -1)) : null;
     const SECTIONS = {
+      overview: { label: 'Ringkasan', sub: 'semua channel digabung', color: '#111318', icon: '▦',
+        value: money(m.revenue), meta: `omzet bersih ${compact(inc.payout)} · iklan ${compact(m.adSpend)}`, d: delta(m.revenue, p.revenue) },
       order: { label: 'Order', sub: 'pesanan masuk dari export order', color: '#2a78d6', icon: '◈',
         value: money(m.revenue), meta: `${num(m.orders)} pesanan · ${num(m.units)} pasang`, d: delta(m.revenue, p.revenue) },
       income: { label: 'Income', sub: 'dana cair ke saldo, setelah fee', color: '#0e8a4f', icon: '₪',
@@ -568,7 +572,7 @@
       live: { label: 'Live', sub: 'TikTok LIVE (GMV atribusi)', color: '#6250d6', icon: '●',
         value: money(live.gmv), meta: `${num(live.sessions)} sesi · ${hours(live.minutes)} · ${num(live.orders)} order`, d: delta(live.gmv, liveP.gmv) },
     };
-    if (!SECTIONS[dashTab]) dashTab = 'order';
+    if (!SECTIONS[dashTab]) dashTab = 'overview';
     const sec = SECTIONS[dashTab];
     const secHead = (title, note, go) => `<div class="sec-head" style="--sec:${sec.color}"><div><h2>${title}</h2><p>${note}</p></div>${go ? `<button class="btn sm" type="button" data-go="${go[0]}">${go[1]} →</button>` : ''}</div>`;
     const kpi = (label, value, d = '', hero = false) => `<div class="kpi solid${hero ? ' hero' : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div>${d}</div>`;
@@ -624,17 +628,17 @@
       return `
       ${secHead('Income', 'Pesanan yang sudah selesai dan dananya sudah masuk ke saldo penjual setelah dipotong semua fee. Tanggal = tanggal dana dilepaskan.', ['income', 'Rincian income'])}
       <div class="kpis">
-        ${kpi('Dana cair ke saldo', money(inc.payout), delta(inc.payout, incP.payout), true)}
-        ${kpi('Harga produk', money(inc.price), delta(inc.price, incP.price))}
+        ${kpi('Omzet bersih (cair)', money(inc.payout), delta(inc.payout, incP.payout), true)}
+        ${kpi('GMV kotor', money(inc.price), delta(inc.price, incP.price))}
         ${kpi('Total fee marketplace', `${money(Math.abs(inc.fees))}`, `<div class="k-delta">${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'} dari harga produk</div>`)}
         ${kpi('Pesanan cair', num(inc.orders), delta(inc.orders, incP.orders))}
         ${kpi('Voucher & subsidi', money(inc.groups['Voucher & subsidi'] || 0))}
         ${kpi('Ongkir netto', money(inc.groups['Biaya pengiriman'] || 0))}
         ${kpi('Refund · penyesuaian', `${compact(inc.groups['Pengembalian dana'] || 0)} · ${compact(inc.groups.Penyesuaian || 0)}`)}
-        ${kpi('Dana cair ÷ harga produk', inc.price ? pct(inc.payout / inc.price) : '–', delta(inc.price ? inc.payout / inc.price : NaN, incP.price ? incP.payout / incP.price : NaN))}
+        ${kpi('Omzet bersih ÷ GMV kotor', inc.price ? pct(inc.payout / inc.price) : '–', delta(inc.price ? inc.payout / inc.price : NaN, incP.price ? incP.payout / incP.price : NaN))}
       </div>
       <section class="panel solid">
-        <div class="panel-head"><h2>Dana cair per channel</h2>${legend(incSeries)}</div>
+        <div class="panel-head"><h2>Omzet bersih per channel</h2>${legend(incSeries)}</div>
         <div class="chart" id="chIncome"></div>
       </section>
       <div class="grid-3">
@@ -731,7 +735,7 @@
       <header class="dash-head glass">
         <img class="dh-logo" src="/img/ballop-wordmark-dark.png" alt="BALLOP">
         <div class="dh-title"><h1>Dashboard Report</h1><p>${sec.label} · ${from === to ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)} · ${len} hari`}</p></div>
-        <button class="btn" id="expReport" type="button">⬇ Export laporan</button>
+        <span class="dh-actions"><button class="btn btn-export" id="expPdf" type="button">⬇ Export PDF report</button><button class="btn" id="expReport" type="button">CSV</button></span>
       </header>
       <div class="toolbar">
         <div class="seg glass">${RANGES.map(([k, l]) => `<button type="button" data-r="${k}" class="${range.key === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -746,7 +750,7 @@
           <span class="ov-meta">${s.meta}</span>
           ${s.d}
         </button>`).join('')}</div>
-      <div class="sec-body">${dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : dashTab === 'offline' ? offlineTab() : orderTab()}</div>
+      <div class="sec-body">${dashTab === 'overview' ? overviewTab(S, SP) : dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : dashTab === 'offline' ? offlineTab() : orderTab()}</div>
       ${reportPanel()}`;
 
     const chartEl = (id) => document.getElementById(id);
@@ -765,7 +769,7 @@
       renderDashboard();
     }));
     $$('[data-cal]', v).forEach((b) => b.addEventListener('click', () => { calShift += Number(b.dataset.cal); renderDashboard(); }));
-    $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { dashTab = b.dataset.tab; try { localStorage.setItem('ballopDashTab', dashTab); } catch {} renderDashboard(); }));
+    $$('[data-tab]', v).forEach((b) => b.addEventListener('click', () => { dashTab = b.dataset.tab; try { localStorage.setItem('ballopDashTab2', dashTab); } catch {} renderDashboard(); }));
 
     $$('[data-r]', v).forEach((b) => b.addEventListener('click', () => { setRange(b.dataset.r); calShift = 0; renderDashboard(); }));
     const custom = () => { const f = $('#rFrom').value, t2 = $('#rTo').value; if (f && t2 && f <= t2) { setRange('custom', f, t2); renderDashboard(); } };
@@ -775,7 +779,249 @@
     $('#demoFill')?.addEventListener('click', fillDemo);
     $('#demoClear')?.addEventListener('click', clearDemo);
     $('#expReport').addEventListener('click', () => exportReport(m));
+    $('#expPdf').addEventListener('click', exportPdfReport);
     bindReport();
+  }
+
+  // ---------- ringkasan: one summary of every source, used by the dashboard and the PDF report ----------
+  const MARKET_CH = ['shopee', 'tiktok', 'tokopedia', 'lazada', 'blibli'];
+  const offlineOf = (a, b) => {
+    const rows = data.offline.filter((x) => x.date >= a && x.date <= b && x.status === 'completed');
+    const t = { omzet: 0, units: 0, trx: new Set() };
+    rows.forEach((x) => { t.omzet += x.qty * x.price - x.discount; t.units += x.qty; t.trx.add(x.invoice || x.id); });
+    t.trx = t.trx.size;
+    return t;
+  };
+  // period rows for trend tables: months for long ranges, weeks for mid, days for short
+  function periodRows(from, to) {
+    const n = daysBetween(from, to);
+    const out = [];
+    if (n > 62) {
+      let d = parse(from); d = new Date(d.getFullYear(), d.getMonth(), 1);
+      while (iso(d) <= to) {
+        const end = iso(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+        out.push({ from: iso(d) < from ? from : iso(d), to: end > to ? to : end, label: `${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}` });
+        d = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+      }
+    } else {
+      const step = n > 14 ? 7 : 1;
+      for (let c = from; c <= to; c = addDays(c, step)) {
+        const end = addDays(c, step - 1) > to ? to : addDays(c, step - 1);
+        out.push({ from: c, to: end, label: step === 1 ? fmtDate(c) : `${fmtDay(c)} – ${fmtDay(end)}` });
+      }
+    }
+    return out;
+  }
+  function summary(from, to) {
+    const m = compute(from, to);
+    const inc = computeIncome(from, to);
+    const live = computeLive(from, to);
+    const off = offlineOf(from, to);
+    const allOrders = Object.values(m.byState).reduce((s, x) => s + x.all, 0);
+    const channels = [...MARKET_CH, 'website', 'offline', 'other'].map((k) => {
+      const o = m.byCh[k], s = m.byState[k], i = inc.byCh[k], a = m.byAd[k];
+      if (!o && !s && !i && !a) return null;
+      return { key: k, label: SALES_CH[k]?.label || k, color: SALES_CH[k]?.color || '#888', omzet: o?.revenue || 0, units: o?.units || 0, orders: o?.orders || 0,
+        all: s?.all || 0, cancelled: s?.cancelled || 0, returned: s?.returned || 0, gmv: i?.price || 0, net: i?.payout || 0, fees: Math.abs(i?.fees || 0),
+        adSpend: a?.spend || 0, adRevenue: a?.revenue || 0 };
+    }).filter(Boolean);
+    const adOnly = Object.entries(m.byAd).filter(([k]) => !channels.some((c) => c.key === k)).map(([k, a]) => ({ key: k, label: ADS_CH[k]?.label || k, spend: a.spend, revenue: a.revenue }));
+    const trend = periodRows(from, to).map((b) => {
+      const x = compute(b.from, b.to), y = computeIncome(b.from, b.to), l = computeLive(b.from, b.to);
+      return { ...b, omzet: x.revenue, orders: x.orders, units: x.units, gmv: y.price, net: y.payout, fees: Math.abs(y.fees), ads: x.adSpend, adRev: x.adRevenue, live: l.gmv, offline: offlineOf(b.from, b.to).omzet };
+    });
+    // product groups: catalog name, or the listing name without its size suffix
+    const prod = {};
+    Object.entries(m.byProduct).forEach(([id, x]) => {
+      const pr = product(id), name = pr ? pr.name : pname(id).replace(/\s*\((?:EU\s*)?\d+(?:[.,]\d+)?\)\s*$/i, '').replace(/\s+[–-]\s+Sepatu.*$/i, '').trim();
+      const g = prod[name] = prod[name] || { name, revenue: 0, units: 0, color: pr?.color };
+      g.revenue += x.revenue; g.units += x.units;
+    });
+    const products = Object.values(prod).sort((a, b) => b.units - a.units || b.revenue - a.revenue);
+    const hpp = inc.price * cogsRate();
+    const profit = inc.payout - hpp - m.adSpend - m.expenses;
+    return { from, to, m, inc, live, off, allOrders, channels, adOnly, trend, products, hpp, profit,
+      cancelRate: allOrders ? (m.cancelled + m.returnOrders) / allOrders : NaN, feeRate: inc.price ? Math.abs(inc.fees) / inc.price : NaN };
+  }
+
+  function overviewTab(S, P) {
+    const { m, inc, live, off } = S;
+    const kpi = (label, value, d = '', hero = false) => `<div class="kpi solid${hero ? ' hero' : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div>${d}</div>`;
+    const totOmzet = S.channels.reduce((s, c) => s + c.omzet, 0) || 1;
+    const maxT = Math.max(1, ...S.trend.map((t) => Math.max(t.omzet, t.net)));
+    const maxP = Math.max(1, ...S.products.slice(0, 8).map((p) => p.units));
+    return `
+      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p>Gabungan Shopee, TikTok Shop, Tokopedia, offline, iklan dan live untuk periode yang dipilih. Omzet pesanan = tanggal pesanan dibuat; omzet bersih = dana yang sudah cair (tanggal dana dilepas).</p></div></div>
+      <div class="kpis">
+        ${kpi('Omzet pesanan', money(m.revenue), delta(m.revenue, P.m.revenue), true)}
+        ${kpi('GMV kotor (cair)', money(inc.price), delta(inc.price, P.inc.price))}
+        ${kpi('Omzet bersih (cair)', money(inc.payout), delta(inc.payout, P.inc.payout))}
+        ${kpi('Fee marketplace', money(Math.abs(inc.fees)), `<div class="k-delta">${pct(S.feeRate)} dari GMV kotor</div>`)}
+        ${kpi('Pesanan · unit', `${num(m.orders)} · ${num(m.units)}`, delta(m.orders, P.m.orders))}
+        ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov))}
+        ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true))}
+        ${kpi('Laba bersih (estimasi)', `<span style="color:${S.profit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(S.profit)}</span>`, delta(S.profit, P.profit))}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Per channel</h2><span class="muted small">pesanan masuk · dana cair · iklan</span></div>
+        <div class="mixbar">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}" title="${esc(c.label)} ${pct(c.omzet / totOmzet)}"></i>`).join('')}</div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Channel</th><th class="num">Omzet pesanan</th><th class="num">Share</th><th class="num">Pesanan</th><th class="num">Unit</th><th class="num">Batal+retur</th><th class="num">GMV kotor</th><th class="num">Fee</th><th class="num">Omzet bersih</th><th class="num">Iklan</th><th class="num">ROAS</th></tr></thead>
+          <tbody>${S.channels.map((c) => `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num"><b>${money(c.omzet)}</b></td><td class="num">${pct(c.omzet / totOmzet)}</td><td class="num">${num(c.orders)}</td><td class="num">${num(c.units)}</td><td class="num">${c.all ? pct((c.cancelled + c.returned) / c.all) : '–'}</td><td class="num">${c.gmv ? money(c.gmv) : '–'}</td><td class="num">${c.gmv ? `${money(c.fees)} <small class="muted">${pct(c.fees / c.gmv)}</small>` : '–'}</td><td class="num"><b>${c.net ? money(c.net) : '–'}</b></td><td class="num">${c.adSpend ? money(c.adSpend) : '–'}</td><td class="num">${ratio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">Belum ada data di periode ini.</td></tr>'}
+          ${S.channels.length > 1 ? `<tr class="tot"><td><b>Total</b></td><td class="num"><b>${money(m.revenue)}</b></td><td class="num">100%</td><td class="num">${num(m.orders)}</td><td class="num">${num(m.units)}</td><td class="num">${pct(S.cancelRate)}</td><td class="num">${money(inc.price)}</td><td class="num">${money(Math.abs(inc.fees))}</td><td class="num"><b>${money(inc.payout)}</b></td><td class="num">${money(m.adSpend)}</td><td class="num">${ratio(m.adRoas)}</td></tr>` : ''}</tbody>
+        </table></div>
+      </section>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Tren per ${S.trend.length && daysBetween(S.from, S.to) > 62 ? 'bulan' : daysBetween(S.from, S.to) > 14 ? 'minggu' : 'hari'}</h2><span class="legend"><span><i style="background:#2a78d6"></i>Omzet pesanan</span><span><i style="background:#0e8a4f"></i>Omzet bersih</span></span></div>
+        <div class="table-wrap"><table class="data trend">
+          <thead><tr><th>Periode</th><th style="width:28%"></th><th class="num">Omzet pesanan</th><th class="num">Pesanan</th><th class="num">GMV kotor</th><th class="num">Omzet bersih</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Live</th><th class="num">Offline</th></tr></thead>
+          <tbody>${S.trend.map((t) => `<tr><td>${esc(t.label)}</td><td><div class="tbar"><i style="width:${(t.omzet / maxT) * 100}%;background:#2a78d6"></i><i style="width:${(t.net / maxT) * 100}%;background:#0e8a4f"></i></div></td><td class="num"><b>${money(t.omzet)}</b></td><td class="num">${num(t.orders)}</td><td class="num">${money(t.gmv)}</td><td class="num">${money(t.net)}</td><td class="num">${money(t.ads)}</td><td class="num">${ratio(t.ads ? t.adRev / t.ads : NaN)}</td><td class="num">${t.live ? compact(t.live) : '–'}</td><td class="num">${t.offline ? compact(t.offline) : '–'}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </section>
+      <div class="grid-3">
+        <section class="panel solid"><div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">unit · omzet pesanan</span></div>
+          <div class="hbar">${S.products.slice(0, 8).map((p) => `<div class="hbar-row"><span class="hb-name" title="${esc(p.name)}">${esc(p.name)}</span><span class="hb-track"><i style="width:${(p.units / maxP) * 100}%;background:${p.color || '#2a78d6'}"></i></span><span class="hb-val">${num(p.units)} · ${compact(p.revenue)}</span></div>`).join('') || '<p class="muted">Belum ada produk terjual.</p>'}</div>
+        </section>
+        <section class="panel solid"><div class="panel-head"><h2>Laba rugi</h2><span class="muted small">basis dana cair</span></div>
+          <table class="pl">
+            <tr><td>GMV kotor</td><td>${money(inc.price)}</td></tr>
+            <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td>−${money(inc.price - inc.payout)}</td></tr>
+            <tr class="mid"><td>Omzet bersih</td><td>${money(inc.payout)}</td></tr>
+            <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td>−${money(S.hpp)}</td></tr>
+            <tr class="sub"><td>Biaya iklan</td><td>−${money(m.adSpend)}</td></tr>
+            <tr class="sub"><td>Biaya operasional</td><td>−${money(m.expenses)}</td></tr>
+            <tr class="total"><td>Laba bersih</td><td style="color:${S.profit < 0 ? 'var(--danger)' : 'var(--good)'}">${money(S.profit)}</td></tr>
+          </table>
+          <div class="alert-list" style="margin-top:10px">
+            <div><span>TikTok LIVE · ${num(live.sessions)} sesi</span><b>${money(live.gmv)}</b></div>
+            <div><span>Offline · ${num(off.trx)} transaksi</span><b>${money(off.omzet)}</b></div>
+          </div>
+        </section>
+      </div>`;
+  }
+
+  // ---------- PDF report: a print-ready A4 page with logo, opened in a new tab ----------
+  function exportPdfReport() {
+    const S = summary(range.from, range.to);
+    const len = daysBetween(range.from, range.to);
+    const P = summary(addDays(range.from, -len), addDays(range.from, -1));
+    const { m, inc, live, off } = S;
+    const rp = (n) => `Rp ${Math.round(n || 0).toLocaleString('id-ID')}`;
+    const chg = (a, b, inv) => { if (!b || !Number.isFinite(a) || !Number.isFinite(b)) return '<span class="chg">–</span>'; const d = (a - b) / Math.abs(b); const good = inv ? d < 0 : d > 0; return `<span class="chg ${d === 0 ? '' : good ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${pct(Math.abs(d))}</span>`; };
+    const period = range.from === range.to ? longDate(range.from) : `${longDate(range.from)} – ${longDate(range.to)}`;
+    const now = new Date();
+    const made = `${longDate(iso(now))}, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const logo = `${location.origin}/img/ballop-wordmark-dark.png`;
+    const totOmzet = S.channels.reduce((s, c) => s + c.omzet, 0) || 1;
+    const maxT = Math.max(1, ...S.trend.map((t) => Math.max(t.omzet, t.net)));
+    const tile = (l, v, d, sub) => `<div class="tile"><span>${l}</span><b>${v}</b><small>${sub || ''} ${d || ''}</small></div>`;
+    const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Laporan Penjualan BALLOP · ${period}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 14mm 13mm 16mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #15171c; font-size: 10.5px; line-height: 1.45; background: #eceef2; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; min-height: 297mm; margin: 16px auto; padding: 14mm 13mm 16mm; background: #fff; box-shadow: 0 6px 30px rgba(0,0,0,.12); }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; justify-content: center; padding: 10px; background: #15171c; }
+  .bar button { font: 700 13px Inter, sans-serif; padding: 9px 18px; border-radius: 9px; border: 0; cursor: pointer; background: #fff; color: #15171c; }
+  .bar button.alt { background: transparent; color: #fff; border: 1px solid #555; }
+  @media print { body { background: #fff; } .page { margin: 0; padding: 0; width: auto; min-height: 0; box-shadow: none; } .bar { display: none; } }
+  header.top { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 14px; border-bottom: 3px solid #15171c; }
+  header.top img { height: 34px; display: block; }
+  header.top .meta { text-align: right; color: #5c616b; font-size: 10px; }
+  header.top .meta b { display: block; font-size: 17px; color: #15171c; letter-spacing: -.01em; }
+  .lead { display: flex; justify-content: space-between; gap: 16px; margin: 14px 0 6px; padding: 12px 14px; border-radius: 10px; background: #f4f5f8; }
+  .lead div span { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #6b7079; font-weight: 700; }
+  .lead div b { font-size: 12px; }
+  h2 { font-size: 12.5px; margin: 20px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #dfe2e8; letter-spacing: -.01em; display: flex; justify-content: space-between; align-items: baseline; }
+  h2 small { font-weight: 600; color: #7a7f88; font-size: 9px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tile { border: 1px solid #e3e6eb; border-radius: 9px; padding: 9px 10px; break-inside: avoid; }
+  .tile.hero { background: #15171c; color: #fff; border-color: #15171c; }
+  .tile.hero span, .tile.hero small { color: #b9bdc6; }
+  .tile span { display: block; font-size: 9px; font-weight: 700; color: #6b7079; text-transform: uppercase; letter-spacing: .05em; }
+  .tile b { display: block; font-size: 14.5px; font-weight: 900; margin: 3px 0 1px; letter-spacing: -.02em; white-space: nowrap; }
+  .tile small { color: #7a7f88; font-size: 9px; }
+  .chg { font-weight: 700; } .chg.up { color: #0e8a4f; } .chg.down { color: #d93a3e; }
+  .tile.hero .chg.up { color: #5fe0a2; } .tile.hero .chg.down { color: #ff8a8d; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: #6b7079; font-weight: 700; padding: 6px 6px; background: #f4f5f8; }
+  td { padding: 5.5px 6px; border-bottom: 1px solid #eceef2; }
+  .n { text-align: right; white-space: nowrap; }
+  tr.tot td { font-weight: 800; border-top: 2px solid #15171c; border-bottom: 0; }
+  tr { break-inside: avoid; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+  .mix { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 8px; gap: 2px; }
+  .tb { display: grid; gap: 2px; min-width: 90px; } .tb i { display: block; height: 5px; border-radius: 3px; }
+  .two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; break-inside: avoid; }
+  .pl td { padding: 6px 4px; } .pl .sub td { color: #6b7079; padding-left: 14px; } .pl .mid td { font-weight: 800; } .pl .total td { font-weight: 900; font-size: 12.5px; border-top: 2px solid #15171c; border-bottom: 0; }
+  .pos { color: #0e8a4f; } .neg { color: #d93a3e; }
+  .note { color: #7a7f88; font-size: 8.5px; margin-top: 18px; padding-top: 8px; border-top: 1px solid #dfe2e8; display: flex; justify-content: space-between; gap: 16px; }
+  .rank { display: inline-flex; width: 17px; height: 17px; border-radius: 5px; align-items: center; justify-content: center; background: #15171c; color: #fff; font-size: 9px; font-weight: 800; margin-right: 6px; }
+  .avoid { break-inside: avoid; }
+</style></head><body>
+<div class="bar"><button onclick="window.print()">⬇ Simpan PDF / Print</button><button class="alt" onclick="window.close()">Tutup</button></div>
+<div class="page">
+  <header class="top"><img src="${logo}" alt="BALLOP"><div class="meta"><b>Laporan Penjualan</b>${esc(period)} · ${num(len)} hari</div></header>
+  <div class="lead">
+    <div><span>Periode</span><b>${esc(period)}</b></div>
+    <div><span>Pembanding</span><b>${esc(longDate(P.from))} – ${esc(longDate(P.to))}</b></div>
+    <div><span>Channel</span><b>${esc(S.channels.map((c) => c.label).join(', ') || '–')}</b></div>
+    <div><span>Dibuat</span><b>${esc(made)}</b></div>
+  </div>
+
+  <h2>Ringkasan utama <small>▲▼ dibanding periode sebelumnya dengan panjang yang sama</small></h2>
+  <div class="tiles">
+    <div class="tile hero"><span>Omzet pesanan</span><b>${rp(m.revenue)}</b><small>${num(m.orders)} pesanan ${chg(m.revenue, P.m.revenue)}</small></div>
+    ${tile('GMV kotor (cair)', rp(inc.price), chg(inc.price, P.inc.price), `${num(inc.orders)} cair`)}
+    ${tile('Omzet bersih (cair)', rp(inc.payout), chg(inc.payout, P.inc.payout), `${pct(inc.price ? inc.payout / inc.price : NaN)} dari GMV`)}
+    ${tile('Laba bersih (estimasi)', `<span class="${S.profit < 0 ? 'neg' : 'pos'}">${rp(S.profit)}</span>`, chg(S.profit, P.profit), '')}
+    ${tile('Unit terjual', `${num(m.units)} pasang`, chg(m.units, P.m.units), '')}
+    ${tile('AOV', rp(m.aov), chg(m.aov, P.m.aov), '')}
+    ${tile('Fee marketplace', rp(Math.abs(inc.fees)), '', `${pct(S.feeRate)} dari GMV`)}
+    ${tile('Batal + retur', pct(S.cancelRate), chg(S.cancelRate, P.cancelRate, true), `${num(m.cancelled + m.returnOrders)} pesanan`)}
+    ${tile('Biaya iklan', rp(m.adSpend), chg(m.adSpend, P.m.adSpend, true), '')}
+    ${tile('ROAS iklan', ratio(m.adRoas), chg(m.adRoas, P.m.adRoas), `GMV iklan ${compact(m.adRevenue)}`)}
+    ${tile('TikTok LIVE', rp(live.gmv), chg(live.gmv, P.live.gmv), `${num(live.sessions)} sesi`)}
+    ${tile('Offline', rp(off.omzet), chg(off.omzet, P.off.omzet), `${num(off.trx)} transaksi`)}
+  </div>
+
+  <div class="avoid">
+  <h2>Kinerja per channel <small>omzet pesanan = tanggal pesanan · omzet bersih = tanggal dana cair</small></h2>
+  <div class="mix">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}"></i>`).join('')}</div>
+  <table><thead><tr><th>Channel</th><th class="n">Omzet pesanan</th><th class="n">Share</th><th class="n">Pesanan</th><th class="n">Unit</th><th class="n">Batal+retur</th><th class="n">GMV kotor</th><th class="n">Fee</th><th class="n">Omzet bersih</th><th class="n">Iklan</th><th class="n">ROAS</th></tr></thead>
+  <tbody>${S.channels.map((c) => `<tr><td><span class="dot" style="background:${c.color}"></span>${esc(c.label)}</td><td class="n"><b>${rp(c.omzet)}</b></td><td class="n">${pct(c.omzet / totOmzet)}</td><td class="n">${num(c.orders)}</td><td class="n">${num(c.units)}</td><td class="n">${c.all ? pct((c.cancelled + c.returned) / c.all) : '–'}</td><td class="n">${c.gmv ? rp(c.gmv) : '–'}</td><td class="n">${c.gmv ? pct(c.fees / c.gmv) : '–'}</td><td class="n"><b>${c.net ? rp(c.net) : '–'}</b></td><td class="n">${c.adSpend ? rp(c.adSpend) : '–'}</td><td class="n">${ratio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}</td></tr>`).join('')}
+  ${S.adOnly.map((a) => `<tr><td><span class="dot" style="background:#999"></span>${esc(a.label)} <small style="color:#7a7f88">(iklan)</small></td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">${rp(a.spend)}</td><td class="n">${ratio(a.spend ? a.revenue / a.spend : NaN)}</td></tr>`).join('')}
+  <tr class="tot"><td>Total</td><td class="n">${rp(m.revenue)}</td><td class="n">100%</td><td class="n">${num(m.orders)}</td><td class="n">${num(m.units)}</td><td class="n">${pct(S.cancelRate)}</td><td class="n">${rp(inc.price)}</td><td class="n">${pct(S.feeRate)}</td><td class="n">${rp(inc.payout)}</td><td class="n">${rp(m.adSpend)}</td><td class="n">${ratio(m.adRoas)}</td></tr></tbody></table>
+  </div>
+
+  <h2>Tren per ${len > 62 ? 'bulan' : len > 14 ? 'minggu' : 'hari'} <small><span class="dot" style="background:#2a78d6"></span>omzet pesanan <span class="dot" style="background:#0e8a4f;margin-left:8px"></span>omzet bersih</small></h2>
+  <table><thead><tr><th>Periode</th><th></th><th class="n">Omzet pesanan</th><th class="n">Pesanan</th><th class="n">Unit</th><th class="n">GMV kotor</th><th class="n">Omzet bersih</th><th class="n">Iklan</th><th class="n">ROAS</th><th class="n">Live</th><th class="n">Offline</th></tr></thead>
+  <tbody>${S.trend.map((t) => `<tr><td>${esc(t.label)}</td><td><div class="tb"><i style="width:${(t.omzet / maxT) * 100}%;background:#2a78d6"></i><i style="width:${(t.net / maxT) * 100}%;background:#0e8a4f"></i></div></td><td class="n"><b>${rp(t.omzet)}</b></td><td class="n">${num(t.orders)}</td><td class="n">${num(t.units)}</td><td class="n">${rp(t.gmv)}</td><td class="n">${rp(t.net)}</td><td class="n">${rp(t.ads)}</td><td class="n">${ratio(t.ads ? t.adRev / t.ads : NaN)}</td><td class="n">${t.live ? rp(t.live) : '–'}</td><td class="n">${t.offline ? rp(t.offline) : '–'}</td></tr>`).join('')}</tbody></table>
+
+  <div class="two">
+    <div><h2>Produk terlaris <small>urut unit terjual</small></h2>
+      <table><thead><tr><th>Produk</th><th class="n">Unit</th><th class="n">Omzet</th><th class="n">Share</th></tr></thead>
+      <tbody>${S.products.slice(0, 10).map((p, i) => `<tr><td><span class="rank">${i + 1}</span>${esc(p.name)}</td><td class="n">${num(p.units)}</td><td class="n">${rp(p.revenue)}</td><td class="n">${pct(m.units ? p.units / m.units : NaN)}</td></tr>`).join('') || '<tr><td colspan="4">Belum ada produk terjual.</td></tr>'}</tbody></table>
+    </div>
+    <div><h2>Laba rugi <small>basis dana cair</small></h2>
+      <table class="pl"><tbody>
+        <tr><td>GMV kotor</td><td class="n">${rp(inc.price)}</td></tr>
+        <tr class="sub"><td>Fee, voucher, ongkir, refund</td><td class="n">−${rp(inc.price - inc.payout)}</td></tr>
+        <tr class="mid"><td>Omzet bersih</td><td class="n">${rp(inc.payout)}</td></tr>
+        <tr class="sub"><td>HPP (estimasi ${pct(cogsRate())})</td><td class="n">−${rp(S.hpp)}</td></tr>
+        <tr class="sub"><td>Biaya iklan</td><td class="n">−${rp(m.adSpend)}</td></tr>
+        <tr class="sub"><td>Biaya operasional</td><td class="n">−${rp(m.expenses)}</td></tr>
+        <tr class="total"><td>Laba bersih</td><td class="n ${S.profit < 0 ? 'neg' : 'pos'}">${rp(S.profit)}</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div class="note"><span>Sumber: export order, income, iklan &amp; Creator Live Performance tiap marketplace. HPP memakai estimasi ${pct(cogsRate())} dari GMV kotor bila HPP produk belum diisi. Angka iklan = atribusi platform.</span><span>BALLOP · ballop.web.id</span></div>
+</div></body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { toast('Pop-up diblokir browser. Izinkan pop-up untuk halaman ini.', true); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
 
   // ---------- daily report text (WhatsApp) ----------
@@ -1780,7 +2026,7 @@
   // shared with other admin modules
   window.Biz = {
     data, LEDGERS, openRecord, save, renderLedger, fillSelect, refresh, productOptions, pname, chBadge, SALES_CH, ADS_CH, ADS_CAMPAIGNS,
-    fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv, rangeBar, bindRangeBar, periodOf,
+    fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv, rangeBar, bindRangeBar, periodOf, summary, exportPdfReport, overviewTab,
     get loaded() { return loaded; },
     registerView(name, fn) { extraViews[name] = fn; },
   };

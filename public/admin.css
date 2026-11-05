@@ -962,3 +962,12 @@ td.ls-bad { color: var(--danger); font-weight: 900; }
 .ss-sizes em{font-style:normal;color:#d23b3b;font-weight:700;min-height:14px}
 @media (max-width:1100px){.ss-kpis{grid-template-columns:repeat(3,1fr)}.ss-grid{grid-template-columns:1fr}}
 @media (max-width:600px){.ss-kpis{grid-template-columns:repeat(2,1fr)}}
+
+/* ringkasan dashboard */
+.dh-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.mixbar { display: flex; height: 10px; gap: 2px; border-radius: 6px; overflow: hidden; margin: 2px 0 12px; }
+.mixbar i { display: block; height: 100%; }
+.tbar { display: grid; gap: 3px; min-width: 80px; }
+.tbar i { display: block; height: 6px; border-radius: 3px; }
+table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
+.btn.btn-export { background: var(--ink); border-color: var(--ink); color: #fff; }
