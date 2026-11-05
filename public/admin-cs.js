@@ -268,44 +268,63 @@
   function dayPopup(d) {
     const draft = { ...Object.fromEntries(CHS.map((k) => [k, { ...(rep(d, k) || { tasks: [] }) }])), fs: fsOf(d).map((x) => ({ ...x })) };
     const had = Object.fromEntries(CHS.map((k) => [k, !!rep(d, k)]));
-    let tab = 'shopee', dirty = false;
+    let dirty = false;
     const names = [...new Set(B.data.stock3pl.map((r) => r.product).filter(Boolean))].sort();
+    const dirtyCh = Object.fromEntries(CHS.map((k) => [k, false]));
     const box = document.createElement('div');
     box.className = 'raw-pop';
     box.innerHTML = `<div class="raw-card cs-pop">
-      <header><div><span class="muted small">Daily report customer service</span><h2>${longDay(d)}</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
-      <div class="seg glass cs-tabs" id="csTabs"></div>
+      <header><div><span class="muted small">Daily report customer service</span><h2>${longDay(d)}</h2></div><div class="cs-state" id="csState"></div><button class="btn sm" type="button" data-close>✕</button></header>
       <div class="raw-body" id="csBody"></div>
       <footer><button class="btn sm" type="button" id="csCopy">⧉ Copy teks report</button><button class="btn sm btn-export" type="button" id="csPdfDay">⬇ PDF report hari ini</button><span class="spacer"></span><button class="btn sm" type="button" data-close>Tutup</button>${canEdit() ? '<button class="btn sm primary" type="button" id="csSave">Simpan</button>' : ''}</footer>
     </div><datalist id="csProducts">${names.map((n) => `<option value="${esc(n)}">`).join('')}</datalist><datalist id="csSessions">${SESSIONS.map((n) => `<option value="${n}">`).join('')}</datalist>`;
     document.body.appendChild(box);
     const dis = canEdit() ? '' : 'disabled';
-    const drawTabs = () => {
-      const mark = (k) => (k === 'fs' ? (draft.fs.length ? ` <i class="cs-dot on">${draft.fs.length}</i>` : ' <i class="cs-dot"></i>') : (had[k] || dirtyCh[k] ? ' <i class="cs-dot on">✓</i>' : ' <i class="cs-dot"></i>'));
-      $('#csTabs', box).innerHTML = [...CHS.map((k) => [k, CH[k].label]), ['fs', '⚡ Flash sale Shopee Official']].map(([k, l]) => `<button type="button" data-cstab="${k}" class="${tab === k ? 'on' : ''}">${l}${mark(k)}</button>`).join('');
-      $$('[data-cstab]', box).forEach((b) => b.addEventListener('click', () => { tab = b.dataset.cstab; draw(); }));
+
+    // one form: a row per number, a column per channel; Tab walks down a column (one seller centre at a time)
+    const SECTIONS = [
+      ['Chat masuk', ['visitors', 'sessions', 'chats', 'askers', 'askRate', 'chatAI', 'chatAgent', 'chatAIAgent']],
+      ['Respon chat', ['replied', 'unreplied', 'resp12h', 'responseTime', 'csat', 'respConv']],
+      ['Penjualan dari chat', ['buyers', 'orders', 'products', 'sales', 'chatConv']],
+      ['Agen & risiko (TikTok)', ['agentsOnline', 'agentsActive', 'riskSessions', 'riskAgents', 'riskPct']],
+    ];
+    const statDef = (key) => { const hit = CHS.map((k) => statKeys(k).find(([fk]) => fk === key)).filter(Boolean); if (!hit.length) return null; const labels = [...new Set(hit.map((x) => x[1]))]; return { label: labels.join(' / '), kind: hit[0][2] }; };
+    const has = (k, key) => statKeys(k).some(([fk]) => fk === key);
+    const unit = (kind) => (kind === 'p' ? '%' : kind === 'rp' ? 'Rp' : kind === 't' ? 'jam:mnt:dtk' : '');
+    let tabi = 0; const tabIdx = {};
+    const ti = (k) => { tabIdx[k] = (tabIdx[k] || 0) + 1; return CHS.indexOf(k) * 1000 + tabIdx[k] + 1; };
+    const cell = (k, key, kind) => {
+      if (!has(k, key)) return '<td class="na">–</td>';
+      const r = draft[k], v = r[key];
+      return kind === 't'
+        ? `<td><input type="text" class="cs-in" data-ch="${k}" data-sk="${key}" data-kind="t" value="${v ? fmtClock(v) : ''}" placeholder="00:15:48" tabindex="${ti(k)}" ${dis}></td>`
+        : `<td><input type="number" class="cs-in" min="0" step="${kind === 'p' ? '0.01' : '1'}" inputmode="decimal" data-ch="${k}" data-sk="${key}" data-kind="${kind}" value="${v ?? ''}" placeholder="0" tabindex="${ti(k)}" ${dis}></td>`;
     };
-    const dirtyCh = Object.fromEntries(CHS.map((k) => [k, false]));
-    const chForm = (k) => {
-      const r = draft[k];
-      const status = had[k] ? `<div class="d-note ok"><b>✓ Laporan ${CH[k].label} tanggal ini sudah diisi</b><span>${r.updatedBy ? `oleh ${esc(r.updatedBy)} · ${esc(r.updatedAt)}` : ''} · ubah angka di bawah lalu Simpan untuk edit</span></div>` : `<div class="d-note"><b>Belum ada laporan ${CH[k].label}</b><span>Isi checklist & angka hari ini.</span></div>`;
-      return `${status}
-        <h3 class="cs-h">Checklist jobdesk</h3>
-        <div class="cs-tasks">${TASKS[k].map(([tk, l]) => `<label class="cs-task${(r.tasks || []).includes(tk) ? ' on' : ''}"><input type="checkbox" data-task="${tk}" ${(r.tasks || []).includes(tk) ? 'checked' : ''} ${dis}><span>${esc(l)}</span></label>`).join('')}</div>
-        <h3 class="cs-h">Data analitik chat <span class="muted small">salin dari ${isShopee(k) ? 'Shopee Seller Centre › Data › Layanan › Chat (Per Hari)' : 'Seller Center › Analitik layanan › Ringkasan pesan'}</span></h3>
-        ${STATS[k].map(([g, list]) => `<div class="cs-sgroup"><b>${esc(g)}</b><div class="cs-grid">${list.map(([fk, l, kind]) => `<label>${esc(l)}${kind === 'p' ? ' (%)' : kind === 'rp' ? ' (Rp)' : ''}<input ${kind === 't' ? 'type="text" placeholder="00:15:48"' : `type="number" min="0" step="${kind === 'p' ? '0.01' : '1'}" inputmode="decimal" placeholder="0"`} data-sk="${fk}" data-kind="${kind}" value="${kind === 't' ? (r[fk] ? fmtClock(r[fk]) : '') : (r[fk] ?? '')}" ${dis}></label>`).join('')}</div></div>`).join('')}
-        <h3 class="cs-h">Operasional hari ini</h3>
-        <div class="cs-grid">${FIELDS.map(([fk, l]) => `<label>${l}<input type="number" min="0" step="${fk === 'responseRate' || fk === 'responseTime' ? '0.1' : '1'}" inputmode="decimal" data-fk="${fk}" value="${r[fk] ?? ''}" placeholder="0" ${dis}></label>`).join('')}
-          <label>${isShopee(k) ? 'Poin penalti / performa toko' : 'Shop Performance Score'}<input type="text" data-fk="score" value="${esc(r.score || '')}" placeholder="${isShopee(k) ? 'mis. 0 poin' : 'mis. 4.8'}" ${dis}></label></div>
-        <label class="cs-note">Catatan / kendala hari ini<textarea data-fk="note" rows="3" placeholder="Komplain penting, pesanan bermasalah, eskalasi…" ${dis}>${esc(r.note || '')}</textarea></label>`;
+    const head = `<thead><tr><th>Isi angka hari ini</th>${CHS.map((k) => `<th style="--c:${CH[k].color}"><span class="cs-colh"><i></i>${esc(CH[k].label)}</span><small>${isShopee(k) ? 'Seller Centre › Data › Layanan › Chat' : 'Analitik layanan › Ringkasan pesan'}</small></th>`).join('')}</tr></thead>`;
+    const formHtml = () => {
+      Object.keys(tabIdx).forEach((k) => delete tabIdx[k]);
+      const statRows = SECTIONS.map(([title, keys]) => {
+        const rows = keys.map((key) => [key, statDef(key)]).filter(([, def]) => def);
+        return `<tr class="cs-sec"><td colspan="${CHS.length + 1}">${esc(title)}</td></tr>${rows.map(([key, def]) => `<tr><th>${esc(def.label)}${unit(def.kind) ? ` <small>${unit(def.kind)}</small>` : ''}</th>${CHS.map((k) => cell(k, key, def.kind)).join('')}</tr>`).join('')}`;
+      }).join('');
+      const opRows = FIELDS.map(([fk, l]) => `<tr><th>${esc(l)}</th>${CHS.map((k) => `<td><input type="number" class="cs-in" min="0" inputmode="numeric" data-ch="${k}" data-fk="${fk}" value="${draft[k][fk] || ''}" placeholder="0" tabindex="${ti(k)}" ${dis}></td>`).join('')}</tr>`).join('')
+        + `<tr><th>Performa toko / SPS</th>${CHS.map((k) => `<td><input type="text" class="cs-in" data-ch="${k}" data-fk="score" value="${esc(draft[k].score || '')}" placeholder="${isShopee(k) ? '0 poin' : '4.8'}" tabindex="${ti(k)}" ${dis}></td>`).join('')}</tr>`
+        + `<tr><th>Catatan / kendala</th>${CHS.map((k) => `<td><textarea class="cs-in" rows="2" data-ch="${k}" data-fk="note" placeholder="Komplain penting, eskalasi…" tabindex="${ti(k)}" ${dis}>${esc(draft[k].note || '')}</textarea></td>`).join('')}</tr>`;
+      const tasks = [...new Map(CHS.flatMap((k) => TASKS[k]).map(([tk, l]) => [tk, l])).entries()];
+      const taskRows = tasks.map(([tk, l]) => `<tr><th>${esc(l)}</th>${CHS.map((k) => (TASKS[k].some(([x]) => x === tk) ? `<td class="cs-chk"><input type="checkbox" data-ch="${k}" data-task="${tk}" ${(draft[k].tasks || []).includes(tk) ? 'checked' : ''} ${dis}></td>` : '<td class="na">–</td>')).join('')}</tr>`).join('');
+      return `
+        <div class="table-wrap cs-mx-wrap"><table class="cs-mx">${head}<tbody>${statRows}
+          <tr class="cs-sec"><td colspan="${CHS.length + 1}">Operasional</td></tr>${opRows}
+          <tr class="cs-sec"><td colspan="${CHS.length + 1}">Checklist jobdesk <span class="cs-allbtns">${canEdit() ? CHS.map((k) => `<button type="button" class="btn sm" data-allt="${k}">✓ semua ${esc(CH[k].label)}</button>`).join('') : ''}</span></td></tr>${taskRows}
+        </tbody></table></div>
+        <p class="muted small">Kosongkan saja angka yang tidak ada. Tekan Tab untuk pindah ke kolom bawahnya (satu channel dulu sampai selesai). Channel yang tidak diisi sama sekali tidak ikut disimpan.</p>
+        <h3 class="cs-h">⚡ Flash sale Shopee Official</h3>
+        ${fsForm()}`;
     };
     const fsForm = () => `
-      <h3 class="cs-h">Performa flash sale hari ini <span class="muted small">salin dari Shopee › Data › Promosi › Flash Sale Toko Saya › Kriteria Utama</span></h3>
-      <div class="cs-sgroup"><div class="cs-grid">${FS_PERF.map(([fk, l, kind]) => `<label>${esc(l)}${kind === 'p' ? ' (%)' : kind === 'rp' ? ' (Rp)' : ''}<input type="number" min="0" step="${kind === 'p' ? '0.01' : '1'}" inputmode="decimal" data-fp="${fk}" value="${draft.shopee[fk] ?? ''}" placeholder="0" ${dis}></label>`).join('')}
+      <div class="cs-sgroup"><b>Performa hari ini <span class="muted small">Shopee › Data › Promosi › Flash Sale Toko Saya › Kriteria Utama</span></b><div class="cs-grid">${FS_PERF.map(([fk, l, kind]) => `<label>${esc(l)}${kind === 'p' ? ' (%)' : kind === 'rp' ? ' (Rp)' : ''}<input type="number" min="0" step="${kind === 'p' ? '0.01' : '1'}" inputmode="decimal" data-fp="${fk}" value="${draft.shopee[fk] ?? ''}" placeholder="0" ${dis}></label>`).join('')}
         <label>Penjualan per pembeli<input type="text" value="${draft.shopee.fsBuyers ? money((draft.shopee.fsSales || 0) / draft.shopee.fsBuyers) : '–'}" disabled data-fpb></label></div></div>
-      <h3 class="cs-h">Produk yang diajukan</h3>
-      ${draft.fs.length ? `<div class="d-note ok"><b>✓ ${num(draft.fs.length)} produk flash sale tercatat untuk tanggal ini</b><span>Ubah status setelah Shopee menyetujui / menolak, isi terjual setelah sesi selesai.</span></div>` : '<div class="d-note"><b>Belum ada flash sale untuk tanggal ini</b><span>Tambahkan produk yang diajukan ke Flash Sale toko Shopee.</span></div>'}
-      <div class="table-wrap"><table class="data cs-fs"><thead><tr><th>Sesi</th><th>Produk</th><th>Varian</th><th class="num">Harga normal</th><th class="num">Harga FS</th><th class="num">Diskon</th><th class="num">Stok FS</th><th class="num">Terjual</th><th>Status</th><th></th></tr></thead>
+      <div class="table-wrap"><table class="data cs-fs"><thead><tr><th>Sesi</th><th>Produk diajukan</th><th>Varian</th><th class="num">Harga normal</th><th class="num">Harga FS</th><th class="num">Diskon</th><th class="num">Stok FS</th><th class="num">Terjual</th><th>Status</th><th></th></tr></thead>
       <tbody>${draft.fs.map((x, i) => `<tr data-fsi="${i}">
         <td><input list="csSessions" data-fs="session" value="${esc(x.session || '')}" placeholder="12:00–15:00" ${dis}></td>
         <td><input list="csProducts" data-fs="product" value="${esc(x.product || '')}" placeholder="Nama produk" class="wide" ${dis}></td>
@@ -316,42 +335,32 @@
         <td class="num"><input type="number" min="0" data-fs="stock" value="${x.stock || ''}" class="sm" ${dis}></td>
         <td class="num"><input type="number" min="0" data-fs="sold" value="${x.sold || ''}" class="sm" ${dis}></td>
         <td><select data-fs="status" ${dis}>${Object.entries(FS_STATUS).map(([sk, l]) => `<option value="${sk}"${(x.status || 'diajukan') === sk ? ' selected' : ''}>${l}</option>`).join('')}</select></td>
-        <td>${canEdit() ? `<button class="icon-btn" type="button" data-fsdel="${i}" title="Hapus">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted" style="text-align:center;padding:20px">Belum ada produk.</td></tr>'}</tbody></table></div>
+        <td>${canEdit() ? `<button class="icon-btn" type="button" data-fsdel="${i}" title="Hapus">✕</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted" style="text-align:center;padding:16px">Belum ada produk yang diajukan.</td></tr>'}</tbody></table></div>
       ${canEdit() ? '<button class="btn sm" type="button" id="fsAdd" style="margin-top:10px">+ Tambah produk flash sale</button>' : ''}`;
+    const drawState = () => {
+      $('#csState', box).innerHTML = CHS.map((k) => `<span class="cs-st${had[k] || dirtyCh[k] ? ' on' : ''}" style="--c:${CH[k].color}" title="${had[k] && draft[k].updatedBy ? `diisi ${esc(draft[k].updatedBy)} · ${esc(draft[k].updatedAt || '')}` : ''}">${had[k] || dirtyCh[k] ? '✓' : '○'} ${esc(CH[k].label)}</span>`).join('');
+    };
+    const touch = (k) => { dirty = true; if (k && !dirtyCh[k]) { dirtyCh[k] = true; drawState(); } };
     function draw() {
-      drawTabs();
       const body = $('#csBody', box);
-      body.innerHTML = tab === 'fs' ? fsForm() : chForm(tab);
-      if (tab === 'fs') {
-        $$('[data-fs]', body).forEach((el) => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
-          const x = draft.fs[Number(el.closest('tr').dataset.fsi)];
-          x[el.dataset.fs] = el.type === 'number' ? Number(el.value) || 0 : el.value;
-          const td = el.closest('tr').querySelector('[data-disc]'); td.textContent = x.normalPrice && x.price ? pct(1 - x.price / x.normalPrice) : '–';
-          dirty = true;
-        }));
-        $$('[data-fp]', body).forEach((el) => el.addEventListener('input', () => {
-          draft.shopee[el.dataset.fp] = el.value === '' ? 0 : Number(el.value);
-          const pb = body.querySelector('[data-fpb]'); pb.value = draft.shopee.fsBuyers ? money((draft.shopee.fsSales || 0) / draft.shopee.fsBuyers) : '–';
-          dirty = true; dirtyCh.shopee = true;
-        }));
-        $$('[data-fsdel]', body).forEach((b) => b.addEventListener('click', () => { draft.fs.splice(Number(b.dataset.fsdel), 1); dirty = true; draw(); }));
-        $('#fsAdd', body)?.addEventListener('click', () => { const last = draft.fs[draft.fs.length - 1]; draft.fs.push({ id: '', date: d, session: last?.session || '', product: '', variant: '', normalPrice: 0, price: 0, stock: 0, sold: 0, status: 'diajukan' }); dirty = true; draw(); $$('[data-fs="product"]', body).pop()?.focus(); });
-      } else {
-        const r = draft[tab], ch = tab;
-        $$('[data-task]', body).forEach((el) => el.addEventListener('change', () => {
-          r.tasks = $$('[data-task]', body).filter((c) => c.checked).map((c) => c.dataset.task);
-          el.closest('.cs-task').classList.toggle('on', el.checked); dirty = true; dirtyCh[ch] = true; drawTabs();
-        }));
-        $$('[data-fk]', body).forEach((el) => el.addEventListener('input', () => {
-          r[el.dataset.fk] = el.type === 'number' ? (el.value === '' ? 0 : Number(el.value)) : el.value;
-          dirty = true; if (!dirtyCh[ch]) { dirtyCh[ch] = true; drawTabs(); }
-        }));
-        $$('[data-sk]', body).forEach((el) => el.addEventListener('input', () => {
-          r[el.dataset.sk] = el.dataset.kind === 't' ? toMin(el.value) : (el.value === '' ? 0 : Number(el.value));
-          syncRate(ch, r);
-          dirty = true; if (!dirtyCh[ch]) { dirtyCh[ch] = true; drawTabs(); }
-        }));
-      }
+      body.innerHTML = formHtml();
+      drawState();
+      // one listener for the whole form
+      body.oninput = (e) => {
+        const el = e.target, k = el.dataset.ch;
+        if (el.dataset.sk) { const r = draft[k]; r[el.dataset.sk] = el.dataset.kind === 't' ? toMin(el.value) : (el.value === '' ? 0 : Number(el.value)); syncRate(k, r); touch(k); }
+        else if (el.dataset.fk) { draft[k][el.dataset.fk] = el.type === 'number' ? (el.value === '' ? 0 : Number(el.value)) : el.value; touch(k); }
+        else if (el.dataset.fp) { draft.shopee[el.dataset.fp] = el.value === '' ? 0 : Number(el.value); const pb = body.querySelector('[data-fpb]'); pb.value = draft.shopee.fsBuyers ? money((draft.shopee.fsSales || 0) / draft.shopee.fsBuyers) : '–'; touch('shopee'); }
+        else if (el.dataset.fs) { const x = draft.fs[Number(el.closest('tr').dataset.fsi)]; x[el.dataset.fs] = el.type === 'number' ? Number(el.value) || 0 : el.value; el.closest('tr').querySelector('[data-disc]').textContent = x.normalPrice && x.price ? pct(1 - x.price / x.normalPrice) : '–'; touch(); }
+      };
+      body.onchange = (e) => {
+        const el = e.target;
+        if (el.dataset.task) { const k = el.dataset.ch; draft[k].tasks = $$(`[data-task][data-ch="${k}"]`, body).filter((c) => c.checked).map((c) => c.dataset.task); touch(k); }
+        else if (el.dataset.fs && el.tagName === 'SELECT') { draft.fs[Number(el.closest('tr').dataset.fsi)].status = el.value; touch(); }
+      };
+      $$('[data-allt]', body).forEach((btn) => btn.addEventListener('click', () => { const k = btn.dataset.allt; const boxes = $$(`[data-task][data-ch="${k}"]`, body); const on = !boxes.every((c) => c.checked); boxes.forEach((c) => { c.checked = on; }); draft[k].tasks = on ? TASKS[k].map(([tk]) => tk) : []; touch(k); }));
+      $$('[data-fsdel]', body).forEach((btn) => btn.addEventListener('click', () => { draft.fs.splice(Number(btn.dataset.fsdel), 1); touch(); draw(); }));
+      $('#fsAdd', body)?.addEventListener('click', () => { const last = draft.fs[draft.fs.length - 1]; draft.fs.push({ id: '', date: d, session: last?.session || '', product: '', variant: '', normalPrice: 0, price: 0, stock: 0, sold: 0, status: 'diajukan' }); touch(); const top = body.scrollTop; draw(); body.scrollTop = top; $$('[data-fs="product"]', body).pop()?.focus(); });
     }
     const close = () => { if (dirty && !confirm('Perubahan belum disimpan. Tutup?')) return; box.remove(); };
     box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) close(); });
@@ -360,7 +369,7 @@
     $('#csSave', box)?.addEventListener('click', async () => {
       const at = stamp(), by = who();
       let daily = B.data.csdaily.filter((r) => r.date !== d || !CHS.some((k) => r.channel === k && (had[k] || dirtyCh[k])));
-      CHS.forEach((k) => { if (had[k] || dirtyCh[k]) syncRate(k, draft[k]); daily.push({ ...draft[k], id: draft[k].id || '', date: d, channel: k, updatedAt: dirtyCh[k] ? at : draft[k].updatedAt, updatedBy: dirtyCh[k] ? by : draft[k].updatedBy }); });
+      CHS.forEach((k) => { if (!had[k] && !dirtyCh[k]) return; syncRate(k, draft[k]); daily.push({ ...draft[k], id: draft[k].id || '', date: d, channel: k, updatedAt: dirtyCh[k] ? at : draft[k].updatedAt, updatedBy: dirtyCh[k] ? by : draft[k].updatedBy }); });
       const fsRows = [...B.data.flashsale.filter((x) => x.date !== d), ...draft.fs.filter((x) => x.product.trim()).map((x) => ({ ...x, date: d, updatedAt: at, updatedBy: by }))];
       try {
         B.data.csdaily = await api('/api/csdaily', json('PUT', daily));

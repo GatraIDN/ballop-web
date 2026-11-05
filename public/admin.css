@@ -1005,3 +1005,30 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .inc-fee b { display: block; font-size: 18px; margin: 4px 0 2px; color: var(--danger); font-variant-numeric: tabular-nums; }
 .inc-fee small { font-size: 11px; color: var(--muted); }
 .inc-fee i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--danger); opacity: .55; }
+
+/* popups never squeeze their header / footer; only the body scrolls */
+.raw-card > header, .raw-card > footer, .raw-card > .seg { flex-shrink: 0; }
+.raw-card > .raw-body { flex: 1 1 auto; min-height: 0; }
+.cs-pop { width: min(1100px, 100%); }
+.cs-state { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; margin-right: 10px; }
+.cs-st { font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.cs-st.on { border-color: var(--c); color: var(--c); background: color-mix(in srgb, var(--c) 9%, transparent); }
+.cs-mx-wrap { border: 1px solid var(--line); border-radius: 14px; margin-top: 6px; }
+.cs-mx { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cs-mx th, .cs-mx td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.cs-mx thead th { position: sticky; top: 0; z-index: 2; background: var(--panel); font-size: 12px; padding: 10px 8px; }
+.cs-mx thead th small { display: block; font-weight: 600; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+.cs-colh { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; }
+.cs-colh i { width: 9px; height: 9px; border-radius: 3px; background: var(--c); }
+.cs-mx tbody th { font-weight: 600; color: var(--ink-2); width: 32%; min-width: 180px; position: sticky; left: 0; background: var(--panel); z-index: 1; }
+.cs-mx tbody th small { color: var(--muted); font-weight: 600; font-size: 10.5px; }
+.cs-mx tr.cs-sec td { background: var(--soft, rgba(0,0,0,.035)); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 8px; }
+.cs-allbtns { float: right; display: inline-flex; gap: 6px; text-transform: none; letter-spacing: 0; }
+.cs-allbtns .btn { padding: 3px 8px; font-size: 11px; }
+.cs-mx .cs-in { width: 100%; min-width: 110px; padding: 7px 9px; border-radius: 9px; border: 1px solid var(--line-2, var(--line)); font: inherit; font-weight: 700; background: #fff; }
+.cs-mx .cs-in:focus { outline: 2px solid #2a78d6; outline-offset: -1px; border-color: transparent; }
+.cs-mx textarea.cs-in { resize: vertical; font-weight: 500; }
+.cs-mx td.na { color: var(--line-2, #c5c9d0); text-align: center; }
+.cs-mx td.cs-chk { text-align: center; }
+.cs-mx td.cs-chk input { width: 18px; height: 18px; accent-color: var(--good); }
+@media (max-width: 700px) { .cs-state { display: none; } .cs-mx tbody th { min-width: 140px; } }
