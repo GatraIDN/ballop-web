@@ -26,5 +26,10 @@ const SI = require('../public/stock-import');
   if (!write) { console.log('\nDry run. Tambah --write untuk menyimpan.'); return; }
   fs.writeFileSync(path.join(__dirname, '..', 'data', `backup-stock3pl-before-${path.basename(file).replace(/[^\w.-]+/g, '_')}-${today}.json`), JSON.stringify(stock));
   await store.set('stock3pl', list);
+  const hist = (await store.get('stockhist', [])).filter((h) => h.date !== date);
+  hist.push({ id: require('crypto').randomUUID(), date, source: path.basename(file), items: SI.snapshot(items), updatedAt: at, updatedBy: 'Import tools' });
+  hist.sort((a, b) => a.date.localeCompare(b.date));
+  await store.set('stockhist', hist);
+  console.log(`riwayat stok: ${hist.length} tanggal (${hist.map((h) => h.date).join(', ')})`);
   console.log(`tersimpan. total SKU ${list.length}`);
 })();

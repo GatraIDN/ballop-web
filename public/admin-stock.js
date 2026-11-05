@@ -6,6 +6,7 @@
   const { esc, num, fmtDate, today, toCsv } = B;
 
   const st = { wh: '', tab: 'sum', cat: '', product: '', color: '', status: '', q: '' };
+  const pst = { range: '7d', from: '', to: '', limit: 150 };
   try { Object.assign(st, JSON.parse(localStorage.getItem('ballopStock') || '{}')); } catch {}
   if (!['sum', 'now', 'size'].includes(st.tab)) st.tab = 'sum';
   const edits = new Map(); // id -> { available, damaged }
@@ -132,6 +133,7 @@
         <div class="st-card warn" data-quick="tipis"><span>Tipis</span><b>${num(cnt('tipis'))}</b><small>good ≤ ${low()}</small></div>
       </div>
       <div class="st-chips"><button type="button" class="chip${!st.cat ? ' on' : ''}" data-cat="">Semua kategori <i>${num(all.length)}</i></button>${cats.map(([c, n]) => `<button type="button" class="chip${st.cat === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c)} <i>${num(n)}</i></button>`).join('')}</div>
+      <div class="ac-export"><b>Export laporan stok</b>${B.rangeBar(pst)}<button class="btn sm btn-export" type="button" id="stPdf">⬇ Export PDF</button><span class="muted small">${(B.data.stockhist || []).length ? `riwayat ${num(B.data.stockhist.length)} hari · ${fmtDate(B.data.stockhist[0].date)} – ${fmtDate(B.data.stockhist[B.data.stockhist.length - 1].date)}` : 'riwayat mulai terisi dari import stock harian'}</span></div>
       <div class="st-filters solid">
         <label>Produk / SKU<select data-f="product">${opts(countBy(inCat, 'product'), st.product, 'Semua produk')}</select></label>
         <label>Varian / warna<select data-f="color">${opts(countBy(inProd, 'color'), st.color, 'Semua warna')}</select></label>
@@ -163,6 +165,8 @@
     $$('[data-grp]', v).forEach((tr) => tr.addEventListener('click', () => { const k = tr.dataset.grp; if (openGroups.has(k)) openGroups.delete(k); else openGroups.add(k); render(); }));
     $$('[data-edit]', v).forEach((b) => b.addEventListener('click', () => openForm(B.data.stock3pl.find((x) => x.id === b.dataset.edit))));
     $('#stAdd')?.addEventListener('click', () => openForm(null));
+    B.bindRangeBar(v.querySelector('.ac-export'), pst, render);
+    $('#stPdf').addEventListener('click', () => { const r = B.periodOf(pst); stockPdf(r.from, r.to); });
     $('#stImport')?.addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importDaily(f); });
     $('#stExport').addEventListener('click', () => {
       const head = ['Kategori', 'Produk', 'Warna', 'Size KR', 'Size EU', 'Kode SKU', 'Item pickpack', 'Good', 'Damaged', 'Total', 'Status', 'Gudang', 'Update'];
@@ -175,6 +179,66 @@
     $('#stDo').addEventListener('click', saveEdits);
     pendingBar();
     if (st.tab === 'daily') bindDaily(v);
+  }
+
+  // ---------- PDF: stock position at the end of the period + movement inside it (from the daily import history) ----------
+  function stockPdf(from, to) {
+    const P = window.PdfReport;
+    const hist = (B.data.stockhist || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+    const meta = new Map(rowsAll().map((r) => [String(r.note || '').trim(), r]));
+    const asMap = (h) => new Map(h.items.map(([item, good, dmg, inn, out]) => [item, { good, dmg, inn, out }]));
+    const endH = [...hist].reverse().find((h) => h.date <= to);
+    const inP = hist.filter((h) => h.date >= from && h.date <= to);
+    const startH = [...hist].reverse().find((h) => h.date < from);
+    // closing stock: last snapshot up to the end date, else today's stock
+    const end = endH ? asMap(endH) : new Map(rowsAll().map((r) => [String(r.note || '').trim(), { good: r.available, dmg: r.damaged, inn: 0, out: 0 }]));
+    const endDate = endH ? endH.date : (rowsAll().map((r) => r.date).filter(Boolean).sort().pop() || today());
+    // movement: sum of the daily in / out inside the period
+    const mv = new Map();
+    inP.forEach((h) => h.items.forEach(([item, , , inn, out]) => { const x = mv.get(item) || { inn: 0, out: 0 }; x.inn += inn; x.out += out; mv.set(item, x); }));
+    // opening stock: snapshot before the period, else first day in the period minus its own movement
+    let start, startNote;
+    if (startH) { start = asMap(startH); startNote = `stok ${fmtDate(startH.date)}`; }
+    else if (inP.length) { start = new Map(inP[0].items.map(([item, good, , inn, out]) => [item, { good: good - inn + out }])); startNote = `opening ${fmtDate(inP[0].date)}`; }
+    const info = (item) => { const r = meta.get(item); return r ? { product: r.product, color: r.color, category: r.category || 'Lainnya', size: r.size || r.sizeKr || '' } : { product: item, color: '', category: 'Lainnya', size: '' }; };
+    const items = [...new Set([...end.keys(), ...(start ? start.keys() : []), ...mv.keys()])];
+    const T = { start: 0, end: 0, dmg: 0, inn: 0, out: 0, habis: 0, tipis: 0 };
+    const G = {}, C = {};
+    items.forEach((item) => {
+      const e = end.get(item) || { good: 0, dmg: 0 }, sv = start?.get(item)?.good ?? null, m = mv.get(item) || { inn: 0, out: 0 }, i = info(item);
+      T.end += e.good; T.dmg += e.dmg; T.inn += m.inn; T.out += m.out; if (sv != null) T.start += sv;
+      if (e.good <= 0) T.habis++; else if (e.good <= low()) T.tipis++;
+      const k = `${i.product}|${i.color}`, g = G[k] = G[k] || { product: i.product, color: i.color, start: 0, end: 0, inn: 0, out: 0, dmg: 0, habis: [], tipis: [] };
+      g.end += e.good; g.dmg += e.dmg; g.inn += m.inn; g.out += m.out; if (sv != null) g.start += sv;
+      if (e.good <= 0) g.habis.push(i.size || '–'); else if (e.good <= low()) g.tipis.push(`${i.size || '–'} (${e.good})`);
+      const c = C[i.category] = C[i.category] || { end: 0, out: 0, sku: 0 }; c.end += e.good; c.out += m.out; c.sku++;
+    });
+    const groups = Object.values(G).sort((a, b) => b.out - a.out || b.end - a.end);
+    const delta = (a, b) => `<span class="${b - a < 0 ? 'neg' : b - a > 0 ? 'pos' : ''}">${b - a > 0 ? '+' : ''}${num(b - a)}</span>`;
+    const body = `
+      ${P.h2('Ringkasan stok', `stok akhir per ${fmtDate(endDate)}${start ? ` · stok awal = ${startNote}` : ''}`)}
+      ${P.tiles([
+        P.tile('Stok akhir (good)', `${num(T.end)} pcs`, `${num(items.length)} SKU`, true),
+        P.tile('Stok awal (good)', start ? `${num(T.start)} pcs` : '–', start ? startNote : 'belum ada riwayat sebelum periode'),
+        P.tile('Perubahan', start ? delta(T.start, T.end) : '–', 'akhir − awal'),
+        P.tile('Barang masuk', `${num(T.inn)} pcs`, `stock in + other in · ${num(inP.length)} hari`),
+        P.tile('Barang keluar', `${num(T.out)} pcs`, 'order out + other out'),
+        P.tile('Damaged', `${num(T.dmg)} pcs`, 'di gudang damaged'),
+        P.tile('SKU habis', num(T.habis), 'good = 0'),
+        P.tile('SKU tipis', num(T.tipis), `good ≤ ${low()}`),
+      ])}
+      ${P.h2('Per produk & warna', 'urut barang keluar terbanyak')}
+      ${P.table([['Produk'], ['Warna'], ['Awal', 1], ['Masuk', 1], ['Keluar', 1], ['Akhir', 1], ['Damaged', 1], ['Size habis'], ['Size tipis']],
+        groups.map((g) => [esc(g.product), esc(g.color), start ? num(g.start) : '–', g.inn ? num(g.inn) : '–', g.out ? `<b>${num(g.out)}</b>` : '–', `<b>${num(g.end)}</b>`, g.dmg ? num(g.dmg) : '–', g.habis.length ? `<span class="chip bad">${esc(g.habis.join(', '))}</span>` : '–', esc(g.tipis.join(', ')) || '–']),
+        ['Total', '', start ? num(T.start) : '–', num(T.inn), num(T.out), num(T.end), num(T.dmg), num(T.habis), num(T.tipis)])}
+      ${P.h2('Per kategori')}
+      ${P.table([['Kategori'], ['SKU', 1], ['Keluar', 1], ['Stok akhir', 1], ['Share stok', 1]],
+        Object.entries(C).sort((a, b) => b[1].end - a[1].end).map(([n, c]) => [esc(n), num(c.sku), num(c.out), num(c.end), P.pct(T.end ? c.end / T.end : NaN)]))}
+      ${inP.length ? `${P.h2('Per tanggal', 'dari import stock harian')}${P.table([['Tanggal'], ['Masuk', 1], ['Keluar', 1], ['Stok good', 1], ['Damaged', 1]],
+        inP.map((h) => { const a = h.items.reduce((t, x) => ({ good: t.good + x[1], dmg: t.dmg + x[2], inn: t.inn + x[3], out: t.out + x[4] }), { good: 0, dmg: 0, inn: 0, out: 0 }); return [fmtDate(h.date), num(a.inn), num(a.out), `<b>${num(a.good)}</b>`, num(a.dmg)]; }))}` : ''}`;
+    P.open({ title: 'Laporan Stok Gudang', period: P.period(from, to),
+      meta: [['Periode', P.period(from, to)], ['Stok akhir per', fmtDate(endDate)], ['Gudang', esc([...new Set(rowsAll().map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
+      body, note: `Good = gudang NORMAL, damaged = gudang DAMAGED. Masuk/keluar dijumlah dari file stock balance harian yang di-import (${num(inP.length)} hari di periode ini).${!inP.length ? ' Belum ada import harian di periode ini, jadi hanya stok akhir yang tampil.' : ''}` });
   }
 
   // ---------- daily import of the 3PL stock balance export ----------
@@ -217,7 +281,10 @@
         e.target.disabled = true;
         const who = window.A.me?.user?.name || window.A.me?.user?.username || 'admin';
         const { list } = SI.apply(B.data.stock3pl, items, { date, at: stamp(), by: `Import ${file.name} · ${who}` });
-        try { B.data.stock3pl = await api('/api/stock3pl', json('PUT', list)); edits.clear(); box.remove(); toast(`Stok ${fmtDate(date)} tersimpan (${num(items.size)} item)`); render(); }
+        try {
+          B.data.stock3pl = await api('/api/stock3pl', json('PUT', list));
+          B.data.stockhist = await api('/api/stockhist', json('POST', { date, source: file.name, items: SI.snapshot(items), updatedAt: stamp(), updatedBy: who }));
+          edits.clear(); box.remove(); toast(`Stok ${fmtDate(date)} tersimpan (${num(items.size)} item)`); render(); }
         catch (err) { e.target.disabled = false; toast(err.message, true); }
       });
     };

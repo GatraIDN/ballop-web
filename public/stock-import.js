@@ -82,5 +82,16 @@
     return { list, stats };
   }
 
-  return { parse, parseItem, dateFromName, apply };
+  // compact snapshot of one export for the stock history: [item, good, damaged, in, out]
+  function snapshot(items) {
+    const out = [];
+    items.forEach((x, item) => {
+      const sum = (pred, k) => x.whs.filter(pred).reduce((t, w) => t + (w[k] || 0), 0);
+      const all = () => true;
+      out.push([item, sum((w) => !isDamaged(w.wh), 'ending'), sum((w) => isDamaged(w.wh), 'ending'), sum(all, 'stockIn') + sum(all, 'otherIn'), sum(all, 'orderOut') + sum(all, 'otherOut')]);
+    });
+    return out;
+  }
+
+  return { parse, parseItem, dateFromName, apply, snapshot };
 });
