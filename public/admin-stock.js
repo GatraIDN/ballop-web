@@ -34,9 +34,9 @@
   const countBy = (rows, k) => Object.entries([...rows].sort(byItem).reduce((m, r) => { m[r[k]] = (m[r[k]] || 0) + 1; return m; }, {}));
   const stepper = (r, k) => `<span class="stepper${edits.get(r.id)?.[k] !== undefined && edits.get(r.id)[k] !== r[k] ? ' changed' : ''}"><button type="button" data-step="-1" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}>−</button><input type="number" inputmode="numeric" min="0" value="${val(r, k)}" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}><button type="button" data-step="1" data-id="${r.id}" data-k="${k}" ${canEdit() ? '' : 'disabled'}>+</button></span>`;
 
-  // landing overview: what is plentiful, what ran out, what moves fastest, what sits still
-  function summary(rows) {
-    if (!rows.length) return '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p></section>';
+  // numbers behind the Ringkasan tab (also used by the PDF): per product · colour, sold in [since, until]
+  function sumData(rows, since = B.addDays(today(), -29), until = today()) {
+    const days = Math.max(1, Math.round((new Date(until) - new Date(since)) / 864e5) + 1);
     const W = (r, k) => (r.whs || []).reduce((t, w) => t + (w[k] || 0), 0);
     const G = {};
     rows.forEach((r) => {
@@ -49,7 +49,6 @@
     // real sales: marketplace orders of the last 30 days, matched to a warehouse model by product + colour words
     const toks = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9.]+/g, ' ').trim().split(' ').filter((w) => w && w !== 'BALLOP');
     const models = gs.map((g) => ({ g, p: toks(g.product), c: toks(g.color) })).sort((a, b) => b.p.length - a.p.length);
-    const since = B.addDays ? B.addDays(today(), -29) : today().slice(0, 8) + '01';
     const memo = {};
     const match = (name, varn) => {
       const k = `${name}|${varn}`; if (k in memo) return memo[k];
@@ -61,14 +60,12 @@
     };
     gs.forEach((g) => { g.sold = 0; g.ch = {}; });
     (B.data.orders || []).forEach((o) => {
-      if (o.date < since || o.state === 'cancelled') return;
+      if (o.date < since || o.date > until || o.state === 'cancelled') return;
       const g = match(o.productName || o.sku, o.variation); if (!g) return;
       const q = Math.max(0, (o.qty || 0) - (o.returnedQty || 0)); g.sold += q; g.ch[o.channel] = (g.ch[o.channel] || 0) + q;
     });
     const totSold = gs.reduce((t, g) => t + g.sold, 0);
-    gs.forEach((g) => { g.cover = g.sold ? Math.round(g.good / (g.sold / 30)) : null; });
-    const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
-    const bars = (list, key, color) => { const mx = Math.max(1, ...list.map((g) => g[key])); return list.map((g, i) => `<div class="ss-row" data-goto="${esc(g.k)}"><span class="ss-i">${i + 1}</span><span class="ss-n">${nm(g)}</span><span class="ss-t"><i style="width:${(g[key] / mx) * 100}%;background:${color}"></i></span><span class="ss-v">${num(g[key])} pcs</span></div>`).join(''); };
+    gs.forEach((g) => { g.cover = g.sold ? Math.round(g.good / (g.sold / days)) : null; });
     const top = [...gs].sort((a, b) => b.good - a.good).slice(0, 8);
     const fast = gs.filter((g) => g.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 8);
     const slowAll = gs.filter((g) => !g.sold && g.good > 0).sort((a, b) => b.good - a.good);
@@ -82,6 +79,15 @@
     const sz = {}; rows.forEach((r) => { const k = r.size || r.sizeKr; if (!k) return; const x = sz[k] = sz[k] || { good: 0, habis: 0 }; x.good += val(r, 'available'); if (val(r, 'available') <= 0) x.habis++; });
     const sizes = Object.entries(sz).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]) || a[0].localeCompare(b[0])), smx = Math.max(1, ...sizes.map(([, x]) => x.good));
     const totOut = gs.reduce((t, g) => t + g.out, 0), totIn = gs.reduce((t, g) => t + g.inn, 0), totGood = gs.reduce((t, g) => t + g.good, 0) || 1;
+    return { gs, fast, top, slowAll, habisAll, habisPart, tipis, cats, cmx, whs, wsum, sizes, smx, totSold, totOut, totIn, totGood, days };
+  }
+
+  // landing overview: what is plentiful, what ran out, what moves fastest, what sits still
+  function summary(rows) {
+    if (!rows.length) return '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p></section>';
+    const { gs, fast, top, slowAll, habisAll, habisPart, tipis, cats, cmx, whs, wsum, sizes, smx, totSold, totOut, totIn, totGood } = sumData(rows);
+    const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
+    const bars = (list, key, color) => { const mx = Math.max(1, ...list.map((g) => g[key])); return list.map((g, i) => `<div class="ss-row" data-goto="${esc(g.k)}"><span class="ss-i">${i + 1}</span><span class="ss-n">${nm(g)}</span><span class="ss-t"><i style="width:${(g[key] / mx) * 100}%;background:${color}"></i></span><span class="ss-v">${num(g[key])} pcs</span></div>`).join(''); };
     const empty = (t) => `<p class="muted small" style="padding:10px 2px">${t}</p>`;
     return `
       <div class="ss-kpis">
@@ -182,6 +188,46 @@
   }
 
   // ---------- PDF: stock position at the end of the period + movement inside it (from the daily import history) ----------
+  // the Ringkasan tab in print form: current stock, sales inside the chosen period
+  function ringkasanPdf(from, to) {
+    const P = window.PdfReport;
+    const D = sumData(rowsAll(), from, to);
+    const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
+    const chs = (g) => Object.entries(g.ch || {}).map(([c, n]) => `${esc((B.SALES_CH[c] || {}).label || c)} ${num(n)}`).join(' · ');
+    const cover = (g) => (g.cover === null ? '–' : `<b class="${g.cover <= 14 ? 'neg' : ''}">±${num(g.cover)} hr</b>`);
+    const chips = (list, cls) => list.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join(' ');
+    return `
+      <div style="break-before:page"></div>
+      ${P.h2('Ringkasan stok terkini', `kondisi stok sekarang · terjual = order marketplace ${P.period(from, to)} (non batal, ${num(D.days)} hari)`)}
+      ${P.tiles([
+        P.tile('Produk × warna', num(D.gs.length), `${num(rowsAll().length)} SKU / size`, true),
+        P.tile('Terjual di periode', num(D.totSold), 'order marketplace'),
+        P.tile('Keluar / masuk 3PL', `${num(D.totOut)} / ${num(D.totIn)}`, 'export stock balance terakhir'),
+        P.tile('Model habis total', num(D.habisAll.length), 'semua size kosong'),
+        P.tile('Model size bolong', num(D.habisPart.length), 'sebagian size habis'),
+        P.tile('Stok diam', num(D.slowAll.reduce((t, g) => t + g.good, 0)), `${num(D.slowAll.length)} model tidak terjual`),
+      ], 3)}
+      <div class="two">
+        <div>${P.h2('🔥 Paling banyak keluar', 'terjual · sisa · cukup ±hari')}
+          ${P.table([['Model'], ['Terjual', 1], ['Sisa', 1], ['Cukup', 1]], D.fast.slice(0, 10).map((g, i) => [`<span class="rank">${i + 1}</span>${nm(g)}<br><span class="muted">${chs(g)}</span>`, `<b>${num(g.sold)}</b>`, num(g.good), cover(g)]), null, 'Belum ada order di periode ini.')}</div>
+        <div>${P.h2('📦 Stok terbanyak', 'good per model')}
+          ${P.table([['Model'], ['Good', 1]], D.top.map((g, i) => [`<span class="rank">${i + 1}</span>${nm(g)}`, `<b>${num(g.good)}</b> pcs`]))}</div>
+      </div>
+      ${P.h2('⛔ Sudah habis', `${num(D.habisAll.length)} model kosong · ${num(D.habisPart.length)} model size bolong`)}
+      ${P.table([['Model'], ['Sisa', 1], ['Size habis']], [...D.habisAll.map((g) => [nm(g), '0', '<span class="chip bad">HABIS semua size</span>']), ...D.habisPart.map((g) => [nm(g), num(g.good), chips(g.habis, 'bad')])], null, 'Tidak ada yang habis.')}
+      ${P.h2('⚠ Stok tipis', `good ≤ ${low()} per size · angka dalam kurung = sisa`)}
+      ${P.table([['Model'], ['Size tipis (sisa)']], D.tipis.map((g) => [nm(g), chips(g.tipis, 'warn')]), null, 'Tidak ada stok tipis.')}
+      <div class="two">
+        <div>${P.h2('💤 Stok diam', 'stok ada, tidak terjual di periode ini')}
+          ${P.table([['Model'], ['Good', 1]], D.slowAll.slice(0, 15).map((g, i) => [`<span class="rank">${i + 1}</span>${nm(g)}`, num(g.good)]), null, 'Semua model ada yang keluar.')}</div>
+        <div>${P.h2('Per kategori')}
+          ${P.table([['Kategori'], ['SKU', 1], ['Habis', 1], ['Good', 1], ['%', 1]], D.cats.map((c) => [esc(c.k), num(c.skus), c.habis ? num(c.habis) : '–', num(c.good), P.pct(c.good / D.totGood)]))}
+          ${D.whs.length ? `${P.h2('Per gudang')}${P.table([['Gudang'], ['Stok', 1], ['%', 1]], D.whs.map(([w, n]) => [esc(w.replace(/ - NORMAL$/, '')), num(n), P.pct(n / D.wsum)]))}` : ''}</div>
+      </div>
+      ${P.h2('Stok per size', 'total good semua model · SKU habis per size')}
+      ${P.table([['Size'], ...D.sizes.map(([k]) => [esc(k), 1])], [['Good', ...D.sizes.map(([, x]) => `<b>${num(x.good)}</b>`)], ['SKU habis', ...D.sizes.map(([, x]) => (x.habis ? `<span class="neg">${num(x.habis)}</span>` : '–'))]])}`;
+  }
+
   function stockPdf(from, to) {
     const P = window.PdfReport;
     const hist = (B.data.stockhist || []).slice().sort((a, b) => a.date.localeCompare(b.date));
@@ -234,6 +280,7 @@
       ${P.h2('Per kategori')}
       ${P.table([['Kategori'], ['SKU', 1], ['Keluar', 1], ['Stok akhir', 1], ['Share stok', 1]],
         Object.entries(C).sort((a, b) => b[1].end - a[1].end).map(([n, c]) => [esc(n), num(c.sku), num(c.out), num(c.end), P.pct(T.end ? c.end / T.end : NaN)]))}
+      ${ringkasanPdf(from, to)}
       ${inP.length ? `${P.h2('Per tanggal', 'dari import stock harian')}${P.table([['Tanggal'], ['Masuk', 1], ['Keluar', 1], ['Stok good', 1], ['Damaged', 1]],
         inP.map((h) => { const a = h.items.reduce((t, x) => ({ good: t.good + x[1], dmg: t.dmg + x[2], inn: t.inn + x[3], out: t.out + x[4] }), { good: 0, dmg: 0, inn: 0, out: 0 }); return [fmtDate(h.date), num(a.inn), num(a.out), `<b>${num(a.good)}</b>`, num(a.dmg)]; }))}` : ''}`;
     P.open({ title: 'Laporan Stok Gudang', period: P.period(from, to),
