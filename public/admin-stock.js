@@ -92,25 +92,17 @@
     return `
       <div class="ss-kpis">
         <div><span>Produk × warna</span><b>${num(gs.length)}</b><small>${num(rows.length)} SKU / size</small></div>
-        <div><span>Terjual 30 hari</span><b>${num(totSold)}</b><small>order marketplace (non batal)</small></div>
-        <div><span>Keluar / masuk 3PL</span><b>${num(totOut)} / ${num(totIn)}</b><small>dari export stock balance</small></div>
         <div class="bad"><span>Model habis total</span><b>${num(habisAll.length)}</b><small>semua size kosong</small></div>
         <div class="warn"><span>Model size bolong</span><b>${num(habisPart.length)}</b><small>sebagian size habis</small></div>
-        <div><span>Stok diam</span><b>${num(slowAll.reduce((t, g) => t + g.good, 0))}</b><small>${num(slowAll.length)} model tidak terjual 30 hari</small></div>
+        <div><span>Total stok good</span><b>${num(totGood)}</b><small>pcs siap jual</small></div>
+        <div class="warn"><span>SKU tipis</span><b>${num(tipis.reduce((t, g) => t + g.tipis.length, 0))}</b><small>good ≤ ${low()} per size</small></div>
       </div>
       <div class="ss-grid">
-        <section class="panel solid"><div class="panel-head"><h2>🔥 Paling banyak keluar</h2><span class="muted small">laku 30 hari · sisa stok · cukup ±hari</span></div>${fast.length ? fast.map((g, i) => `<div class="ss-row" data-goto="${esc(g.k)}"><span class="ss-i">${i + 1}</span><span class="ss-n">${nm(g)}<small class="muted"> ${Object.entries(g.ch).map(([c, n]) => `${esc((B.SALES_CH[c] || {}).label || c)} ${num(n)}`).join(' · ')}</small></span><span class="ss-t"><i style="width:${(g.sold / fast[0].sold) * 100}%;background:#e8552b"></i></span><span class="ss-v">${num(g.sold)} terjual · sisa ${num(g.good)}${g.cover !== null ? ` · <b style="color:${g.cover <= 14 ? '#d23b3b' : g.cover <= 30 ? '#c98a00' : 'inherit'}">±${num(g.cover)} hr</b>` : ''}</span></div>`).join('') : empty('Belum ada order marketplace 30 hari terakhir.')}</section>
         <section class="panel solid"><div class="panel-head"><h2>📦 Stok terbanyak</h2><span class="muted small">good per model</span></div>${bars(top, 'good', '#2a78d6')}</section>
         <section class="panel solid"><div class="panel-head"><h2>⛔ Sudah habis</h2><span class="muted small">${num(habisAll.length)} model kosong · ${num(habisPart.length)} size bolong</span></div>
           <div class="ss-list">${habisAll.map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}</span><span class="badge bad">HABIS semua size</span></div>`).join('')}${habisPart.slice(0, 12).map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}<small class="muted"> sisa ${num(g.good)}</small></span><span class="ss-sz">${g.habis.map((x) => `<em>${esc(x)}</em>`).join('')}</span></div>`).join('') || (habisAll.length ? '' : empty('Tidak ada yang habis.'))}</div></section>
         <section class="panel solid"><div class="panel-head"><h2>⚠ Stok tipis</h2><span class="muted small">good ≤ ${low()} per size</span></div>
           <div class="ss-list">${tipis.slice(0, 12).map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}</span><span class="ss-sz warn">${g.tipis.map((x) => `<em>${esc(x)}</em>`).join('')}</span></div>`).join('') || empty('Tidak ada stok tipis.')}</div></section>
-        <section class="panel solid"><div class="panel-head"><h2>💤 Stok diam</h2><span class="muted small">stok ada, tidak terjual 30 hari</span></div>${slowAll.length ? bars(slowAll.slice(0, 8), 'good', '#8a8f98') : empty('Semua model ada yang keluar.')}</section>
-        <section class="panel solid"><div class="panel-head"><h2>Per kategori</h2></div>
-          ${cats.map((c) => `<div class="ss-row" data-gocat="${esc(c.k)}"><span class="ss-n"><b>${esc(c.k)}</b> <small class="muted">${num(c.skus)} SKU${c.habis ? ` · ${num(c.habis)} habis` : ''}</small></span><span class="ss-t"><i style="width:${(c.good / cmx) * 100}%;background:#0e8a4f"></i></span><span class="ss-v">${num(c.good)} · ${Math.round((c.good / totGood) * 100)}%</span></div>`).join('')}
-          ${whs.length ? `<h3 class="ss-h3">Per gudang</h3><div class="ss-wh">${whs.map(([w, n]) => `<div><span>${esc(w.replace(/ - NORMAL$/, ''))}</span><b>${num(n)}</b><i style="width:${(n / wsum) * 100}%"></i></div>`).join('')}</div>` : ''}</section>
-        <section class="panel solid ss-wide"><div class="panel-head"><h2>Stok per size</h2><span class="muted small">total good semua model · merah = jumlah SKU habis</span></div>
-          <div class="ss-sizes">${sizes.map(([k, x]) => `<div title="${esc(k)}: ${num(x.good)} pcs${x.habis ? `, ${x.habis} SKU habis` : ''}"><b>${num(x.good)}</b><span class="ss-bar"><i style="height:${Math.max(3, (x.good / smx) * 100)}%"></i></span><span>${esc(k)}</span>${x.habis ? `<em>${x.habis}</em>` : '<em class="z"></em>'}</div>`).join('')}</div></section>
       </div>`;
   }
 
@@ -129,7 +121,7 @@
 
     v.innerHTML = `
       <header class="bar"><div><h1>Stok gudang</h1><p class="muted">Stok terakhir per SKU di ${esc([...new Set(all.map((r) => r.warehouse))].join(', ') || 'gudang')}${dates.length ? ` · update terakhir ${fmtDate(dates[dates.length - 1].slice(0, 10))}` : ''}. ${canEdit() ? 'Ubah angka langsung di tabel, lalu tekan Simpan.' : 'Hanya bisa dilihat.'}</p></div>
-        <div class="bar-actions">${canEdit() ? '<label class="btn sm btn-export" title="File export stock balance 3PL (Item, W/H, Opening … Ending)">⬆ Import stock harian<input type="file" id="stImport" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sm primary" type="button" id="stAdd">+ SKU baru</button>' : ''}<button class="btn sm" type="button" id="stExport">⬇ Export</button></div></header>
+        <div class="bar-actions"><button class="btn sm btn-export" type="button" id="stPdf">⬇ Export PDF</button>${canEdit() ? '<label class="btn sm btn-export" title="File export stock balance 3PL (Item, W/H, Opening … Ending)">⬆ Import stock harian<input type="file" id="stImport" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sm primary" type="button" id="stAdd">+ SKU baru</button>' : ''}<button class="btn sm" type="button" id="stExport">⬇ Export</button></div></header>
       <div class="st-cards">
         <div class="st-card hero"><span>Total stok</span><b>${num(good + dmg)}</b><small>pasang / pcs di filter ini</small></div>
         <div class="st-card"><span>Good</span><b>${num(good)}</b><small>siap jual</small></div>
@@ -139,7 +131,6 @@
         <div class="st-card warn" data-quick="tipis"><span>Tipis</span><b>${num(cnt('tipis'))}</b><small>good ≤ ${low()}</small></div>
       </div>
       <div class="st-chips"><button type="button" class="chip${!st.cat ? ' on' : ''}" data-cat="">Semua kategori <i>${num(all.length)}</i></button>${cats.map(([c, n]) => `<button type="button" class="chip${st.cat === c ? ' on' : ''}" data-cat="${esc(c)}">${esc(c)} <i>${num(n)}</i></button>`).join('')}</div>
-      <div class="ac-export"><b>Export laporan stok</b>${B.rangeBar(pst)}<button class="btn sm btn-export" type="button" id="stPdf">⬇ Export PDF</button><span class="muted small">${(B.data.stockhist || []).length ? `riwayat ${num(B.data.stockhist.length)} hari · ${fmtDate(B.data.stockhist[0].date)} – ${fmtDate(B.data.stockhist[B.data.stockhist.length - 1].date)}` : 'riwayat mulai terisi dari import stock harian'}</span></div>
       <div class="st-filters solid">
         <label>Produk / SKU<select data-f="product">${opts(countBy(inCat, 'product'), st.product, 'Semua produk')}</select></label>
         <label>Varian / warna<select data-f="color">${opts(countBy(inProd, 'color'), st.color, 'Semua warna')}</select></label>
@@ -171,8 +162,7 @@
     $$('[data-grp]', v).forEach((tr) => tr.addEventListener('click', () => { const k = tr.dataset.grp; if (openGroups.has(k)) openGroups.delete(k); else openGroups.add(k); render(); }));
     $$('[data-edit]', v).forEach((b) => b.addEventListener('click', () => openForm(B.data.stock3pl.find((x) => x.id === b.dataset.edit))));
     $('#stAdd')?.addEventListener('click', () => openForm(null));
-    B.bindRangeBar(v.querySelector('.ac-export'), pst, render);
-    $('#stPdf').addEventListener('click', () => { const r = B.periodOf(pst); stockPdf(r.from, r.to); });
+    $('#stPdf').addEventListener('click', stockPdf);
     $('#stImport')?.addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importDaily(f); });
     $('#stExport').addEventListener('click', () => {
       const head = ['Kategori', 'Produk', 'Warna', 'Size KR', 'Size EU', 'Kode SKU', 'Item pickpack', 'Good', 'Damaged', 'Total', 'Status', 'Gudang', 'Update'];
@@ -189,103 +179,34 @@
 
   // ---------- PDF: stock position at the end of the period + movement inside it (from the daily import history) ----------
   // the Ringkasan tab in print form: current stock, sales inside the chosen period
-  function ringkasanPdf(from, to) {
+  // PDF: current stock only — sisa (tipis), habis, terbanyak
+  function stockPdf() {
     const P = window.PdfReport;
-    const D = sumData(rowsAll(), from, to);
+    const rows = rowsAll();
+    const D = sumData(rows);
     const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
-    const chs = (g) => Object.entries(g.ch || {}).map(([c, n]) => `${esc((B.SALES_CH[c] || {}).label || c)} ${num(n)}`).join(' · ');
-    const cover = (g) => (g.cover === null ? '–' : `<b class="${g.cover <= 14 ? 'neg' : ''}">±${num(g.cover)} hr</b>`);
     const chips = (list, cls) => list.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join(' ');
-    return `
-      <div style="break-before:page"></div>
-      ${P.h2('Ringkasan stok terkini', `kondisi stok sekarang · terjual = order marketplace ${P.period(from, to)} (non batal, ${num(D.days)} hari)`)}
+    const asOf = rows.map((r) => r.date).filter(Boolean).sort().pop() || today();
+    const dmg = rows.reduce((t, r) => t + (r.damaged || 0), 0);
+    const tipisN = D.tipis.reduce((t, g) => t + g.tipis.length, 0);
+    const body = `
+      ${P.h2('Ringkasan stok', `per ${fmtDate(asOf)}`)}
       ${P.tiles([
-        P.tile('Produk × warna', num(D.gs.length), `${num(rowsAll().length)} SKU / size`, true),
-        P.tile('Terjual di periode', num(D.totSold), 'order marketplace'),
-        P.tile('Keluar / masuk 3PL', `${num(D.totOut)} / ${num(D.totIn)}`, 'export stock balance terakhir'),
+        P.tile('Total stok good', `${num(D.totGood)} pcs`, `${num(rows.length)} SKU · ${num(D.gs.length)} produk × warna`, true),
+        P.tile('Damaged', `${num(dmg)} pcs`),
         P.tile('Model habis total', num(D.habisAll.length), 'semua size kosong'),
         P.tile('Model size bolong', num(D.habisPart.length), 'sebagian size habis'),
-        P.tile('Stok diam', num(D.slowAll.reduce((t, g) => t + g.good, 0)), `${num(D.slowAll.length)} model tidak terjual`),
-      ], 3)}
-      <div class="two">
-        <div>${P.h2('🔥 Paling banyak keluar', 'terjual · sisa · cukup ±hari')}
-          ${P.table([['Model'], ['Terjual', 1], ['Sisa', 1], ['Cukup', 1]], D.fast.slice(0, 10).map((g, i) => [`<span class="rank">${i + 1}</span>${nm(g)}<br><span class="muted">${chs(g)}</span>`, `<b>${num(g.sold)}</b>`, num(g.good), cover(g)]), null, 'Belum ada order di periode ini.')}</div>
-        <div>${P.h2('📦 Stok terbanyak', 'good per model')}
-          ${P.table([['Model'], ['Good', 1]], D.top.map((g, i) => [`<span class="rank">${i + 1}</span>${nm(g)}`, `<b>${num(g.good)}</b> pcs`]))}</div>
-      </div>
+        P.tile('SKU tipis', num(tipisN), `good ≤ ${low()} per size`),
+      ], 5)}
+      ${P.h2('📦 Stok terbanyak', 'good per model')}
+      ${P.table([['Model'], ['Good', 1]], [...D.gs].sort((x, y) => y.good - x.good).filter((g) => g.good > 0).slice(0, 15).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, `<b>${num(g.good)}</b> pcs`]))}
       ${P.h2('⛔ Sudah habis', `${num(D.habisAll.length)} model kosong · ${num(D.habisPart.length)} model size bolong`)}
       ${P.table([['Model'], ['Sisa', 1], ['Size habis']], [...D.habisAll.map((g) => [nm(g), '0', '<span class="chip bad">HABIS semua size</span>']), ...D.habisPart.map((g) => [nm(g), num(g.good), chips(g.habis, 'bad')])], null, 'Tidak ada yang habis.')}
       ${P.h2('⚠ Stok tipis', `good ≤ ${low()} per size · angka dalam kurung = sisa`)}
-      ${P.table([['Model'], ['Size tipis (sisa)']], D.tipis.map((g) => [nm(g), chips(g.tipis, 'warn')]), null, 'Tidak ada stok tipis.')}
-      <div class="two">
-        <div>${P.h2('💤 Stok diam', 'stok ada, tidak terjual di periode ini')}
-          ${P.table([['Model'], ['Good', 1]], D.slowAll.slice(0, 15).map((g, i) => [`<span class="rank">${i + 1}</span>${nm(g)}`, num(g.good)]), null, 'Semua model ada yang keluar.')}</div>
-        <div>${P.h2('Per kategori')}
-          ${P.table([['Kategori'], ['SKU', 1], ['Habis', 1], ['Good', 1], ['%', 1]], D.cats.map((c) => [esc(c.k), num(c.skus), c.habis ? num(c.habis) : '–', num(c.good), P.pct(c.good / D.totGood)]))}
-          ${D.whs.length ? `${P.h2('Per gudang')}${P.table([['Gudang'], ['Stok', 1], ['%', 1]], D.whs.map(([w, n]) => [esc(w.replace(/ - NORMAL$/, '')), num(n), P.pct(n / D.wsum)]))}` : ''}</div>
-      </div>
-      ${P.h2('Stok per size', 'total good semua model · SKU habis per size')}
-      ${P.table([['Size'], ...D.sizes.map(([k]) => [esc(k), 1])], [['Good', ...D.sizes.map(([, x]) => `<b>${num(x.good)}</b>`)], ['SKU habis', ...D.sizes.map(([, x]) => (x.habis ? `<span class="neg">${num(x.habis)}</span>` : '–'))]])}`;
-  }
-
-  function stockPdf(from, to) {
-    const P = window.PdfReport;
-    const hist = (B.data.stockhist || []).slice().sort((a, b) => a.date.localeCompare(b.date));
-    const meta = new Map(rowsAll().map((r) => [String(r.note || '').trim(), r]));
-    const asMap = (h) => new Map(h.items.map(([item, good, dmg, inn, out]) => [item, { good, dmg, inn, out }]));
-    const endH = [...hist].reverse().find((h) => h.date <= to);
-    const inP = hist.filter((h) => h.date >= from && h.date <= to);
-    const startH = [...hist].reverse().find((h) => h.date < from);
-    // closing stock: last snapshot up to the end date, else today's stock
-    const end = endH ? asMap(endH) : new Map(rowsAll().map((r) => [String(r.note || '').trim(), { good: r.available, dmg: r.damaged, inn: 0, out: 0 }]));
-    const endDate = endH ? endH.date : (rowsAll().map((r) => r.date).filter(Boolean).sort().pop() || today());
-    // movement: sum of the daily in / out inside the period
-    const mv = new Map();
-    inP.forEach((h) => h.items.forEach(([item, , , inn, out]) => { const x = mv.get(item) || { inn: 0, out: 0 }; x.inn += inn; x.out += out; mv.set(item, x); }));
-    // opening stock: snapshot before the period, else first day in the period minus its own movement
-    let start, startNote;
-    if (startH) { start = asMap(startH); startNote = `stok ${fmtDate(startH.date)}`; }
-    else if (inP.length) { start = new Map(inP[0].items.map(([item, good, , inn, out]) => [item, { good: good - inn + out }])); startNote = `opening ${fmtDate(inP[0].date)}`; }
-    const info = (item) => { const r = meta.get(item); return r ? { product: r.product, color: r.color, category: r.category || 'Lainnya', size: r.size || r.sizeKr || '' } : { product: item, color: '', category: 'Lainnya', size: '' }; };
-    const items = [...new Set([...end.keys(), ...(start ? start.keys() : []), ...mv.keys()])];
-    const T = { start: 0, end: 0, dmg: 0, inn: 0, out: 0, habis: 0, tipis: 0 };
-    const G = {}, C = {};
-    items.forEach((item) => {
-      const e = end.get(item) || { good: 0, dmg: 0 }, sv = start?.get(item)?.good ?? null, m = mv.get(item) || { inn: 0, out: 0 }, i = info(item);
-      T.end += e.good; T.dmg += e.dmg; T.inn += m.inn; T.out += m.out; if (sv != null) T.start += sv;
-      if (e.good <= 0) T.habis++; else if (e.good <= low()) T.tipis++;
-      const k = `${i.product}|${i.color}`, g = G[k] = G[k] || { product: i.product, color: i.color, start: 0, end: 0, inn: 0, out: 0, dmg: 0, habis: [], tipis: [] };
-      g.end += e.good; g.dmg += e.dmg; g.inn += m.inn; g.out += m.out; if (sv != null) g.start += sv;
-      if (e.good <= 0) g.habis.push(i.size || '–'); else if (e.good <= low()) g.tipis.push(`${i.size || '–'} (${e.good})`);
-      const c = C[i.category] = C[i.category] || { end: 0, out: 0, sku: 0 }; c.end += e.good; c.out += m.out; c.sku++;
-    });
-    const groups = Object.values(G).sort((a, b) => b.out - a.out || b.end - a.end);
-    const delta = (a, b) => `<span class="${b - a < 0 ? 'neg' : b - a > 0 ? 'pos' : ''}">${b - a > 0 ? '+' : ''}${num(b - a)}</span>`;
-    const body = `
-      ${P.h2('Ringkasan stok', `stok akhir per ${fmtDate(endDate)}${start ? ` · stok awal = ${startNote}` : ''}`)}
-      ${P.tiles([
-        P.tile('Stok akhir (good)', `${num(T.end)} pcs`, `${num(items.length)} SKU`, true),
-        P.tile('Stok awal (good)', start ? `${num(T.start)} pcs` : '–', start ? startNote : 'belum ada riwayat sebelum periode'),
-        P.tile('Perubahan', start ? delta(T.start, T.end) : '–', 'akhir − awal'),
-        P.tile('Barang masuk', `${num(T.inn)} pcs`, `stock in + other in · ${num(inP.length)} hari`),
-        P.tile('Barang keluar', `${num(T.out)} pcs`, 'order out + other out'),
-        P.tile('Damaged', `${num(T.dmg)} pcs`, 'di gudang damaged'),
-        P.tile('SKU habis', num(T.habis), 'good = 0'),
-        P.tile('SKU tipis', num(T.tipis), `good ≤ ${low()}`),
-      ])}
-      ${P.h2('Per produk & warna', 'urut barang keluar terbanyak')}
-      ${P.table([['Produk'], ['Warna'], ['Awal', 1], ['Masuk', 1], ['Keluar', 1], ['Akhir', 1], ['Damaged', 1], ['Size habis'], ['Size tipis']],
-        groups.map((g) => [esc(g.product), esc(g.color), start ? num(g.start) : '–', g.inn ? num(g.inn) : '–', g.out ? `<b>${num(g.out)}</b>` : '–', `<b>${num(g.end)}</b>`, g.dmg ? num(g.dmg) : '–', g.habis.length ? `<span class="chip bad">${esc(g.habis.join(', '))}</span>` : '–', esc(g.tipis.join(', ')) || '–']),
-        ['Total', '', start ? num(T.start) : '–', num(T.inn), num(T.out), num(T.end), num(T.dmg), num(T.habis), num(T.tipis)])}
-      ${P.h2('Per kategori')}
-      ${P.table([['Kategori'], ['SKU', 1], ['Keluar', 1], ['Stok akhir', 1], ['Share stok', 1]],
-        Object.entries(C).sort((a, b) => b[1].end - a[1].end).map(([n, c]) => [esc(n), num(c.sku), num(c.out), num(c.end), P.pct(T.end ? c.end / T.end : NaN)]))}
-      ${ringkasanPdf(from, to)}
-      ${inP.length ? `${P.h2('Per tanggal', 'dari import stock harian')}${P.table([['Tanggal'], ['Masuk', 1], ['Keluar', 1], ['Stok good', 1], ['Damaged', 1]],
-        inP.map((h) => { const a = h.items.reduce((t, x) => ({ good: t.good + x[1], dmg: t.dmg + x[2], inn: t.inn + x[3], out: t.out + x[4] }), { good: 0, dmg: 0, inn: 0, out: 0 }); return [fmtDate(h.date), num(a.inn), num(a.out), `<b>${num(a.good)}</b>`, num(a.dmg)]; }))}` : ''}`;
-    P.open({ title: 'Laporan Stok Gudang', period: P.period(from, to),
-      meta: [['Periode', P.period(from, to)], ['Stok akhir per', fmtDate(endDate)], ['Gudang', esc([...new Set(rowsAll().map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
-      body, note: `Good = gudang NORMAL, damaged = gudang DAMAGED. Masuk/keluar dijumlah dari file stock balance harian yang di-import (${num(inP.length)} hari di periode ini).${!inP.length ? ' Belum ada import harian di periode ini, jadi hanya stok akhir yang tampil.' : ''}` });
+      ${P.table([['Model'], ['Size tipis (sisa)']], D.tipis.map((g) => [nm(g), chips(g.tipis, 'warn')]), null, 'Tidak ada stok tipis.')}`;
+    P.open({ title: 'Laporan Stok Gudang', period: `per ${fmtDate(asOf)}`,
+      meta: [['Stok per', fmtDate(asOf)], ['Gudang', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
+      body, note: 'Good = gudang NORMAL, damaged = gudang DAMAGED, dari file stock balance terakhir yang di-import.' });
   }
 
   // ---------- daily import of the 3PL stock balance export ----------
