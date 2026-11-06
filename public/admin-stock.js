@@ -232,8 +232,8 @@
         P.tile('Model size bolong', num(D.habisPart.length), 'sebagian size habis'),
         P.tile('SKU tipis', num(tipisN), `good ≤ ${low()} per size`),
       ], 5)}
-      ${P.h2('📦 Stok semua model', `${num(D.gs.length)} model · urut stok terbanyak`)}
-      ${P.table([['Model'], ['Size', 1], ['Stok', 1]], [...D.gs].sort((x, y) => y.good - x.good).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, num(g.sizes.length), g.good > 0 ? `<b>${num(g.good)}</b> pcs` : '<span class="chip bad">habis</span>']), ['Total', num(D.gs.reduce((t, g) => t + g.sizes.length, 0)), `${num(D.totGood)} pcs`])}
+      ${P.h2('📦 Stok semua model', `${num(D.gs.length)} model · urut abjad, yang habis di bawah`)}
+      ${P.table([['Model'], ['Size', 1], ['Stok', 1]], [...D.gs].sort((x, y) => (x.good <= 0) - (y.good <= 0) || `${x.product} ${x.color}`.localeCompare(`${y.product} ${y.color}`)).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, num(g.sizes.length), g.good > 0 ? `<b>${num(g.good)}</b> pcs` : '<span class="chip bad">habis</span>']), ['Total', num(D.gs.reduce((t, g) => t + g.sizes.length, 0)), `${num(D.totGood)} pcs`])}
       ${P.h2('⛔ Sudah habis', `${num(D.habisAll.length)} model kosong · ${num(D.habisPart.length)} model size bolong`)}
       ${pdfLegend}<div class="szl">${[...D.habisAll, ...D.habisPart].map((g) => sizeRow(g, 'habis')).join('') || '<p class="muted">Tidak ada yang habis.</p>'}</div>
       ${P.h2('⚠ Stok tipis', `good ≤ ${low()} per size`)}
