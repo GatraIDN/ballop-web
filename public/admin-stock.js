@@ -128,7 +128,7 @@
 
     v.innerHTML = `
       <header class="bar"><div><h1>Stok gudang</h1><p class="muted">Stok terakhir per SKU di ${esc([...new Set(all.map((r) => r.warehouse))].join(', ') || 'gudang')}${dates.length ? ` · update terakhir ${fmtDate(dates[dates.length - 1].slice(0, 10))}` : ''}. ${canEdit() ? 'Ubah angka langsung di tabel, lalu tekan Simpan.' : 'Hanya bisa dilihat.'}</p></div>
-        <div class="bar-actions"><button class="btn sm btn-export" type="button" id="stPdf">⬇ Export PDF</button>${canEdit() ? '<label class="btn sm btn-export" title="File export stock balance 3PL (Item, W/H, Opening … Ending)">⬆ Import stock harian<input type="file" id="stImport" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sm primary" type="button" id="stAdd">+ SKU baru</button>' : ''}<button class="btn sm" type="button" id="stExport">⬇ Export</button></div></header>
+        <div class="bar-actions"><button class="btn sm" type="button" id="stCopy">⧉ Copy teks report</button><button class="btn sm btn-export" type="button" id="stPdf">⬇ Export PDF</button>${canEdit() ? '<label class="btn sm btn-export" title="File export stock balance 3PL (Item, W/H, Opening … Ending)">⬆ Import stock harian<input type="file" id="stImport" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sm primary" type="button" id="stAdd">+ SKU baru</button>' : ''}<button class="btn sm" type="button" id="stExport">⬇ Export</button></div></header>
       <div class="st-cards">
         <div class="st-card hero"><span>Total stok</span><b>${num(good + dmg)}</b><small>pasang / pcs di filter ini</small></div>
         <div class="st-card"><span>Good</span><b>${num(good)}</b><small>siap jual</small></div>
@@ -170,6 +170,7 @@
     $$('[data-edit]', v).forEach((b) => b.addEventListener('click', () => openForm(B.data.stock3pl.find((x) => x.id === b.dataset.edit))));
     $('#stAdd')?.addEventListener('click', () => openForm(null));
     $('#stPdf').addEventListener('click', stockPdf);
+    $('#stCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(stockText()); toast('Teks report stok disalin'); } catch { toast('Tidak bisa menyalin', true); } });
     $('#stImport')?.addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importDaily(f); });
     $('#stExport').addEventListener('click', () => {
       const head = ['Kategori', 'Produk', 'Warna', 'Size KR', 'Size EU', 'Kode SKU', 'Item pickpack', 'Good', 'Damaged', 'Total', 'Status', 'Gudang', 'Update'];
@@ -187,6 +188,30 @@
   // ---------- PDF: stock position at the end of the period + movement inside it (from the daily import history) ----------
   // the Ringkasan tab in print form: current stock, sales inside the chosen period
   const SZ_PDF_CSS = '.szl{display:grid;gap:6px}.szr{border:1px solid #e3e6eb;border-radius:9px;padding:7px 9px;break-inside:avoid}.szr-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin-bottom:5px;font-size:10.5px}.szr-h span{color:#6b7079}.szr-h em{font-style:normal;margin-left:auto;font-size:9px;font-weight:700;color:#a32020}.szs{display:flex;flex-wrap:wrap;gap:3px}.sz{display:inline-flex;flex-direction:column;align-items:center;min-width:34px;padding:2px 4px;border-radius:6px;border:1px solid #e3e6eb;line-height:1.15}.sz b{font-size:9.5px}.sz i{font-style:normal;font-size:8px;color:#6b7079}.sz.out{background:#fde3e3;border-color:#f4b7b7}.sz.out b,.sz.out i{color:#b42323}.sz.low{background:#fff1d6;border-color:#f0d39a}.sz.low i{color:#8a5a00;font-weight:700}.sz.ok{background:#fff}.sz-legend{display:flex;align-items:center;gap:6px;font-size:9px;color:#6b7079;margin:0 0 6px}';
+  // WhatsApp text: short, each line with a plain explanation
+  function stockText() {
+    const rows = rowsAll();
+    const D = sumData(rows);
+    const MON = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const asOf = rows.map((r) => r.date).filter(Boolean).sort().pop() || today();
+    const [y, m, dd] = asOf.split('-').map(Number), dt = new Date(y, m - 1, dd);
+    const nm = (g) => `${g.product.replace(/^BALLOP\s+/i, '')}${g.color ? ` ${g.color}` : ''}`;
+    const dmg = rows.reduce((t, r) => t + (r.damaged || 0), 0);
+    const top = [...D.gs].sort((a, b) => b.good - a.good).filter((g) => g.good > 0).slice(0, 3);
+    const tipisOnly = D.tipis.filter((g) => !g.habis.length);
+    return [
+      `Selamat pagi mister, berikut ini update stock Ballop hari ${HARI[dt.getDay()]}, ${dd} ${MON[m - 1]} ${y} :`, '',
+      `1. Total stock siap jual : ${num(D.totGood)} pcs (${num(D.gs.length)} model, ${num(rows.length)} size)`,
+      `2. Stock rusak : ${num(dmg)} pcs`,
+      `3. Habis semua size : ${D.habisAll.length ? D.habisAll.map(nm).join(', ') : 'tidak ada'}`,
+      `4. Ada size yang habis : ${num(D.habisPart.length)} model (masih ada stock di size lain)`,
+      `5. Stock tipis (sisa ≤ ${low()} per size) : ${num(tipisOnly.length)} model`,
+      `6. Stock terbanyak : ${top.map((g) => `${nm(g)} ${num(g.good)} pcs`).join(', ') || '-'}`,
+      '', 'Detail size yang habis & tipis ada di PDF report stock.',
+    ].join('\n');
+  }
+
   // PDF: current stock only — sisa (tipis), habis, terbanyak
   function stockPdf() {
     const P = window.PdfReport;
