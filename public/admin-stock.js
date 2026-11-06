@@ -40,10 +40,10 @@
     const W = (r, k) => (r.whs || []).reduce((t, w) => t + (w[k] || 0), 0);
     const G = {};
     rows.forEach((r) => {
-      const k = `${r.product}|${r.color}`, g = G[k] = G[k] || { k, product: r.product, color: r.color, good: 0, out: 0, inn: 0, habis: [], tipis: [] };
+      const k = `${r.product}|${r.color}`, g = G[k] = G[k] || { k, product: r.product, color: r.color, good: 0, out: 0, inn: 0, habis: [], tipis: [], sizes: [] };
       const a = val(r, 'available'); g.good += a;
       g.out += W(r, 'orderOut') + W(r, 'otherOut'); g.inn += W(r, 'stockIn') + W(r, 'otherIn');
-      const sz = r.size || r.sizeKr || '–'; if (a <= 0) g.habis.push(sz); else if (a <= low()) g.tipis.push(`${sz} (${a})`);
+      const sz = r.size || r.sizeKr || '–'; g.sizes.push([sz, a]); if (a <= 0) g.habis.push(sz); else if (a <= low()) g.tipis.push(`${sz} (${a})`);
     });
     const gs = Object.values(G);
     // real sales: marketplace orders of the last 30 days, matched to a warehouse model by product + colour words
@@ -83,6 +83,13 @@
   }
 
   // landing overview: what is plentiful, what ran out, what moves fastest, what sits still
+
+  // one row per model: all sizes in order, red = habis, amber = tipis (qty shown), grey = aman
+  const sizeNum = (x) => parseFloat(String(x).replace(',', '.')) || 1e4;
+  const sizeStrip = (g) => [...g.sizes].sort((a, b) => sizeNum(a[0]) - sizeNum(b[0])).map(([sz, a]) => `<span class="sz ${a <= 0 ? 'out' : a <= low() ? 'low' : 'ok'}" title="Size ${esc(sz)}: ${num(a)} pcs"><b>${esc(sz)}</b><i>${a <= 0 ? 'habis' : num(a)}</i></span>`).join('');
+  const sizeRow = (g, kind) => `<div class="szr" data-goto="${esc(g.k)}"><div class="szr-h"><b>${esc(g.product)}</b>${g.color ? `<span>${esc(g.color)}</span>` : ''}<em>${g.good <= 0 ? 'HABIS semua size' : kind === 'habis' ? `${num(g.habis.length)} size habis · sisa ${num(g.good)} pcs` : `${num(g.tipis.length)} size tipis · sisa ${num(g.good)} pcs`}</em></div><div class="szs">${sizeStrip(g)}</div></div>`;
+  const szLegend = () => `<div class="sz-legend"><span class="sz out"><b>40</b><i>habis</i></span> habis <span class="sz low"><b>40</b><i>3</i></span> tipis (≤ ${low()}) <span class="sz ok"><b>40</b><i>12</i></span> aman</div>`;
+
   function summary(rows) {
     if (!rows.length) return '<section class="panel solid"><p class="muted" style="text-align:center;padding:30px">Tidak ada SKU di filter ini.</p></section>';
     const { gs, fast, top, slowAll, habisAll, habisPart, tipis, cats, cmx, whs, wsum, sizes, smx, totSold, totOut, totIn, totGood } = sumData(rows);
@@ -99,10 +106,10 @@
       </div>
       <div class="ss-grid">
         <section class="panel solid"><div class="panel-head"><h2>📦 Stok terbanyak</h2><span class="muted small">good per model</span></div>${bars(top, 'good', '#2a78d6')}</section>
-        <section class="panel solid"><div class="panel-head"><h2>⛔ Sudah habis</h2><span class="muted small">${num(habisAll.length)} model kosong · ${num(habisPart.length)} size bolong</span></div>
-          <div class="ss-list">${habisAll.map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}</span><span class="badge bad">HABIS semua size</span></div>`).join('')}${habisPart.slice(0, 12).map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}<small class="muted"> sisa ${num(g.good)}</small></span><span class="ss-sz">${g.habis.map((x) => `<em>${esc(x)}</em>`).join('')}</span></div>`).join('') || (habisAll.length ? '' : empty('Tidak ada yang habis.'))}</div></section>
-        <section class="panel solid"><div class="panel-head"><h2>⚠ Stok tipis</h2><span class="muted small">good ≤ ${low()} per size</span></div>
-          <div class="ss-list">${tipis.slice(0, 12).map((g) => `<div data-goto="${esc(g.k)}"><span>${nm(g)}</span><span class="ss-sz warn">${g.tipis.map((x) => `<em>${esc(x)}</em>`).join('')}</span></div>`).join('') || empty('Tidak ada stok tipis.')}</div></section>
+        <section class="panel solid ss-wide"><div class="panel-head"><h2>⛔ Sudah habis</h2><span class="muted small">${num(habisAll.length)} model kosong · ${num(habisPart.length)} model size bolong</span></div>
+          ${szLegend()}<div class="szl">${[...habisAll, ...habisPart].map((g) => sizeRow(g, 'habis')).join('') || empty('Tidak ada yang habis.')}</div></section>
+        <section class="panel solid ss-wide"><div class="panel-head"><h2>⚠ Stok tipis</h2><span class="muted small">good ≤ ${low()} per size</span></div>
+          <div class="szl">${tipis.filter((g) => !g.habis.length).map((g) => sizeRow(g, 'tipis')).join('') || empty('Tidak ada model yang hanya tipis (yang juga punya size habis ada di atas).')}</div></section>
       </div>`;
   }
 
@@ -179,6 +186,7 @@
 
   // ---------- PDF: stock position at the end of the period + movement inside it (from the daily import history) ----------
   // the Ringkasan tab in print form: current stock, sales inside the chosen period
+  const SZ_PDF_CSS = '.szl{display:grid;gap:6px}.szr{border:1px solid #e3e6eb;border-radius:9px;padding:7px 9px;break-inside:avoid}.szr-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin-bottom:5px;font-size:10.5px}.szr-h span{color:#6b7079}.szr-h em{font-style:normal;margin-left:auto;font-size:9px;font-weight:700;color:#a32020}.szs{display:flex;flex-wrap:wrap;gap:3px}.sz{display:inline-flex;flex-direction:column;align-items:center;min-width:34px;padding:2px 4px;border-radius:6px;border:1px solid #e3e6eb;line-height:1.15}.sz b{font-size:9.5px}.sz i{font-style:normal;font-size:8px;color:#6b7079}.sz.out{background:#fde3e3;border-color:#f4b7b7}.sz.out b,.sz.out i{color:#b42323}.sz.low{background:#fff1d6;border-color:#f0d39a}.sz.low i{color:#8a5a00;font-weight:700}.sz.ok{background:#fff}.sz-legend{display:flex;align-items:center;gap:6px;font-size:9px;color:#6b7079;margin:0 0 6px}';
   // PDF: current stock only — sisa (tipis), habis, terbanyak
   function stockPdf() {
     const P = window.PdfReport;
@@ -186,6 +194,7 @@
     const D = sumData(rows);
     const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
     const chips = (list, cls) => list.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join(' ');
+    const pdfLegend = szLegend();
     const asOf = rows.map((r) => r.date).filter(Boolean).sort().pop() || today();
     const dmg = rows.reduce((t, r) => t + (r.damaged || 0), 0);
     const tipisN = D.tipis.reduce((t, g) => t + g.tipis.length, 0);
@@ -201,9 +210,10 @@
       ${P.h2('📦 Stok terbanyak', 'good per model')}
       ${P.table([['Model'], ['Good', 1]], [...D.gs].sort((x, y) => y.good - x.good).filter((g) => g.good > 0).slice(0, 15).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, `<b>${num(g.good)}</b> pcs`]))}
       ${P.h2('⛔ Sudah habis', `${num(D.habisAll.length)} model kosong · ${num(D.habisPart.length)} model size bolong`)}
-      ${P.table([['Model'], ['Sisa', 1], ['Size habis']], [...D.habisAll.map((g) => [nm(g), '0', '<span class="chip bad">HABIS semua size</span>']), ...D.habisPart.map((g) => [nm(g), num(g.good), chips(g.habis, 'bad')])], null, 'Tidak ada yang habis.')}
-      ${P.h2('⚠ Stok tipis', `good ≤ ${low()} per size · angka dalam kurung = sisa`)}
-      ${P.table([['Model'], ['Size tipis (sisa)']], D.tipis.map((g) => [nm(g), chips(g.tipis, 'warn')]), null, 'Tidak ada stok tipis.')}`;
+      ${pdfLegend}<div class="szl">${[...D.habisAll, ...D.habisPart].map((g) => sizeRow(g, 'habis')).join('') || '<p class="muted">Tidak ada yang habis.</p>'}</div>
+      ${P.h2('⚠ Stok tipis', `good ≤ ${low()} per size`)}
+      <div class="szl">${D.tipis.filter((g) => !g.habis.length).map((g) => sizeRow(g, 'tipis')).join('') || '<p class="muted">Tidak ada model yang hanya tipis.</p>'}</div>
+      <style>${SZ_PDF_CSS}</style>`;
     P.open({ title: 'Laporan Stok Gudang', period: `per ${fmtDate(asOf)}`,
       meta: [['Stok per', fmtDate(asOf)], ['Gudang', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
       body, note: 'Good = gudang NORMAL, damaged = gudang DAMAGED, dari file stock balance terakhir yang di-import.' });

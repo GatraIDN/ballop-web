@@ -1032,3 +1032,21 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .cs-mx td.cs-chk { text-align: center; }
 .cs-mx td.cs-chk input { width: 18px; height: 18px; accent-color: var(--good); }
 @media (max-width: 700px) { .cs-state { display: none; } .cs-mx tbody th { min-width: 140px; } }
+
+/* stock size strips (Sudah habis / Stok tipis) */
+.szl { display: grid; gap: 8px; max-height: 520px; overflow: auto; padding-right: 4px; }
+.szr { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; cursor: pointer; transition: border-color .15s; }
+.szr:hover { border-color: var(--ink-2); }
+.szr-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.szr-h span { color: var(--muted); font-weight: 600; }
+.szr-h em { font-style: normal; margin-left: auto; font-size: 12px; font-weight: 700; color: var(--danger); }
+.szs { display: flex; flex-wrap: wrap; gap: 5px; }
+.sz { display: inline-flex; flex-direction: column; align-items: center; min-width: 46px; padding: 4px 6px; border-radius: 9px; border: 1px solid var(--line); line-height: 1.2; background: #fff; }
+.sz b { font-size: 12.5px; }
+.sz i { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.sz.out { background: #fde3e3; border-color: #f4b7b7; }
+.sz.out b, .sz.out i { color: #b42323; }
+.sz.low { background: #fff1d6; border-color: #f0d39a; }
+.sz.low i { color: #8a5a00; font-weight: 700; }
+.sz-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.sz-legend .sz { min-width: 38px; padding: 2px 5px; }
