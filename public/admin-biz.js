@@ -171,7 +171,7 @@
 
   function compute(from, to) {
     const inR = (r) => r.date >= from && r.date <= to;
-    const lines = saleLines(from, to);
+    const lines = saleLines(from, to).filter((r) => r.channel !== 'offline');
     const done = lines.filter((r) => r.state === 'completed');
     const ads = data.ads.filter(inR);
     const exp = data.expenses.filter(inR);
@@ -957,16 +957,15 @@
     const maxT = Math.max(1, ...S.trend.map((t) => Math.max(t.omzet, t.net)));
     const maxP = Math.max(1, ...S.products.slice(0, 8).map((p) => p.units));
     return `
-      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p><b>Order value</b> = dari file order (tanggal pesanan dibuat, pesanan selesai + diproses). <b>Income value</b> = dari file income (uang yang masuk ke saldo, tanggal dana dilepas).</p></div></div>
+      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p>Hanya <b>e-commerce</b> (Shopee, TikTok Shop, Tokopedia). Offline ada di section terpisah di bawah. <b>Order value</b> = dari file order (tanggal pesanan dibuat, pesanan selesai + diproses). <b>Income value</b> = dari file income (uang yang masuk ke saldo, tanggal dana dilepas).</p></div></div>
       <div class="kpis">
         ${kpi('Order value', money(m.revenue), delta(m.revenue, P.m.revenue), true, `file order · ${num(m.orders)} pesanan`)}
         ${kpi('Income value', money(inc.payout), delta(inc.payout, P.inc.payout), false, `file income · ${num(inc.orders)} pesanan cair`)}
+        ${kpi('Overall fee', money(m.revenue - inc.payout), `<div class="k-delta">${pct(m.revenue ? (m.revenue - inc.payout) / m.revenue : NaN)} dari order value</div>`, false, 'order value − income value (semua potongan + selisih pesanan yang belum cair)')}
         ${kpi('Pesanan · unit', `${num(m.orders)} · ${num(onUnits)}`, delta(m.orders, P.m.orders), false, 'file order · unit = pasang')}
         ${kpi('Batal', `${num(m.cancelled)} · ${money(m.cancelValue)}`, delta(m.cancelValue, P.m.cancelValue, true), false, 'file order · jumlah pesanan · nilai')}
         ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov), false, 'order value ÷ pesanan')}
         ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true), false, 'Seller Centre + input manual')}
-        ${kpi('Stock keluar offline', `${num(offUnits)} pcs`, delta(offUnits, P.off.units), false, 'menu Penjualan offline')}
-        ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, P.off.omzet), false, `${num(off.trx)} transaksi`)}
       </div>
       <p class="muted small cmp-note">▲▼ dibanding tanggal yang sama bulan lalu: <b>${rangeLabel(S)}</b> vs <b>${rangeLabel(P)}</b>.</p>
       <section class="panel solid">
@@ -1002,12 +1001,16 @@
         <section class="panel solid"><div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">unit · order value</span></div>
           <div class="hbar">${S.products.slice(0, 8).map((p) => `<div class="hbar-row"><span class="hb-name" title="${esc(p.name)}">${esc(p.name)}</span><span class="hb-track"><i style="width:${(p.units / maxP) * 100}%;background:${p.color || '#2a78d6'}"></i></span><span class="hb-val">${num(p.units)} · ${compact(p.revenue)}</span></div>`).join('') || '<p class="muted">Belum ada produk terjual.</p>'}</div>
         </section>
-        <section class="panel solid"><div class="panel-head"><h2>Live & offline</h2></div>
-          <div class="alert-list">
-            <div><span>TikTok LIVE · ${num(live.sessions)} sesi</span><b>${money(live.gmv)}</b></div>
-            <div><span>Offline · ${num(off.trx)} transaksi · ${num(off.units)} pcs keluar</span><b>${money(off.omzet)}</b></div>
-          </div>
+        <section class="panel solid"><div class="panel-head"><h2>TikTok LIVE</h2></div>
+          <div class="alert-list"><div><span>${num(live.sessions)} sesi</span><b>${money(live.gmv)}</b></div></div>
         </section>
+      </div>
+      <div class="sec-head" style="--sec:#0e8a8a;margin-top:18px"><div><h2>Offline</h2><p>Toko, distributor, reseller, event — dari menu Penjualan offline. Tidak masuk order value / income value e-commerce.</p></div></div>
+      <div class="kpis">
+        ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, P.off.omzet), true, 'menu Penjualan offline · transaksi selesai')}
+        ${kpi('Transaksi', num(off.trx), delta(off.trx, P.off.trx))}
+        ${kpi('Stock keluar offline', `${num(off.units)} pcs`, delta(off.units, P.off.units))}
+        ${kpi('Per jenis', `<span style="font-size:15px">${Object.entries(off.byType).map(([k, q]) => `${esc(k)} ${num(q)}`).join(' · ') || '–'}</span>`, '', false, 'pcs keluar per jenis')}
       </div>`;
   }
 
@@ -1035,29 +1038,36 @@
     const trendLabel = (t) => (unit === 'month' ? t.label : t.from === t.to ? R.longDate(t.from) : `${R.longDate(t.from)} – ${R.longDate(t.to)}`);
     const cmp = `vs ${R.period(P.from, P.to)}`;
     const body = `
-  ${h2('Key figures', `▲▼ compared with the same dates last month (${R.period(P.from, P.to)})`)}
+  ${h2('E-commerce key figures', `Shopee, TikTok Shop, Tokopedia · ▲▼ compared with the same dates last month (${R.period(P.from, P.to)})`)}
   ${tiles([
     tile('Order value', rp(m.revenue), `order file · ${n(m.orders)} orders ${chg(m.revenue, P.m.revenue)}`, true),
     tile('Income value', rp(inc.payout), `income file · ${n(inc.orders)} paid-out orders ${chg(inc.payout, P.inc.payout)}`, true),
+    tile('Overall fee', rp(m.revenue - inc.payout), `${pc(m.revenue ? (m.revenue - inc.payout) / m.revenue : NaN)} of order value · order value − overall fee = income value`),
     tile('Orders · units', `${n(m.orders)} · ${n(onU(S))}`, chg(m.orders, P.m.orders)),
     tile('Cancelled', `${n(m.cancelled)} · ${rp(m.cancelValue)}`, `orders · value ${chg(m.cancelValue, P.m.cancelValue, true)}`),
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
     tile('Ad spend · ROAS', rp(m.adSpend), `ROAS ${x(m.adRoas)} ${chg(m.adSpend, P.m.adSpend, true)}`),
-    tile('Units out offline', `${n(off.units)} pcs`, `${n(off.trx)} transactions ${chg(off.units, P.off.units)}`),
-    tile('Offline revenue', rp(off.omzet), chg(off.omzet, P.off.omzet)),
   ])}
   <div class="avoid">
   ${h2('Comparison', cmp)}
   ${table([['Metric'], [R.period(S.from, S.to), 1], [R.period(P.from, P.to), 1], ['Change', 1]], [
     ['Order value', rp(m.revenue), rp(P.m.revenue), chg(m.revenue, P.m.revenue)],
     ['Income value', rp(inc.payout), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
+    ['Overall fee', rp(m.revenue - inc.payout), rp(P.m.revenue - P.inc.payout), chg(m.revenue - inc.payout, P.m.revenue - P.inc.payout, true)],
     ['Orders', n(m.orders), n(P.m.orders), chg(m.orders, P.m.orders)],
     ['Units sold online', n(onU(S)), n(onU(P)), chg(onU(S), onU(P))],
     ['Cancelled orders', n(m.cancelled), n(P.m.cancelled), chg(m.cancelled, P.m.cancelled, true)],
     ['Cancelled value', rp(m.cancelValue), rp(P.m.cancelValue), chg(m.cancelValue, P.m.cancelValue, true)],
     ['Ad spend', rp(m.adSpend), rp(P.m.adSpend), chg(m.adSpend, P.m.adSpend, true)],
-    ['Units out offline', n(off.units), n(P.off.units), chg(off.units, P.off.units)],
-    ['Offline revenue', rp(off.omzet), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
+  ])}
+  </div>
+  <div class="avoid">
+  ${h2('Offline (separate from e-commerce)', 'store, distributor, reseller, event · offline sales menu')}
+  ${tiles([
+    tile('Offline revenue', rp(off.omzet), chg(off.omzet, P.off.omzet), true),
+    tile('Transactions', n(off.trx), chg(off.trx, P.off.trx)),
+    tile('Units out', `${n(off.units)} pcs`, chg(off.units, P.off.units)),
+    tile('By type', Object.entries(off.byType).map(([k, q]) => `${esc(k)} ${n(q)}`).join(' · ') || '–', 'pcs'),
   ])}
   </div>
   <div class="avoid">
