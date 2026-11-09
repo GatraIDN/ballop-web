@@ -51,9 +51,6 @@
         const bt = Object.entries(agg(typeOf)).sort((a, b) => b[1].spend - a[1].spend);
         return `${P.h2('By ad type')}${P.table([['Ad type'], ['Spend', 1], ['Share', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['CTR', 1], ['CPC', 1]],
           bt.map(([k, x]) => [`${P.dot(chColor(x.ch))}${esc(k)}`, `<b>${P.rp(x.spend)}</b>`, P.pct(tot.spend ? x.spend / tot.spend : NaN), P.rp(x.revenue), roas(x), num(x.orders), cpo(x), ctr(x), cpc(x)]))}`; })()}
-      ${P.h2('By campaign', 'sorted by spend')}
-      ${P.table([['Channel'], ['Campaign'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Impressions', 1], ['Clicks', 1], ['CTR', 1]],
-        byCamp.map(([k, x]) => { const [ch, name] = k.split('|'); return [`${P.dot(chColor(ch))}${esc(chLabel(ch))}`, esc(name), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x)]; }))}
       ${one ? '' : `${P.h2('By date', 'all campaigns combined')}
       ${P.table([['Date'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Clicks', 1]],
         byDay.map(([d, x]) => [P.longDate(d), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.clicks)]),
