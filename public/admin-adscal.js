@@ -47,6 +47,10 @@
       ${P.table([['Channel'], ['Spend', 1], ['Share', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Impressions', 1], ['Clicks', 1], ['CTR', 1], ['CPC', 1]],
         byCh.map(([k, x]) => [`${P.dot(chColor(k))}${esc(chLabel(k))}`, `<b>${P.rp(x.spend)}</b>`, P.pct(tot.spend ? x.spend / tot.spend : NaN), P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x), cpc(x)]),
         ['Total', P.rp(tot.spend), '100%', P.rp(tot.revenue), roas(tot), num(tot.orders), cpo(tot), num(tot.impressions), num(tot.clicks), ctr(tot), cpc(tot)], 'No ad spend yet.')}
+      ${(() => { const typeOf = (a) => (/dari Seller Centre/.test(a.note || '') ? (a.note || '').split(' · ')[0].replace('Iklan Produk', 'Product Ads').replace('Iklan Toko+', 'Shop Ads').replace('Iklan Live', 'Live Ads').replace('Iklan Banner', 'Banner Ads') : /cpas/i.test(a.campaign) ? 'CPAS (Meta × Shopee)' : /gmv max/i.test(a.campaign) ? 'GMV Max' : a.channel === 'meta' ? 'Meta Ads' : a.channel === 'tiktok' ? 'TikTok Ads Manager' : 'Other');
+        const bt = Object.entries(agg(typeOf)).sort((a, b) => b[1].spend - a[1].spend);
+        return `${P.h2('By ad type')}${P.table([['Ad type'], ['Spend', 1], ['Share', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['CTR', 1], ['CPC', 1]],
+          bt.map(([k, x]) => [`${P.dot(chColor(x.ch))}${esc(k)}`, `<b>${P.rp(x.spend)}</b>`, P.pct(tot.spend ? x.spend / tot.spend : NaN), P.rp(x.revenue), roas(x), num(x.orders), cpo(x), ctr(x), cpc(x)]))}`; })()}
       ${P.h2('By campaign', 'sorted by spend')}
       ${P.table([['Channel'], ['Campaign'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Impressions', 1], ['Clicks', 1], ['CTR', 1]],
         byCamp.map(([k, x]) => { const [ch, name] = k.split('|'); return [`${P.dot(chColor(ch))}${esc(chLabel(ch))}`, esc(name), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x)]; }))}

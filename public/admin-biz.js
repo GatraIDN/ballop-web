@@ -579,6 +579,7 @@
       const chs = Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).sort((a, b) => m.byAd[b[0]].spend - m.byAd[a[0]].spend);
       if (!chs.length) return '<p class="muted">Belum ada data iklan di periode ini.</p>';
       return `
+      <div class="filters-row" style="justify-content:flex-end;margin:0 0 10px"><button class="btn sm btn-export" type="button" id="adsDashPdf">⬇ Export PDF iklan</button></div>
       <h2 class="ads-h">Semua channel</h2>
       ${adKpis(m.adTot, true)}
       ${adsExtra()}
@@ -839,6 +840,7 @@
     $('#demoClear')?.addEventListener('click', clearDemo);
     $('#expReport').addEventListener('click', () => exportReport(m));
     $('#expPdf').addEventListener('click', exportPdfReport);
+    $('#adsDashPdf')?.addEventListener('click', () => (window.AdsCal ? window.AdsCal.pdf(from, to) : toast('Modul iklan belum termuat', true)));
     bindReport();
   }
 
@@ -947,6 +949,47 @@
     if (Math.abs(rest) >= 1) g.push(['Lain-lain (selisih di file)', rest]);
     return g;
   }
+  // [regex, type, English explanation, Indonesian explanation]
+  const FEE_INFO = [
+    [/^Biaya Administrasi/i, 'fee', 'Shopee admin fee per sold item (incl. 11% VAT)', 'Biaya admin Shopee per produk terjual (termasuk PPN 11%)'],
+    [/Gratis Ongkir XTRA/i, 'fee', 'Free Shipping XTRA program fee', 'Biaya program Gratis Ongkir XTRA'],
+    [/Layanan Promo XTRA/i, 'fee', 'Promo XTRA program fee (cashback program)', 'Biaya program Promo XTRA (cashback)'],
+    [/Shopee Video XTRA/i, 'fee', 'Shopee Video XTRA program fee', 'Biaya program Shopee Video XTRA'],
+    [/Komisi AMS/i, 'fee', 'Shopee affiliate (AMS) commission', 'Komisi affiliate Shopee (AMS)'],
+    [/^Biaya Pembayaran/i, 'fee', 'Payment processing fee', 'Biaya pembayaran'],
+    [/^Biaya Transaksi/i, 'fee', 'Transaction fee', 'Biaya transaksi'],
+    [/Proses Pesanan|Order processing fee/i, 'fee', 'Order processing fee per order', 'Biaya proses per pesanan'],
+    [/Platform commission/i, 'fee', 'TikTok/Tokopedia platform commission', 'Komisi platform TikTok/Tokopedia'],
+    [/Dynamic commission/i, 'fee', 'Dynamic commission (category-based)', 'Komisi dinamis (sesuai kategori)'],
+    [/Mall service fee/i, 'fee', 'Mall (official store) service fee', 'Biaya layanan Mall'],
+    [/Growth Xtra Program Super/i, 'fee', 'Growth Xtra Super program fee', 'Biaya program Growth Xtra Super'],
+    [/Growth Xtra Program/i, 'fee', 'Growth Xtra program fee', 'Biaya program Growth Xtra'],
+    [/Additional marketing benefits/i, 'fee', 'Additional marketing benefits package', 'Biaya paket benefit marketing tambahan'],
+    [/Affiliate Shop Ads/i, 'fee', 'Affiliate Shop Ads commission', 'Komisi affiliate Shop Ads'],
+    [/Affiliate Commission/i, 'fee', 'Affiliate (creator) commission', 'Komisi affiliate (kreator)'],
+    [/Logistics service fee/i, 'fee', 'Logistics service fee', 'Biaya layanan logistik'],
+    [/Income Tax|Pajak/i, 'tax', 'Income tax (PPh 22) withheld by the platform', 'PPh 22 yang dipotong platform'],
+    [/Isi Saldo Otomatis|GMV payment for TikTok Ads/i, 'ads', 'Ad spend paid automatically from earnings', 'Biaya iklan yang dipotong otomatis dari penghasilan'],
+    [/Voucher/i, 'voucher', 'Vouchers funded by the seller', 'Voucher yang ditanggung penjual'],
+    [/Refund|Pengembalian/i, 'refund', 'Refunds to buyers (returns / cancellations after payout)', 'Pengembalian dana ke pembeli'],
+    [/Ongkos Kirim|Ongkir|Shipping|Logistics reimbursement|Gratis Ongkir dari Shopee/i, 'shipping', 'Shipping paid by buyer / platform minus what the courier charged', 'Ongkir dari pembeli/platform dikurangi biaya kurir'],
+    [/Diskon Produk dari Shopee/i, 'subsidy', 'Product discount funded by Shopee (added back)', 'Diskon produk yang ditanggung Shopee (dikembalikan)'],
+  ];
+  const FEE_TYPE = { fee: ['Marketplace fee', 'Fee marketplace'], ads: ['Ads (auto-deducted)', 'Iklan (potong otomatis)'], voucher: ['Seller voucher', 'Voucher penjual'], refund: ['Refund', 'Refund'], shipping: ['Shipping (net)', 'Ongkir (netto)'], tax: ['Tax', 'Pajak'], subsidy: ['Platform subsidy', 'Subsidi platform'], other: ['Other', 'Lainnya'] };
+  const feeInfo = (k) => FEE_INFO.find(([re]) => re.test(k)) || [null, 'other', '', ''];
+  function feeDetail(from, to) {
+    const out = {};
+    data.settlements.filter((x) => payDay(x) >= from && payDay(x) <= to).forEach((x) => {
+      const d = x.detail && Object.keys(x.detail).length ? x.detail : { 'Biaya marketplace': -Math.abs(x.fees || 0) };
+      const c = out[x.channel] = out[x.channel] || {};
+      Object.entries(d).forEach(([k, v]) => { c[k] = (c[k] || 0) + v; });
+    });
+    return Object.fromEntries(Object.entries(out).map(([ch, items]) => {
+      const rows = Object.entries(items).filter(([, v]) => Math.abs(v) >= 1).map(([k, v]) => { const [, type, en, id] = feeInfo(k); return { k, v, type, en, id }; })
+        .sort((a, b) => (a.type === 'fee' ? 0 : 1) - (b.type === 'fee' ? 0 : 1) || a.v - b.v);
+      return [ch, { rows, fee: rows.filter((r) => r.type === 'fee').reduce((t, r) => t + r.v, 0), all: rows.reduce((t, r) => t + r.v, 0) }];
+    }));
+  }
   function overviewTab(S, P) {
     const { m, inc, live, off } = S;
     const kpi = (label, value, d = '', hero = false, src = '') => `<div class="kpi solid${hero ? ' hero' : ''}"><div class="k-label">${label}</div><div class="k-value">${value}</div>${d}${src ? `<div class="k-src">${esc(src)}</div>` : ''}</div>`;
@@ -1005,6 +1048,11 @@
           <div class="alert-list"><div><span>${num(live.sessions)} sesi</span><b>${money(live.gmv)}</b></div></div>
         </section>
       </div>
+      ${(() => { const FD = feeDetail(S.from, S.to); const chs = ['shopee', 'tiktok', 'tokopedia'].filter((k) => FD[k]); return chs.length ? `<div class="sec-head" style="--sec:#e34948;margin-top:18px"><div><h2>Detail fee per marketplace</h2><p>Semua baris potongan dari file income periode ini (tanggal dana dilepas). Minus = memotong penghasilan, plus = menambah.</p></div></div>
+      <div class="grid-3">${chs.map((k) => `<section class="panel solid"><div class="panel-head"><h2><span class="ch"><i style="background:${SALES_CH[k].color}"></i>${SALES_CH[k].label}</span></h2><span class="muted small">fee ${money(-FD[k].fee)} · semua potongan ${money(-FD[k].all)}</span></div>
+        <div class="table-wrap"><table class="data"><thead><tr><th>Potongan</th><th>Jenis</th><th class="num">Jumlah</th></tr></thead><tbody>
+        ${FD[k].rows.map((r) => `<tr><td><b>${esc(r.k)}</b>${r.id ? `<br><small class="muted">${esc(r.id)}</small>` : ''}</td><td><span class="badge${r.type === 'fee' ? ' bad' : ''}">${FEE_TYPE[r.type][1]}</span></td><td class="num">${money(r.v)}</td></tr>`).join('')}
+        <tr class="tot"><td>Total fee marketplace</td><td></td><td class="num">${money(FD[k].fee)}</td></tr><tr class="tot"><td>Total semua potongan</td><td></td><td class="num">${money(FD[k].all)}</td></tr></tbody></table></div></section>`).join('')}</div>` : ''; })()}
       <div class="sec-head" style="--sec:#0e8a8a;margin-top:18px"><div><h2>Offline</h2><p>Toko, distributor, reseller, event — dari menu Penjualan offline. Tidak masuk order value / income value e-commerce.</p></div></div>
       <div class="kpis">
         ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, P.off.omzet), true, 'menu Penjualan offline · transaksi selesai')}
@@ -1092,7 +1140,11 @@
     [`${dot('#2a78d6')}E-commerce income value`, rp(inc.payout), pc(inc.payout + off.omzet ? inc.payout / (inc.payout + off.omzet) : NaN), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
     [`${dot('#0e8a8a')}Offline revenue`, rp(off.omzet), pc(inc.payout + off.omzet ? off.omzet / (inc.payout + off.omzet) : NaN), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
   ], ['Total income', `<b>${rp(inc.payout + off.omzet)}</b>`, '100%', rp(P.inc.payout + P.off.omzet), chg(inc.payout + off.omzet, P.inc.payout + P.off.omzet)])}
-  </div>`;
+  </div>
+  ${(() => { const FD = feeDetail(S.from, S.to); return ['shopee', 'tiktok', 'tokopedia'].filter((k) => FD[k]).map((k) => `<div class="avoid">${h2(`${dot(SALES_CH[k].color)}Fee details · ${SALES_CH[k].label}`, `marketplace fees ${rp(-FD[k].fee)} · all deductions ${rp(-FD[k].all)} · income file, payout date`)}
+  ${table([['Line in income file'], ['Type'], ['What it is'], ['Amount', 1]], FD[k].rows.map((r) => [`<b>${esc(r.k)}</b>`, r.type === 'fee' ? `<span class="chip bad">${FEE_TYPE[r.type][0]}</span>` : `<span class="chip">${FEE_TYPE[r.type][0]}</span>`, esc(r.en || '–'), rp(r.v)]),
+    ['Total marketplace fees', '', '', rp(FD[k].fee)])}
+  <p class="muted" style="margin:4px 0 0">All deductions incl. vouchers, shipping, refunds, ads &amp; tax: <b>${rp(FD[k].all)}</b>. Negative = taken from income, positive = added.</p></div>`).join(''); })()}`;
     R.open({ title: 'Sales Report', period: `${R.period(range.from, range.to)} · ${n(len)} days`,
       meta: [['Period', R.period(range.from, range.to)], ['Compared with', R.period(P.from, P.to)], ['Channels', esc(S.channels.map((c) => c.label).join(', ') || '–')]],
       body, note: 'Sources: order, income, ads &amp; Creator Live Performance exports of each marketplace, plus the offline sales menu. Ad figures are platform attribution.' });
