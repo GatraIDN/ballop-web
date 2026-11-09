@@ -1060,3 +1060,26 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .defs-grid p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 @media (max-width: 960px) { .defs-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .defs-grid { grid-template-columns: 1fr; } }
+
+/* ads budget popup */
+.bg-pop { max-width: 640px; }
+.bg-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.bg-field { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.bg-wide { grid-column: 1 / -1; }
+.bg-label { font-size: 13px; font-weight: 800; color: var(--ink); }
+.bg-label em { font-style: normal; font-weight: 600; color: var(--muted); }
+.bg-field small { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+.bg-money { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; background: #fff; overflow: hidden; }
+.bg-money:focus-within { border-color: var(--ink-2); }
+.bg-money i { font-style: normal; font-weight: 700; color: var(--muted); padding: 0 4px 0 12px; font-size: 13px; }
+.bg-money input { border: 0 !important; box-shadow: none !important; flex: 1; min-width: 0; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; padding-left: 4px; }
+.bg-total { justify-content: center; padding: 10px 14px; border-radius: 12px; background: var(--bg-soft, #f4f5f8); }
+.bg-total b { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .bg-form { grid-template-columns: 1fr; } }
+
+/* readability: overview cards in one even grid, clearer source lines */
+.ov-grid { grid-template-columns: repeat(4, 1fr); }
+@media (min-width: 1500px) { .ov-grid { grid-template-columns: repeat(7, 1fr); gap: 12px; } .ov-card { padding: 16px 14px 14px; } .ov-value { font-size: clamp(18px, 1.35vw, 24px); } .ov-top small { font-size: 10.5px; } .ov-meta { font-size: 11.5px; } }
+.kpi .k-src { font-size: 11.5px; color: var(--ink-2); opacity: .75; }
+.kpi .k-label { font-size: 12.5px; color: var(--ink-2); }
+.sec-head p { font-size: 13.5px; line-height: 1.5; }

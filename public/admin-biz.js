@@ -879,18 +879,25 @@
     const r = rec || { date: today(), ...(B0 ? Object.fromEntries(BUDGET.map(([k]) => [k, B0[k] || 0])) : {}) };
     const box = document.createElement('div');
     box.className = 'raw-pop';
-    box.innerHTML = `<div class="raw-card rep-pop">
+    box.innerHTML = `<div class="raw-card rep-pop bg-pop">
       <header><div><span class="muted small">Ads budget</span><h2>${rec ? 'Ubah' : 'Update'} saldo iklan</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
       <div class="raw-body">
-        <label>Tanggal<input type="date" id="bgDate" value="${esc(r.date)}"></label>
-        ${BUDGET.map(([k, l, src]) => `<label>${esc(l)} <small class="muted">· ${esc(src)}</small><input type="text" inputmode="numeric" data-bg="${k}" value="${r[k] ? Math.round(r[k]) : ''}" placeholder="0"></label>`).join('')}
-        <label>Catatan<input type="text" id="bgNote" value="${esc(r.note || '')}"></label>
+        <div class="bg-form">
+          <label class="bg-field bg-wide"><span class="bg-label">Tanggal saldo</span><input type="date" id="bgDate" value="${esc(r.date)}"></label>
+          ${BUDGET.map(([k, l, src]) => `<label class="bg-field"><span class="bg-label">${esc(l)}</span><span class="bg-money"><i>Rp</i><input type="text" inputmode="numeric" data-bg="${k}" value="${((n) => (n ? Math.round(n).toLocaleString('id-ID') : ''))(r[k])}" placeholder="0"></span><small>${esc(src)}</small></label>`).join('')}
+          <div class="bg-field bg-total"><span class="bg-label">Total saldo</span><b id="bgTotal">–</b></div>
+          <label class="bg-field bg-wide"><span class="bg-label">Catatan <em>(opsional)</em></span><input type="text" id="bgNote" value="${esc(r.note || '')}" placeholder="mis. setelah top up Shopee"></label>
+        </div>
       </div>
       <footer>${rec ? '<button class="btn sm danger" type="button" id="bgDel">Hapus</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Batal</button><button class="btn sm btn-export" type="button" id="bgSave">Simpan</button></footer>
     </div>`;
     document.body.appendChild(box);
     const close = () => box.remove();
     box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) close(); });
+    const fmtIn = (el) => { const n = Number(el.value.replace(/[^0-9]/g, '')) || 0; el.value = n ? n.toLocaleString('id-ID') : ''; };
+    const sumIn = () => { $('#bgTotal', box).textContent = money($('[data-bg]', box).reduce((t, el) => t + (Number(el.value.replace(/[^0-9]/g, '')) || 0), 0)); };
+    $('[data-bg]', box).forEach((el) => el.addEventListener('input', () => { fmtIn(el); sumIn(); }));
+    sumIn();
     const put = async (list) => { data.adbudget = await api('/api/adbudget', json('PUT', list)); close(); renderDashboard(); };
     $('#bgSave', box).addEventListener('click', async () => {
       const d = $('#bgDate', box).value; if (!d) { toast('Isi tanggal', true); return; }
