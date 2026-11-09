@@ -1973,34 +1973,34 @@
       rows.forEach((x) => { const c = byCh[x.channel] = byCh[x.channel] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0, rrp: 0 };
         c.all.add(x.orderId); if (x.state === 'completed' || x.state === 'pending') { c.done.add(x.orderId); c.omzet += x.net; c.units += x.qty; c.rrp += rrpOf(x); } if (x.state === 'cancelled') c.cancelled.add(x.orderId); if (x.state === 'returned') c.returned.add(x.orderId); });
       const chs = Object.entries(byCh).sort((a, b) => b[1].omzet - a[1].omzet);
-      const filt = [ost.channel ? SALES_CH[ost.channel].label : 'Semua marketplace', ost.state ? ORDER_STATE[ost.state] : 'Semua status', ost.q ? `cari "${esc(ost.q)}"` : ''].filter(Boolean).join(' · ');
+      const filt = [ost.channel ? SALES_CH[ost.channel].label : 'All marketplaces', ost.state ? ORDER_STATE[ost.state] : 'All statuses', ost.q ? `search "${esc(ost.q)}"` : ''].filter(Boolean).join(' · ');
       const dayMap = {};
       rows.forEach((x) => { const c = dayMap[x.date] = dayMap[x.date] || { all: new Set(), done: new Set(), cancelled: new Set(), returned: new Set(), omzet: 0, units: 0, rrp: 0 }; const k = `${x.channel}:${x.orderId}`;
         c.all.add(k); if (x.state === 'completed' || x.state === 'pending') { c.done.add(k); c.omzet += x.net; c.units += x.qty; c.rrp += rrpOf(x); } if (x.state === 'cancelled') c.cancelled.add(k); if (x.state === 'returned') c.returned.add(k); });
       const perDay = Object.entries(dayMap).sort((a, b) => a[0].localeCompare(b[0]));
       const body = `
-        ${R.h2('Ringkasan pesanan')}
+        ${R.h2('Order summary')}
         ${R.tiles([
-          R.tile('Pesanan masuk', num(orders.size), 'selesai + diproses'),
-          R.tile('RRP · sebelum diskon', R.rp(T.rrp), `rata-rata ${T.qty ? R.rp(T.rrp / T.qty) : '–'} / pasang`),
-          R.tile('ASP · setelah diskon', R.rp(T.asp), `rata-rata ${T.qty ? R.rp(T.asp / T.qty) : '–'} / pasang · diskon ${T.rrp ? R.pct(1 - T.asp / T.rrp) : '–'}`, true),
-          R.tile('QTY', `${num(T.qty)} pasang`, 'pasang terjual'),
-          R.tile('Batal · retur', `${num(cnt('cancelled'))} · ${num(cnt('returned'))}`, 'pesanan'),
+          R.tile('Orders', R.num(orders.size), 'completed + in process'),
+          R.tile('RRP · before discount', R.rp(T.rrp), `avg ${T.qty ? R.rp(T.rrp / T.qty) : '–'} / pair`),
+          R.tile('ASP · after discount', R.rp(T.asp), `avg ${T.qty ? R.rp(T.asp / T.qty) : '–'} / pair · discount ${T.rrp ? R.pct(1 - T.asp / T.rrp) : '–'}`, true),
+          R.tile('QTY', `${R.num(T.qty)} pairs`, 'pairs sold'),
+          R.tile('Cancelled · returned', `${R.num(cnt('cancelled'))} · ${R.num(cnt('returned'))}`, 'orders'),
         ], 5)}
-        ${R.h2('Per channel')}
-        ${R.table([['Channel'], ['QTY', 1], ['RRP', 1], ['ASP', 1], ['Diskon', 1], ['ASP / pasang', 1], ['Share ASP', 1]],
-          chs.map(([k, c]) => [`${R.dot(SALES_CH[k]?.color || '#888')}${esc(SALES_CH[k]?.label || k)}`, num(c.units), R.rp(c.rrp), `<b>${R.rp(c.omzet)}</b>`, c.rrp ? R.pct(1 - c.omzet / c.rrp) : '–', c.units ? R.rp(c.omzet / c.units) : '–', R.pct(omzet ? c.omzet / omzet : NaN)]),
-          ['Total', num(T.qty), R.rp(T.rrp), R.rp(T.asp), T.rrp ? R.pct(1 - T.asp / T.rrp) : '–', T.qty ? R.rp(T.asp / T.qty) : '–', '100%'])}
+        ${R.h2('By channel')}
+        ${R.table([['Channel'], ['QTY', 1], ['RRP', 1], ['ASP', 1], ['Discount', 1], ['ASP / pair', 1], ['Share ASP', 1]],
+          chs.map(([k, c]) => [`${R.dot(SALES_CH[k]?.color || '#888')}${esc(SALES_CH[k]?.label || k)}`, R.num(c.units), R.rp(c.rrp), `<b>${R.rp(c.omzet)}</b>`, c.rrp ? R.pct(1 - c.omzet / c.rrp) : '–', c.units ? R.rp(c.omzet / c.units) : '–', R.pct(omzet ? c.omzet / omzet : NaN)]),
+          ['Total', R.num(T.qty), R.rp(T.rrp), R.rp(T.asp), T.rrp ? R.pct(1 - T.asp / T.rrp) : '–', T.qty ? R.rp(T.asp / T.qty) : '–', '100%'])}
         <div class="two">
-          <div>${R.h2('Produk terlaris', 'QTY · ASP')}${R.table([['Produk'], ['QTY', 1], ['ASP', 1]], top.slice(0, 10).map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, num(x.units), R.rp(x.revenue)]))}</div>
-          <div>${R.h2('Provinsi teratas', 'pasang')}${R.table([['Provinsi'], ['Pasang', 1]], cities.map(([c, q]) => [esc(c), num(q)]))}</div>
+          <div>${R.h2('Best sellers', 'QTY · ASP')}${R.table([['Product'], ['QTY', 1], ['ASP', 1]], top.slice(0, 10).map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, R.num(x.units), R.rp(x.revenue)]))}</div>
+          <div>${R.h2('Top provinces', 'pairs')}${R.table([['Province'], ['Pairs', 1]], cities.map(([c, q]) => [esc(c), R.num(q)]))}</div>
         </div>
-        ${R.h2('Pesanan per tanggal', 'akumulasi per tanggal pesanan dibuat')}
-        ${R.table([['Tanggal'], ['QTY', 1], ['RRP', 1], ['ASP', 1], ['Diskon', 1]],
-          perDay.map(([d, x]) => [fmtDate(d), num(x.units), R.rp(x.rrp), `<b>${R.rp(x.omzet)}</b>`, x.rrp ? R.pct(1 - x.omzet / x.rrp) : '–']),
-          ['Total', num(T.qty), R.rp(T.rrp), R.rp(T.asp), T.rrp ? R.pct(1 - T.asp / T.rrp) : '–'])}`;
-      R.open({ title: 'Laporan Order', period: R.period(r.from, r.to), meta: [['Periode', R.period(r.from, r.to)], ['Filter', filt]], body,
-        note: 'Pesanan selesai + diproses (batal & retur tidak dihitung). Tanggal = tanggal pesanan dibuat. RRP = harga sebelum diskon; ASP = harga setelah diskon, belum dipotong fee marketplace.' });
+        ${R.h2('Orders by date', 'totals per order created date')}
+        ${R.table([['Date'], ['QTY', 1], ['RRP', 1], ['ASP', 1], ['Discount', 1]],
+          perDay.map(([d, x]) => [R.longDate(d), R.num(x.units), R.rp(x.rrp), `<b>${R.rp(x.omzet)}</b>`, x.rrp ? R.pct(1 - x.omzet / x.rrp) : '–']),
+          ['Total', R.num(T.qty), R.rp(T.rrp), R.rp(T.asp), T.rrp ? R.pct(1 - T.asp / T.rrp) : '–'])}`;
+      R.open({ title: 'Order Report', period: R.period(r.from, r.to), meta: [['Period', R.period(r.from, r.to)], ['Filter', filt]], body,
+        note: 'Completed + in-process orders (cancelled &amp; returned excluded). Date = order created date. RRP = price before discount; ASP = price after discount, before marketplace fees.' });
     });
     $('#ordExport').addEventListener('click', () => {
       const head = ['date', 'channel', 'orderId', 'status', 'sku', 'productName', 'variation', 'size', 'qty', 'unitPrice', 'sellerDiscount', 'platformDiscount', 'net', 'province', 'city', 'courier'];
@@ -2089,26 +2089,27 @@
     const unpaidP = done.filter((x) => x.payment !== 'lunas');
     const unpaidAll = data.offline.filter((x) => x.status === 'completed' && x.payment !== 'lunas');
     const group = (key) => { const g = {}; done.forEach((x) => { const k = key(x); const o = g[k] = g[k] || { v: 0, q: 0, n: 0, unpaid: 0, type: x.type }; o.v += val(x); o.q += x.qty; o.n++; if (x.payment !== 'lunas') o.unpaid += val(x); }); return Object.entries(g).sort((a, b) => b[1].v - a[1].v); };
-    const outlets = group((x) => x.outlet || '(tanpa nama)');
-    const types = group((x) => OFF_TYPES[x.type] || x.type);
+    const outlets = group((x) => x.outlet || '(no name)');
+    const TYPE_EN = { toko: 'Store', distributor: 'Distributor', reseller: 'Reseller', event: 'Event / bazaar' };
+    const types = group((x) => TYPE_EN[x.type] || x.type);
     const days = group((x) => x.date).sort((a, b) => a[0].localeCompare(b[0]));
     const body = `
-      ${R.h2('Ringkasan penjualan offline')}
+      ${R.h2('Offline sales summary')}
       ${R.tiles([
-        R.tile('Omzet offline', R.rp(total), `${num(done.length)} transaksi`, true),
-        R.tile('Pasang terjual', num(units), `rata-rata ${done.length ? R.rp(total / done.length) : '–'} / transaksi`),
-        R.tile('Piutang periode ini', R.rp(unpaidP.reduce((s, x) => s + val(x), 0)), `${num(unpaidP.length)} transaksi belum lunas`),
-        R.tile('Total piutang berjalan', R.rp(unpaidAll.reduce((s, x) => s + val(x), 0)), `${num(unpaidAll.filter((x) => x.dueDate && x.dueDate < today()).length)} lewat jatuh tempo`),
+        R.tile('Offline revenue', R.rp(total), `${R.num(done.length)} transactions`, true),
+        R.tile('Pairs sold (stock out)', R.num(units), `avg ${done.length ? R.rp(total / done.length) : '–'} / transaction`),
+        R.tile('Receivables this period', R.rp(unpaidP.reduce((s, x) => s + val(x), 0)), `${R.num(unpaidP.length)} unpaid transactions`),
+        R.tile('Total outstanding receivables', R.rp(unpaidAll.reduce((s, x) => s + val(x), 0)), `${R.num(unpaidAll.filter((x) => x.dueDate && x.dueDate < today()).length)} overdue`),
       ])}
       <div class="two">
-        <div>${R.h2('Per toko / distributor', 'omzet')}${R.table([['Toko / distributor'], ['Jenis'], ['Trx', 1], ['Pasang', 1], ['Omzet', 1]], outlets.map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, esc(OFF_TYPES[x.type] || ''), num(x.n), num(x.q), `<b>${R.rp(x.v)}</b>`]), null, 'Belum ada penjualan offline.')}</div>
-        <div>${R.h2('Per jenis')}${R.table([['Jenis'], ['Trx', 1], ['Pasang', 1], ['Omzet', 1], ['Share', 1]], types.map(([n, x]) => [esc(n), num(x.n), num(x.q), R.rp(x.v), R.pct(total ? x.v / total : NaN)]))}</div>
+        <div>${R.h2('By store / distributor', 'revenue')}${R.table([['Store / distributor'], ['Type'], ['Trx', 1], ['Pairs', 1], ['Revenue', 1]], outlets.map(([n, x], i) => [`<span class="rank">${i + 1}</span>${esc(n)}`, esc(TYPE_EN[x.type] || x.type || ''), R.num(x.n), R.num(x.q), `<b>${R.rp(x.v)}</b>`]), null, 'No offline sales yet.')}</div>
+        <div>${R.h2('By type')}${R.table([['Type'], ['Trx', 1], ['Pairs', 1], ['Revenue', 1], ['Share', 1]], types.map(([n, x]) => [esc(n), R.num(x.n), R.num(x.q), R.rp(x.v), R.pct(total ? x.v / total : NaN)]))}</div>
       </div>
-      ${R.h2('Penjualan per tanggal', 'akumulasi')}
-      ${R.table([['Tanggal'], ['Transaksi', 1], ['Pasang', 1], ['Belum lunas', 1], ['Omzet', 1]], days.map(([d, x]) => [fmtDate(d), num(x.n), num(x.q), x.unpaid ? R.rp(x.unpaid) : '–', `<b>${R.rp(x.v)}</b>`]), ['Total', num(done.length), num(units), R.rp(unpaidP.reduce((s, x) => s + val(x), 0)), R.rp(total)])}
-      ${unpaidAll.length ? `${R.h2('Piutang belum lunas', `${num(unpaidAll.length)} transaksi`)}${R.table([['Tanggal'], ['Toko / distributor'], ['Invoice'], ['Nilai', 1], ['Jatuh tempo'], ['Status']], unpaidAll.sort((a, b) => (a.dueDate || '9').localeCompare(b.dueDate || '9')).map((x) => [fmtDate(x.date), esc(x.outlet), esc(x.invoice || '–'), R.rp(val(x)), x.dueDate ? fmtDate(x.dueDate) : '–', x.dueDate && x.dueDate < today() ? '<span class="chip bad">Lewat tempo</span>' : `<span class="chip warn">${PAY[x.payment]}</span>`]))}` : ''}`;
-    R.open({ title: 'Laporan Penjualan Offline', period: R.period(r.from, r.to), meta: [['Periode', R.period(r.from, r.to)], ['Cakupan', 'Toko, distributor, reseller, event']], body,
-      note: 'Hanya transaksi berstatus selesai. Piutang = pembayaran tempo / belum bayar.', sign: ['Dibuat oleh', 'Mengetahui'] });
+      ${R.h2('Sales by date', 'daily totals')}
+      ${R.table([['Date'], ['Transactions', 1], ['Pairs', 1], ['Unpaid', 1], ['Revenue', 1]], days.map(([d, x]) => [R.longDate(d), R.num(x.n), R.num(x.q), x.unpaid ? R.rp(x.unpaid) : '–', `<b>${R.rp(x.v)}</b>`]), ['Total', R.num(done.length), R.num(units), R.rp(unpaidP.reduce((s, x) => s + val(x), 0)), R.rp(total)])}
+      ${unpaidAll.length ? `${R.h2('Outstanding receivables', `${R.num(unpaidAll.length)} transactions`)}${R.table([['Date'], ['Store / distributor'], ['Invoice'], ['Amount', 1], ['Due date'], ['Status']], unpaidAll.sort((a, b) => (a.dueDate || '9').localeCompare(b.dueDate || '9')).map((x) => [R.longDate(x.date), esc(x.outlet), esc(x.invoice || '–'), R.rp(val(x)), x.dueDate ? R.longDate(x.dueDate) : '–', x.dueDate && x.dueDate < today() ? '<span class="chip bad">Overdue</span>' : `<span class="chip warn">${({ tempo: 'Credit terms', belum: 'Unpaid', dp: 'Down payment' })[x.payment] || PAY[x.payment]}</span>`]))}` : ''}`;
+    R.open({ title: 'Offline Sales Report', period: R.period(r.from, r.to), meta: [['Period', R.period(r.from, r.to)], ['Scope', 'Store, distributor, reseller, event']], body,
+      note: 'Completed transactions only. Receivables = credit-term / unpaid sales.', sign: ['Prepared by', 'Approved by'] });
   }
 
   // latest report per warehouse + item + size

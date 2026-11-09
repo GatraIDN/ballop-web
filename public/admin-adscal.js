@@ -15,6 +15,7 @@
   // ---------- PDF: one day (from the popup, may be unsaved) or a period ----------
   function adsPdf(from, to, list) {
     const P = window.PdfReport, CH = B.ADS_CH;
+    const num = P.num, ratio = (n) => (Number.isFinite(n) && n > 0 ? `${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}×` : '–');
     const rows = list || B.data.ads.filter((a) => a.date >= from && a.date <= to);
     const agg = (key) => { const g = {}; rows.forEach((a) => { const k = key(a); const x = g[k] = g[k] || { spend: 0, revenue: 0, orders: 0, impressions: 0, clicks: 0, impWithClicks: 0, spendClicked: 0, ch: a.channel, n: 0 };
       x.spend += a.spend || 0; x.revenue += a.revenue || 0; x.orders += a.orders || 0; x.n++;
@@ -27,35 +28,35 @@
     const cpo = (x) => (x.orders ? P.rp(x.spend / x.orders) : '–');
     const chLabel = (k) => (CH[k] || CH.other).label, chColor = (k) => (CH[k] || CH.other).color;
     const byCh = Object.entries(agg((a) => a.channel)).sort((a, b) => b[1].spend - a[1].spend);
-    const byCamp = Object.entries(agg((a) => `${a.channel}|${a.campaign || '(tanpa nama)'}`)).sort((a, b) => b[1].spend - a[1].spend);
+    const byCamp = Object.entries(agg((a) => `${a.channel}|${a.campaign || '(no name)'}`)).sort((a, b) => b[1].spend - a[1].spend);
     const byDay = Object.entries(agg((a) => a.date)).sort((a, b) => a[0].localeCompare(b[0]));
     const one = from === to;
     const body = `
-      ${P.h2('Ringkasan iklan', 'revenue & order = atribusi dashboard iklan')}
+      ${P.h2('Ads summary', 'revenue &amp; orders = attribution from the ad dashboards')}
       ${P.tiles([
-        P.tile('Total spend', P.rp(tot.spend), `${num(byCamp.length)} campaign · ${num(byCh.length)} channel`, true),
-        P.tile('Revenue / GMV iklan', P.rp(tot.revenue), `${num(tot.orders)} order`),
+        P.tile('Total spend', P.rp(tot.spend), `${num(byCamp.length)} campaigns · ${num(byCh.length)} channels`, true),
+        P.tile('Ad revenue / GMV', P.rp(tot.revenue), `${num(tot.orders)} orders`),
         P.tile('ROAS', roas(tot), 'revenue ÷ spend'),
         P.tile('Cost per order', cpo(tot)),
-        P.tile('Impresi', num(tot.impressions)),
-        P.tile('Klik', num(tot.clicks), `CTR ${ctr(tot)}`),
+        P.tile('Impressions', num(tot.impressions)),
+        P.tile('Clicks', num(tot.clicks), `CTR ${ctr(tot)}`),
         P.tile('CPC', cpc(tot)),
-        P.tile('AOV iklan', tot.orders ? P.rp(tot.revenue / tot.orders) : '–'),
+        P.tile('Ad AOV', tot.orders ? P.rp(tot.revenue / tot.orders) : '–'),
       ])}
-      ${P.h2('Per channel')}
-      ${P.table([['Channel'], ['Spend', 1], ['Share', 1], ['Revenue', 1], ['ROAS', 1], ['Order', 1], ['Cost/order', 1], ['Impresi', 1], ['Klik', 1], ['CTR', 1], ['CPC', 1]],
+      ${P.h2('By channel')}
+      ${P.table([['Channel'], ['Spend', 1], ['Share', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Impressions', 1], ['Clicks', 1], ['CTR', 1], ['CPC', 1]],
         byCh.map(([k, x]) => [`${P.dot(chColor(k))}${esc(chLabel(k))}`, `<b>${P.rp(x.spend)}</b>`, P.pct(tot.spend ? x.spend / tot.spend : NaN), P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x), cpc(x)]),
-        ['Total', P.rp(tot.spend), '100%', P.rp(tot.revenue), roas(tot), num(tot.orders), cpo(tot), num(tot.impressions), num(tot.clicks), ctr(tot), cpc(tot)], 'Belum ada spending iklan.')}
-      ${P.h2('Per campaign', 'urut spend')}
-      ${P.table([['Channel'], ['Campaign'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Order', 1], ['Cost/order', 1], ['Impresi', 1], ['Klik', 1], ['CTR', 1]],
+        ['Total', P.rp(tot.spend), '100%', P.rp(tot.revenue), roas(tot), num(tot.orders), cpo(tot), num(tot.impressions), num(tot.clicks), ctr(tot), cpc(tot)], 'No ad spend yet.')}
+      ${P.h2('By campaign', 'sorted by spend')}
+      ${P.table([['Channel'], ['Campaign'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Impressions', 1], ['Clicks', 1], ['CTR', 1]],
         byCamp.map(([k, x]) => { const [ch, name] = k.split('|'); return [`${P.dot(chColor(ch))}${esc(chLabel(ch))}`, esc(name), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.impressions), num(x.clicks), ctr(x)]; }))}
-      ${one ? '' : `${P.h2('Per tanggal', 'akumulasi semua campaign')}
-      ${P.table([['Tanggal'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Order', 1], ['Cost/order', 1], ['Klik', 1]],
-        byDay.map(([d, x]) => [B.fmtDate(d), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.clicks)]),
+      ${one ? '' : `${P.h2('By date', 'all campaigns combined')}
+      ${P.table([['Date'], ['Spend', 1], ['Revenue', 1], ['ROAS', 1], ['Orders', 1], ['Cost/order', 1], ['Clicks', 1]],
+        byDay.map(([d, x]) => [P.longDate(d), `<b>${P.rp(x.spend)}</b>`, P.rp(x.revenue), roas(x), num(x.orders), cpo(x), num(x.clicks)]),
         ['Total', P.rp(tot.spend), P.rp(tot.revenue), roas(tot), num(tot.orders), cpo(tot), num(tot.clicks)])}`}`;
-    P.open({ title: one ? 'Laporan Iklan Harian' : 'Laporan Iklan', period: P.period(from, to), onePage: one || byDay.length <= 10,
-      meta: [[one ? 'Tanggal' : 'Periode', P.period(from, to)], ['Channel', esc(byCh.map(([k]) => chLabel(k)).join(', ') || '–')], ...(one ? [] : [['Hari diisi', `${num(byDay.length)} hari`]])],
-      body, note: 'Revenue, order, impresi & klik = angka atribusi dari dashboard iklan tiap platform (bisa termasuk pesanan yang nanti batal). CTR & CPC hanya dari campaign yang melaporkan impresi/klik.' });
+    P.open({ title: one ? 'Daily Ads Report' : 'Ads Report', period: P.period(from, to), onePage: one || byDay.length <= 10,
+      meta: [[one ? 'Date' : 'Period', P.period(from, to)], ['Channel', esc(byCh.map(([k]) => chLabel(k)).join(', ') || '–')], ...(one ? [] : [['Days with data', `${num(byDay.length)} days`]])],
+      body, note: 'Revenue, orders, impressions &amp; clicks = attribution from each platform ad dashboard (may include orders later cancelled). CTR &amp; CPC only from campaigns that report impressions/clicks.' });
   }
   const NUMS = [['spend', 'Spend (Rp)'], ['impressions', 'Impresi'], ['clicks', 'Klik'], ['orders', 'Order'], ['revenue', 'Revenue / GMV (Rp)']];
 

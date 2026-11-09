@@ -184,39 +184,42 @@
     $('#incPdf').addEventListener('click', () => {
       const R = window.PdfReport;
       const byDay = [...new Set(rows.map((s) => day(s)).filter(Boolean))].sort().map((d) => [d, sum(rows.filter((s) => day(s) === d))]);
+      const EN = { 'Pengembalian dana': 'Refunds', 'Voucher & subsidi': 'Vouchers & subsidies', 'Biaya pengiriman': 'Shipping', 'Biaya platform': 'Platform fees', 'Biaya Gratis Ongkir XTRA': 'Free Shipping XTRA fee', 'Biaya layanan': 'Service fees', 'Biaya promosi': 'Promotion fees', 'Biaya lainnya': 'Other fees', Pajak: 'Tax', Penyesuaian: 'Adjustments', 'Top-up saldo iklan': 'Ad balance top-up', 'Komisi affiliate': 'Affiliate commission', 'Biaya admin': 'Admin fee', 'Biaya layanan & program': 'Service &amp; program fees', 'Biaya transaksi': 'Transaction fee' };
+      const en = (x) => EN[x] || x;
+      const chEn = (c) => (c === 'all' || /semua/i.test(c) ? 'All marketplaces' : c);
       const body = `
-        ${R.h2(`Ringkasan income · ${esc(chLabel(st.ch))}`)}
+        ${R.h2(`Income summary · ${esc(chEn(chLabel(st.ch)))}`)}
         ${R.tiles([
-          R.tile('RRP', R.rp(K.rrp), 'harga sebelum diskon'),
-          R.tile('ASP', R.rp(K.asp), 'harga setelah diskon'),
-          R.tile('Discount', R.rp(K.disc), `${pct(K.discPct)} dari RRP`),
-          R.tile('Subsidi', R.rp(K.subsidi), 'ditanggung marketplace'),
-          R.tile('Ongkir', R.rp(K.ongkir), 'netto ditanggung penjual'),
-          R.tile('Voucher', K.voucher ? R.rp(K.voucher) : '–', 'voucher & cashback penjual'),
-          R.tile('MP fee', R.rp(K.mp), `${pct(K.mpPct)} dari ASP + subsidi`),
-          R.tile('Komisi affiliate', R.rp(K.aff)),
+          R.tile('RRP', R.rp(K.rrp), 'price before discount'),
+          R.tile('ASP', R.rp(K.asp), 'price after discount'),
+          R.tile('Discount', R.rp(K.disc), `${R.pct(K.discPct)} of RRP`),
+          R.tile('Subsidy', R.rp(K.subsidi), 'paid by marketplace'),
+          R.tile('Shipping', R.rp(K.ongkir), 'net, paid by seller'),
+          R.tile('Voucher', K.voucher ? R.rp(K.voucher) : '–', 'seller vouchers &amp; cashback'),
+          R.tile('MP fee', R.rp(K.mp), `${R.pct(K.mpPct)} of ASP + subsidy`),
+          R.tile('Affiliate commission', R.rp(K.aff)),
           ...(K.refund ? [R.tile('Refund', R.rp(K.refund))] : []),
-          ...(K.topup ? [R.tile('Top-up saldo iklan', R.rp(K.topup))] : []),
-          ...(K.adj ? [R.tile('Penyesuaian', R.rp(K.adj))] : []),
-          R.tile('NMV', R.rp(K.nmv), `penghasilan bersih · ${num(K.orders)} pesanan`, true),
+          ...(K.topup ? [R.tile('Ad balance top-up', R.rp(K.topup))] : []),
+          ...(K.adj ? [R.tile('Adjustments', R.rp(K.adj))] : []),
+          R.tile('NMV', R.rp(K.nmv), `net income · ${R.num(K.orders)} orders`, true),
         ], 4)}
-        ${R.h2('Rincian MP fee', `${R.rp(K.mp)} · ${pct(K.mpPct)} dari ASP + subsidi`)}
-        ${R.table([['Jenis fee'], ['Jumlah', 1], ['% dari ASP', 1], ['% dari MP fee', 1]], mpCards(K).map(([n, x]) => [esc(n), R.rp(x), K.asp ? pct(x / K.asp) : '–', K.mp ? pct(x / K.mp) : '–']), ['Total MP fee', R.rp(K.mp), K.asp ? pct(K.mp / K.asp) : '–', '100%'])}
-        ${st.ch === 'all' ? `${R.h2('Per channel')}${R.table([['Channel'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Fee %', 1], ['Penghasilan bersih', 1]],
-          CHANNELS.filter((c) => c !== 'all').map((c) => [c, sum(rows.filter((x) => x.channel === c))]).filter(([, x]) => x.orders || x.payout).map(([c, x]) => [`${R.dot(SALES_CH[c].color)}${SALES_CH[c].label}`, num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? pct(Math.abs(x.fees) / x.price) : '–', `<b>${R.rp(x.payout)}</b>`]),
-          ['Total', num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(t.payout)])}` : ''}
+        ${R.h2('MP fee breakdown', `${R.rp(K.mp)} · ${R.pct(K.mpPct)} of ASP + subsidy`)}
+        ${R.table([['Fee type'], ['Amount', 1], ['% of ASP', 1], ['% of MP fee', 1]], mpCards(K).map(([n, x]) => [esc(en(n)), R.rp(x), K.asp ? R.pct(x / K.asp) : '–', K.mp ? R.pct(x / K.mp) : '–']), ['Total MP fee', R.rp(K.mp), K.asp ? R.pct(K.mp / K.asp) : '–', '100%'])}
+        ${st.ch === 'all' ? `${R.h2('By channel')}${R.table([['Channel'], ['Orders', 1], ['Gross GMV', 1], ['Fees', 1], ['Fee %', 1], ['Net income', 1]],
+          CHANNELS.filter((c) => c !== 'all').map((c) => [c, sum(rows.filter((x) => x.channel === c))]).filter(([, x]) => x.orders || x.payout).map(([c, x]) => [`${R.dot(SALES_CH[c].color)}${SALES_CH[c].label}`, R.num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? R.pct(Math.abs(x.fees) / x.price) : '–', `<b>${R.rp(x.payout)}</b>`]),
+          ['Total', R.num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(t.payout)])}` : ''}
         <div class="two">
-          <div>${R.h2('Rincian potongan', '% dari GMV kotor')}
-            ${R.table([['Komponen'], ['Jumlah', 1], ['%', 1]], [['<b>GMV kotor</b>', `<b>${R.rp(t.price)}</b>`, '100%'], ...groups.map((n) => [`${esc(n)}${MI.NOT_FEES.includes(n) ? '' : ' <span class="chip warn">fee</span>'}`, R.rp(t.groups[n].total), share(t.groups[n].total)])], ['Penghasilan bersih', R.rp(t.payout), share(t.payout)])}</div>
-          <div>${R.h2('Per bulan', 'tanggal penghasilan masuk')}
-            ${R.table([['Bulan'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Penghasilan bersih', 1]], byMonth.map(([m, x]) => [monthLabel(m), num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), `<b>${R.rp(x.payout)}</b>`]))}</div>
+          <div>${R.h2('Deductions', '% of gross GMV')}
+            ${R.table([['Component'], ['Amount', 1], ['%', 1]], [['<b>Gross GMV</b>', `<b>${R.rp(t.price)}</b>`, '100%'], ...groups.map((n) => [`${esc(en(n))}${MI.NOT_FEES.includes(n) ? '' : ' <span class="chip warn">fee</span>'}`, R.rp(t.groups[n].total), share(t.groups[n].total)])], ['Net income', R.rp(t.payout), share(t.payout)])}</div>
+          <div>${R.h2('By month', 'payout release date')}
+            ${R.table([['Month'], ['Orders', 1], ['Gross GMV', 1], ['Fees', 1], ['Net income', 1]], byMonth.map(([m, x]) => [R.longDate(`${m}-01`).replace(/^1 /, ''), R.num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), `<b>${R.rp(x.payout)}</b>`]))}</div>
         </div>
-        ${R.h2('Income per tanggal', 'akumulasi per tanggal penghasilan masuk')}
-        ${R.table([['Tanggal'], ['Pesanan', 1], ['GMV kotor', 1], ['Fee', 1], ['Fee %', 1], ['Refund · penyesuaian', 1], ['Penghasilan bersih', 1]],
-          byDay.map(([d, x]) => [fmtDate(d), num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? pct(Math.abs(x.fees) / x.price) : '–', R.rp(g(x, 'Pengembalian dana') + g(x, 'Penyesuaian')), `<b>${R.rp(x.payout)}</b>`]),
-          ['Total', num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(g(t, 'Pengembalian dana') + g(t, 'Penyesuaian')), R.rp(t.payout)])}`;
-      R.open({ title: 'Laporan Income', period: R.period(r.from, r.to), meta: [['Periode', st.range === 'all' ? 'Semua data' : R.period(r.from, r.to)], ['Channel', esc(chLabel(st.ch))]], body,
-        note: 'Income = pesanan selesai yang penghasilannya sudah masuk ke saldo penjual. Tanggal = tanggal dana dilepaskan. Penghasilan bersih = GMV kotor setelah semua fee, voucher, ongkir & refund.' });
+        ${R.h2('Income by date', 'totals per payout release date')}
+        ${R.table([['Date'], ['Orders', 1], ['Gross GMV', 1], ['Fees', 1], ['Fee %', 1], ['Refunds · adjustments', 1], ['Net income', 1]],
+          byDay.map(([d, x]) => [R.longDate(d), R.num(x.orders), R.rp(x.price), R.rp(Math.abs(x.fees)), x.price ? R.pct(Math.abs(x.fees) / x.price) : '–', R.rp(g(x, 'Pengembalian dana') + g(x, 'Penyesuaian')), `<b>${R.rp(x.payout)}</b>`]),
+          ['Total', R.num(t.orders), R.rp(t.price), R.rp(Math.abs(t.fees)), share(t.fees), R.rp(g(t, 'Pengembalian dana') + g(t, 'Penyesuaian')), R.rp(t.payout)])}`;
+      R.open({ title: 'Income Report', period: R.period(r.from, r.to), meta: [['Period', st.range === 'all' ? 'All data' : R.period(r.from, r.to)], ['Channel', esc(chEn(chLabel(st.ch)))]], body,
+        note: 'Income = completed orders whose payout has reached the seller balance. Date = payout release date. Net income = gross GMV after all fees, vouchers, shipping &amp; refunds.' });
     });
     $('#incExport').addEventListener('click', () => {
       const cols = [...new Set(rows.flatMap((s) => Object.keys(detailOf(s))))];

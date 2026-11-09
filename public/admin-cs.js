@@ -112,27 +112,36 @@
 
   // ---------- PDF ----------
   const P = () => window.PdfReport;
+  // English labels for the PDFs (the app itself stays Indonesian)
+  const STAT_EN = { visitors: 'Total visitors', chats: 'Chats', askers: 'Visitors who asked', askRate: 'Questions asked', replied: 'Chats replied', unreplied: 'Chats not replied', responseTime: 'Avg response time', csat: 'CSAT', respConv: 'Conversion (responded chats)', buyers: 'Total buyers', orders: 'Orders', products: 'Products', sales: 'Sales', chatConv: 'Conversion (replied chats)', sessions: 'Sessions today', agentsOnline: 'Agents online', agentsActive: 'Agents active', chatAI: 'AI-only chats', chatAgent: 'Agent-only chats', chatAIAgent: 'AI to agent chats', resp12h: 'Responded within 12h', riskSessions: 'Risky chats (sessions)', riskAgents: 'Agents affected', riskPct: 'Risk rate' };
+  const GROUP_EN = { 'Kunjungan & pertanyaan': 'Visits &amp; questions', 'Tanggapan chat': 'Chat responses', 'Pesanan dibuat dari chat': 'Orders from chat', Aktivitas: 'Activity', 'Volume chat': 'Chat volume', 'Performa layanan': 'Service performance', 'Konversi penjualan': 'Sales conversion', 'Risiko chat': 'Chat risk' };
+  const TASK_EN = { chat: 'Reply to all incoming chats (keep response rate)', orders: 'Check orders to ship &amp; late orders', flash: 'Submit shop flash sale for tomorrow' };
+  const FS_EN = { diajukan: 'Submitted', disetujui: 'Approved', ditolak: 'Rejected', live: 'Live', selesai: 'Finished' };
+  const rpE = (n) => P().rp(n), nE = (n) => P().num(n);
+  const pE = (v) => (Number.isFinite(v) ? `${v.toLocaleString('en-US', { maximumFractionDigits: 1 })}%` : '–');
+  const minE = (m) => { if (!m) return '–'; const t = Math.round(m * 60); const h = Math.floor(t / 3600), mi = Math.floor((t % 3600) / 60), se = t % 60; return h ? `${h}h ${mi}m` : `${mi}m ${String(se).padStart(2, '0')}s`; };
+  const valE = (kind, v) => (kind === 'p' ? (v || v === 0 ? pE(Number(v)) : '–') : kind === 'rp' ? rpE(v || 0) : kind === 't' ? minE(v) : nE(v || 0));
   function chBlock(k, r) {
     const { tile, tiles, h2, table } = P();
-    if (!r) return `${h2(CH[k].label)}<div class="box muted">Belum ada laporan ${CH[k].label} untuk tanggal ini.</div>`;
+    if (!r) return `${h2(CH[k].label)}<div class="box muted">No ${CH[k].label} report for this date.</div>`;
     const groups = STATS[k].map(([g, list]) => [g, list.filter(([fk]) => r[fk] || r[fk] === 0)]).filter(([, l]) => l.length);
     const done = (r.tasks || []).length, all = TASKS[k].length;
     return `
-      ${h2(`${P().dot(CH[k].color)}${CH[k].label}`, `jobdesk ${done}/${all} · ${r.updatedBy ? `diisi ${esc(r.updatedBy)}` : ''}`)}
+      ${h2(`${P().dot(CH[k].color)}${CH[k].label}`, `tasks ${done}/${all} · ${r.updatedBy ? `by ${esc(r.updatedBy)}` : ''}`)}
       ${tiles([
-        tile('Jumlah chat', num(r.chats), isShopee(k) ? `${num(r.visitors)} pengunjung` : `AI ${num(r.chatAI)} · agen ${num(r.chatAgent)} · AI→agen ${num(r.chatAIAgent)}`, true),
-        tile(isShopee(k) ? 'Chat dibalas' : 'Respons ≤ 12 jam', pctTxt(r.responseRate), isShopee(k) ? `${num(r.replied)} dibalas · ${num(r.unreplied)} belum` : ''),
-        tile('Waktu respon rata-rata', fmtMin(r.responseTime)),
-        tile(isShopee(k) ? 'CSAT' : 'Tingkat kepuasan', r.csat || r.csat === 0 ? pctTxt(r.csat) : '–'),
-        tile('Pesanan dari chat', num(r.orders), `konversi ${r.chatConv ? pctTxt(r.chatConv) : '–'}`),
-        tile('Penjualan dari chat', money(r.sales || 0), isShopee(k) ? `${num(r.buyers)} pembeli · ${num(r.products)} produk` : ''),
-        tile(isShopee(k) ? 'Konversi chat dibalas' : 'Konversi penjualan', r.chatConv ? pctTxt(r.chatConv) : '–', ''),
-        tile(isShopee(k) ? 'Pengunjung bertanya' : 'Risiko chat', isShopee(k) ? num(r.askers) : `${num(r.riskSessions)} sesi`, isShopee(k) ? `pertanyaan diajukan ${r.askRate ? pctTxt(r.askRate) : '–'}` : `${r.riskPct ? pctTxt(r.riskPct) : '0%'} dari chat`),
+        tile('Chats', nE(r.chats), isShopee(k) ? `${nE(r.visitors)} visitors` : `AI ${nE(r.chatAI)} · agent ${nE(r.chatAgent)} · AI→agent ${nE(r.chatAIAgent)}`, true),
+        tile(isShopee(k) ? 'Chats replied' : 'Responded ≤ 12h', pE(r.responseRate), isShopee(k) ? `${nE(r.replied)} replied · ${nE(r.unreplied)} not yet` : ''),
+        tile('Avg response time', minE(r.responseTime)),
+        tile(isShopee(k) ? 'CSAT' : 'Satisfaction', r.csat || r.csat === 0 ? pE(r.csat) : '–'),
+        tile('Orders from chat', nE(r.orders), `conversion ${r.chatConv ? pE(r.chatConv) : '–'}`),
+        tile('Sales from chat', rpE(r.sales || 0), isShopee(k) ? `${nE(r.buyers)} buyers · ${nE(r.products)} products` : ''),
+        tile(isShopee(k) ? 'Replied-chat conversion' : 'Sales conversion', r.chatConv ? pE(r.chatConv) : '–', ''),
+        tile(isShopee(k) ? 'Visitors who asked' : 'Chat risk', isShopee(k) ? nE(r.askers) : `${nE(r.riskSessions)} sessions`, isShopee(k) ? `questions asked ${r.askRate ? pE(r.askRate) : '–'}` : `${r.riskPct ? pE(r.riskPct) : '0%'} of chats`),
       ])}
       <div class="two" style="margin-top:8px">
-        <div>${table([['Metrik'], ['Nilai', 1]], groups.flatMap(([g, l]) => [[`<b>${esc(g)}</b>`, ''], ...l.map(([fk, lab, kind]) => [`<span class="muted">${esc(lab)}</span>`, statVal(kind, r[fk])])]), null, 'Data analitik belum diisi.')}</div>
-        <div><div class="box"><p><b>Jobdesk</b></p>${TASKS[k].map(([tk, l]) => `<p>${(r.tasks || []).includes(tk) ? '<span class="chip ok">✓</span>' : '<span class="chip">–</span>'} ${esc(l)}</p>`).join('')}</div>
-          ${r.note ? `<div class="box" style="margin-top:8px"><p><b>Catatan</b></p><p>${esc(r.note)}</p></div>` : ''}</div>
+        <div>${table([['Metric'], ['Value', 1]], groups.flatMap(([g, l]) => [[`<b>${GROUP_EN[g] || esc(g)}</b>`, ''], ...l.map(([fk, lab, kind]) => [`<span class="muted">${esc(STAT_EN[fk] || lab)}</span>`, valE(kind, r[fk])])]), null, 'Analytics not filled in.')}</div>
+        <div><div class="box"><p><b>Daily tasks</b></p>${TASKS[k].map(([tk, l]) => `<p>${(r.tasks || []).includes(tk) ? '<span class="chip ok">✓</span>' : '<span class="chip">–</span>'} ${TASK_EN[tk] || esc(l)}</p>`).join('')}</div>
+          ${r.note ? `<div class="box" style="margin-top:8px"><p><b>Notes</b></p><p>${esc(r.note)}</p></div>` : ''}</div>
       </div>`;
   }
   function dayPdf(d, draft) {
@@ -143,24 +152,24 @@
     const t = chatTotals(Object.values(recs).filter(Boolean));
     const fsl = (draft ? draft.fs : fsOf(d)).filter((x) => (x.product || '').trim());
     const body = `
-      ${R.h2('Gabungan Shopee Official + Shopee Global + TikTok Shop', 'rata-rata waktu respon & kepuasan ditimbang jumlah chat')}
+      ${R.h2('Shopee Official + Shopee Global + TikTok Shop combined', 'response time &amp; satisfaction weighted by chats')}
       ${R.tiles([
-        R.tile('Total chat', num(t.chats), `${num(t.reports)} channel dilaporkan`, true),
-        R.tile('Chat dibalas', pctTxt(t.rate)),
-        R.tile('Waktu respon rata-rata', fmtMin(t.responseTime)),
-        R.tile('Kepuasan / CSAT', pctTxt(t.csat)),
-        R.tile('Pesanan dari chat', num(t.orders), `konversi ${Number.isFinite(t.conv) ? pct(t.conv) : '–'}`),
-        R.tile('Penjualan dari chat', money(t.sales)),
+        R.tile('Total chats', nE(t.chats), `${nE(t.reports)} channels reported`, true),
+        R.tile('Chats replied', pE(t.rate)),
+        R.tile('Avg response time', minE(t.responseTime)),
+        R.tile('Satisfaction / CSAT', pE(t.csat)),
+        R.tile('Orders from chat', nE(t.orders), `conversion ${Number.isFinite(t.conv) ? R.pct(t.conv) : '–'}`),
+        R.tile('Sales from chat', rpE(t.sales)),
       ], 6)}
       ${CHS.map((k) => chBlock(k, recs[k])).join('')}
-      ${a && FS_PERF.some(([k]) => a[k]) ? `${R.h2('⚡ Performa flash sale Shopee', 'Promosi › Flash Sale Toko Saya')}${R.tiles([
-        R.tile('Penjualan', money(a.fsSales || 0), '', true), R.tile('Pesanan', num(a.fsOrders)), R.tile('Total pembeli', num(a.fsBuyers)),
-        R.tile('Penjualan / pembeli', a.fsBuyers ? money((a.fsSales || 0) / a.fsBuyers) : '–'), R.tile('Persentase klik', pctTxt(a.fsClick)), R.tile('Produk dilihat', num(a.fsViews)),
+      ${a && FS_PERF.some(([k]) => a[k]) ? `${R.h2('⚡ Shopee flash sale performance', 'Promotions › My Shop Flash Sale')}${R.tiles([
+        R.tile('Sales', rpE(a.fsSales || 0), '', true), R.tile('Orders', nE(a.fsOrders)), R.tile('Total buyers', nE(a.fsBuyers)),
+        R.tile('Sales / buyer', a.fsBuyers ? rpE((a.fsSales || 0) / a.fsBuyers) : '–'), R.tile('Click rate', pE(a.fsClick)), R.tile('Product views', nE(a.fsViews)),
       ], 6)}` : ''}
-      ${fsl.length ? `${R.h2('⚡ Produk flash sale Shopee', `${num(fsl.length)} produk`)}${R.table([['Sesi'], ['Produk'], ['Harga normal', 1], ['Harga FS', 1], ['Stok', 1], ['Terjual', 1], ['Status']], fsl.map((x) => [esc(x.session), `${esc(x.product)} <span class="muted">${esc(x.variant || '')}</span>`, money(x.normalPrice), `<b>${money(x.price)}</b>`, num(x.stock), num(x.sold), FS_STATUS[x.status || 'diajukan']]))}` : ''}`;
-    R.open({ title: 'Daily Report Customer Service', period: longDay(d), onePage: true,
-      meta: [['Tanggal', longDay(d)], ['Channel', 'Shopee Official · Shopee Global · TikTok Shop / Tokopedia'], ['Disusun oleh', esc(Object.values(recs).find((x) => x?.updatedBy)?.updatedBy || who())]],
-      body, sign: ['Customer Service', 'Mengetahui'], note: 'Angka analitik disalin dari Shopee Seller Centre (Layanan › Chat) dan Seller Center TikTok/Tokopedia (Analitik layanan). Waktu: GMT+7.' });
+      ${fsl.length ? `${R.h2('⚡ Shopee flash sale products', `${nE(fsl.length)} products`)}${R.table([['Session'], ['Product'], ['Normal price', 1], ['FS price', 1], ['Stock', 1], ['Sold', 1], ['Status']], fsl.map((x) => [esc(x.session), `${esc(x.product)} <span class="muted">${esc(x.variant || '')}</span>`, rpE(x.normalPrice), `<b>${rpE(x.price)}</b>`, nE(x.stock), nE(x.sold), FS_EN[x.status || 'diajukan']]))}` : ''}`;
+    R.open({ title: 'Customer Service Daily Report', period: R.longDate(d), onePage: true,
+      meta: [['Date', R.longDate(d)], ['Channel', 'Shopee Official · Shopee Global · TikTok Shop / Tokopedia'], ['Prepared by', esc(Object.values(recs).find((x) => x?.updatedBy)?.updatedBy || who())]],
+      body, sign: ['Customer Service', 'Approved by'], note: 'Analytics copied from Shopee Seller Centre (Service › Chat) and TikTok/Tokopedia Seller Center (Service analytics). Time: GMT+7.' });
   }
   function periodPdf() {
     const R = P();
@@ -170,25 +179,25 @@
     const all = chatTotals(chRows(sst.ch, r.from, r.to));
     const days = [...new Set(chRows(sst.ch, r.from, r.to).map((x) => x.date))].sort();
     const body = `
-      ${R.h2(sst.ch === 'all' ? 'Gabungan semua channel' : CH[sst.ch].label)}
+      ${R.h2(sst.ch === 'all' ? 'All channels combined' : CH[sst.ch].label)}
       ${R.tiles([
-        R.tile('Jumlah chat', num(all.chats), `${num(all.days)} hari dilaporkan`, true),
-        R.tile('Chat dibalas', pctTxt(all.rate), `${num(all.unreplied)} belum dibalas`),
-        R.tile('Waktu respon rata-rata', fmtMin(all.responseTime)),
-        R.tile('Kepuasan / CSAT', pctTxt(all.csat)),
-        R.tile('Pesanan dari chat', num(all.orders), `konversi ${Number.isFinite(all.conv) ? pct(all.conv) : '–'}`),
-        R.tile('Penjualan dari chat', money(all.sales)),
+        R.tile('Chats', nE(all.chats), `${nE(all.days)} days reported`, true),
+        R.tile('Chats replied', pE(all.rate), `${nE(all.unreplied)} not replied`),
+        R.tile('Avg response time', minE(all.responseTime)),
+        R.tile('Satisfaction / CSAT', pE(all.csat)),
+        R.tile('Orders from chat', nE(all.orders), `conversion ${Number.isFinite(all.conv) ? R.pct(all.conv) : '–'}`),
+        R.tile('Sales from chat', rpE(all.sales)),
       ], 3)}
-      ${sst.ch !== 'tiktok' && all.fsSales ? R.tiles([R.tile('⚡ Penjualan flash sale', money(all.fsSales), '', true), R.tile('Pesanan flash sale', num(all.fsOrders)), R.tile('Pembeli flash sale', num(all.fsBuyers)), R.tile('Produk dilihat', num(all.fsViews))]) : ''}
-      ${chs.length > 1 ? `${R.h2('Per channel')}${R.table([['Channel'], ['Hari', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Konversi', 1]],
-        per.map(([k, x]) => [`${R.dot(CH[k].color)}${CH[k].label}`, num(x.days), num(x.chats), pctTxt(x.rate), fmtMin(x.responseTime), pctTxt(x.csat), num(x.orders), money(x.sales), Number.isFinite(x.conv) ? pct(x.conv) : '–']),
-        ['Total', num(all.days), num(all.chats), pctTxt(all.rate), fmtMin(all.responseTime), pctTxt(all.csat), num(all.orders), money(all.sales), Number.isFinite(all.conv) ? pct(all.conv) : '–'])}` : ''}
-      ${R.h2('Harian')}
-      ${R.table([['Tanggal'], ['Channel'], ['Pengunjung', 1], ['Chat', 1], ['Dibalas', 1], ['Waktu respon', 1], ['CSAT', 1], ['Pesanan', 1], ['Penjualan', 1], ['Konversi', 1]],
-        days.flatMap((d) => chs.map((k) => rep(d, k)).filter(Boolean)).map((x) => [fmtDate(x.date), CH[x.channel].label, x.visitors ? num(x.visitors) : '–', num(x.chats), pctTxt(x.responseRate), fmtMin(x.responseTime), x.csat ? pctTxt(x.csat) : '–', num(x.orders), money(x.sales || 0), x.chatConv ? pctTxt(x.chatConv) : '–']), null, 'Belum ada laporan di periode ini.')}`;
-    R.open({ title: 'Laporan Customer Service', period: R.period(r.from, r.to), onePage: days.length <= 14,
-      meta: [['Periode', R.period(r.from, r.to)], ['Channel', sst.ch === 'all' ? 'Gabungan semua channel' : CH[sst.ch].label]],
-      body, sign: ['Customer Service', 'Mengetahui'], note: 'Rata-rata waktu respon & kepuasan ditimbang jumlah chat per hari. Sumber: input harian CS dari Seller Centre.' });
+      ${sst.ch !== 'tiktok' && all.fsSales ? R.tiles([R.tile('⚡ Flash sale sales', rpE(all.fsSales), '', true), R.tile('Flash sale orders', nE(all.fsOrders)), R.tile('Flash sale buyers', nE(all.fsBuyers)), R.tile('Product views', nE(all.fsViews))]) : ''}
+      ${chs.length > 1 ? `${R.h2('By channel')}${R.table([['Channel'], ['Days', 1], ['Chats', 1], ['Replied', 1], ['Response time', 1], ['CSAT', 1], ['Orders', 1], ['Sales', 1], ['Conversion', 1]],
+        per.map(([k, x]) => [`${R.dot(CH[k].color)}${CH[k].label}`, nE(x.days), nE(x.chats), pE(x.rate), minE(x.responseTime), pE(x.csat), nE(x.orders), rpE(x.sales), Number.isFinite(x.conv) ? R.pct(x.conv) : '–']),
+        ['Total', nE(all.days), nE(all.chats), pE(all.rate), minE(all.responseTime), pE(all.csat), nE(all.orders), rpE(all.sales), Number.isFinite(all.conv) ? R.pct(all.conv) : '–'])}` : ''}
+      ${R.h2('Daily')}
+      ${R.table([['Date'], ['Channel'], ['Visitors', 1], ['Chats', 1], ['Replied', 1], ['Response time', 1], ['CSAT', 1], ['Orders', 1], ['Sales', 1], ['Conversion', 1]],
+        days.flatMap((d) => chs.map((k) => rep(d, k)).filter(Boolean)).map((x) => [R.longDate(x.date), CH[x.channel].label, x.visitors ? nE(x.visitors) : '–', nE(x.chats), pE(x.responseRate), minE(x.responseTime), x.csat ? pE(x.csat) : '–', nE(x.orders), rpE(x.sales || 0), x.chatConv ? pE(x.chatConv) : '–']), null, 'No reports in this period.')}`;
+    R.open({ title: 'Customer Service Report', period: R.period(r.from, r.to), onePage: days.length <= 14,
+      meta: [['Period', R.period(r.from, r.to)], ['Channel', sst.ch === 'all' ? 'All channels combined' : CH[sst.ch].label]],
+      body, sign: ['Customer Service', 'Approved by'], note: 'Response time &amp; satisfaction are weighted by chats per day. Source: daily CS input from Seller Centre.' });
   }
 
   function render() {
