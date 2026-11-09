@@ -913,6 +913,7 @@
     const back = topupBack(inc, m);
     const profit = inc.payout + back - hpp - m.adSpend - m.expenses;
     return { from, to, m, inc, live, off, allOrders, channels, adOnly, trend, products, hpp, profit, back, targets, targetMonth, dayPct,
+      allFees: inc.price - inc.payout, allFeeRate: inc.price ? (inc.price - inc.payout) / inc.price : NaN,
       cancelRate: allOrders ? (m.cancelled + m.returnOrders) / allOrders : NaN, feeRate: inc.price ? Math.abs(inc.fees) / inc.price : NaN };
   }
 
@@ -961,7 +962,7 @@
         ${kpi('Omzet pesanan', money(m.revenue), delta(m.revenue, P.m.revenue), true, SRC.omzet)}
         ${kpi('GMV kotor', money(inc.price), delta(inc.price, P.inc.price), false, SRC.gmv)}
         ${kpi('Penghasilan bersih', money(inc.payout), delta(inc.payout, P.inc.payout), false, SRC.net)}
-        ${kpi('Fee marketplace', money(Math.abs(inc.fees)), `<div class="k-delta">${pct(S.feeRate)} dari GMV kotor · ${cmpLabel}: ${pct(P.feeRate)}</div>`, false, SRC.fee)}
+        ${kpi('Total fee marketplace', money(S.allFees), `<div class="k-delta">${pct(S.allFeeRate)} dari GMV kotor</div>${deltaPt(S.allFeeRate, P.allFeeRate, true)}`, false, 'Semua potongan di export income: fee admin, layanan, program, voucher, ongkir, refund, penyesuaian. GMV kotor − angka ini = penghasilan bersih')}
         ${kpi('Pesanan · unit', `${num(m.orders)} · ${num(m.units)}`, delta(m.orders, P.m.orders), false, SRC.orders)}
         ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov), false, SRC.aov)}
         ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true), false, SRC.ads)}
@@ -1072,7 +1073,7 @@
     tile('Units sold online', `${n(onU(S))} pairs`, chg(onU(S), onU(P))),
     tile('Units out offline', `${n(off.units)} pcs`, `${n(off.trx)} transactions ${chg(off.units, P.off.units)}`),
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
-    tile('Marketplace fees', rp(Math.abs(inc.fees)), `${pc(S.feeRate)} of GMV ${chgPt(S.feeRate, P.feeRate, true)}`),
+    tile('Marketplace fees (all)', rp(S.allFees), `${pc(S.allFeeRate)} of GMV ${chgPt(S.allFeeRate, P.allFeeRate, true)} · GMV − fees = net income`),
     tile('Cancel + return rate', pc(S.cancelRate), `${n(m.cancelled + m.returnOrders)} orders ${chgPt(S.cancelRate, P.cancelRate, true)}`),
     tile('Ad spend · ROAS', `${rp(m.adSpend)}`, `ROAS ${x(m.adRoas)} · ad GMV ${rp(m.adRevenue)} ${chg(m.adSpend, P.m.adSpend, true)}`),
     tile('Cancelled orders', `${n(m.cancelled)} orders`, `value ${rp(m.cancelValue)} ${chg(m.cancelValue, P.m.cancelValue, true)}`),
@@ -1088,7 +1089,7 @@
     ['Gross GMV', rp(inc.price), rp(P.inc.price), chg(inc.price, P.inc.price)],
     ['Net income', rp(inc.payout), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
     ['Net income ÷ GMV', pc(inc.price ? inc.payout / inc.price : NaN), pc(P.inc.price ? P.inc.payout / P.inc.price : NaN), chgPt(inc.price ? inc.payout / inc.price : NaN, P.inc.price ? P.inc.payout / P.inc.price : NaN)],
-    ['Marketplace fees', rp(Math.abs(inc.fees)), rp(Math.abs(P.inc.fees)), chg(Math.abs(inc.fees), Math.abs(P.inc.fees), true)],
+    ['Marketplace fees (all deductions)', rp(S.allFees), rp(P.allFees), chg(S.allFees, P.allFees, true)],
     ['Ad spend', rp(m.adSpend), rp(P.m.adSpend), chg(m.adSpend, P.m.adSpend, true)],
     ['Offline revenue', rp(off.omzet), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
     ['Cancelled orders', n(m.cancelled), n(P.m.cancelled), chg(m.cancelled, P.m.cancelled, true)],
