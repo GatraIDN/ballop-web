@@ -1069,6 +1069,7 @@
         ${kpi('Batal', `${num(m.cancelled)} · ${money(m.cancelValue)}`, delta(m.cancelValue, P.m.cancelValue, true), false, 'file order · jumlah pesanan · nilai')}
         ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov), false, 'order value ÷ pesanan')}
         ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true), false, 'Seller Centre + input manual')}
+        ${kpi('Total income (online + offline)', money(inc.payout + off.omzet), delta(inc.payout + off.omzet, P.inc.payout + P.off.omzet), false, `income value ${compact(inc.payout)} + offline ${compact(off.omzet)}`)}
       </div>
       <p class="muted small cmp-note">▲▼ dibanding tanggal yang sama bulan lalu: <b>${rangeLabel(S)}</b> vs <b>${rangeLabel(P)}</b>.</p>
       <section class="panel solid">
