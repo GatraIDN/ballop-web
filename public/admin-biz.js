@@ -893,7 +893,7 @@
     const adOnly = Object.entries(m.byAd).filter(([k]) => !channels.some((c) => c.key === k)).map(([k, a]) => ({ key: k, label: ADS_CH[k]?.label || k, spend: a.spend, revenue: a.revenue }));
     const trend = periodRows(from, to).map((b) => {
       const x = compute(b.from, b.to), y = computeIncome(b.from, b.to), l = computeLive(b.from, b.to);
-      return { ...b, omzet: x.revenue, orders: x.orders, units: x.units, gmv: y.price, net: y.payout, fees: Math.abs(y.fees), ads: x.adSpend, adRev: x.adRevenue, live: l.gmv, offline: offlineOf(b.from, b.to).omzet };
+      return { ...b, byCh: Object.fromEntries(Object.entries(x.byCh).map(([k, c]) => [k, c.revenue])), omzet: x.revenue, orders: x.orders, units: x.units, gmv: y.price, net: y.payout, fees: Math.abs(y.fees), ads: x.adSpend, adRev: x.adRevenue, live: l.gmv, offline: offlineOf(b.from, b.to).omzet };
     });
     // product groups: catalog name, or the listing name without its size suffix
     const prod = {};
@@ -932,7 +932,7 @@
   function coverage(S) {
     const last = (rows, ch, day) => rows.filter((r) => r.channel === ch).map(day).filter(Boolean).sort().pop() || '';
     return MARKET_CH.map((k) => {
-      const lo = last(data.sales, k, (r) => r.date), li = last(data.settlements, k, payDay);
+      const lo = last(data.orders, k, (r) => r.date), li = last(data.settlements, k, payDay);
       if (!lo && !li) return null;
       const c = S.channels.find((x) => x.key === k) || {};
       return { key: k, label: SALES_CH[k]?.label || k, color: SALES_CH[k]?.color || '#888', lastOrder: lo, lastIncome: li, orders: c.orders || 0, incOrders: S.inc.byCh[k]?.orders || 0 };
@@ -1029,6 +1029,7 @@
     const n = (v) => R.num(v);
     const totOmzet = S.channels.reduce((s, c) => s + c.omzet, 0) || 1;
     const maxT = Math.max(1, ...S.trend.map((t) => Math.max(t.omzet, t.net)));
+    const maxO = Math.max(1, ...S.trend.map((t) => t.omzet));
     const unit = len > 62 ? 'month' : len > 14 ? 'week' : 'day';
     const EN = { 'Biaya marketplace': 'Marketplace fees', 'Biaya platform': 'Platform fees', 'Biaya Gratis Ongkir XTRA': 'Free Shipping XTRA fee', 'Biaya layanan': 'Service fees', 'Biaya promosi': 'Promotion fees', 'Biaya lainnya': 'Other fees', Pajak: 'Tax','Voucher & subsidi': 'Vouchers & subsidies', 'Biaya pengiriman': 'Shipping', 'Pengembalian dana': 'Refunds', Penyesuaian: 'Adjustments', 'Top-up saldo iklan': 'Ad balance top-up', 'Lain-lain (selisih di file)': 'Other (difference in file)' };
     const steps = moneySteps(inc);
@@ -1047,6 +1048,7 @@
     tile('Cancelled', `${n(m.cancelled)} · ${rp(m.cancelValue)}`, `orders · value ${chg(m.cancelValue, P.m.cancelValue, true)}`),
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
     tile('Ad spend · ROAS', rp(m.adSpend), `ROAS ${x(m.adRoas)} ${chg(m.adSpend, P.m.adSpend, true)}`),
+    tile('Total income (online + offline)', rp(inc.payout + off.omzet), `e-com ${rp(inc.payout)} + offline ${rp(off.omzet)} ${chg(inc.payout + off.omzet, P.inc.payout + P.off.omzet)}`),
   ])}
   <div class="avoid">
   ${h2('Comparison', cmp)}
@@ -1079,22 +1081,17 @@
     ['Total', rp(m.revenue), '100%', n(m.orders), n(m.units), n(m.cancelled), rp(m.cancelValue), rp(inc.payout), rp(m.adSpend), x(m.adRoas)])}
   </div>
   ${S.targets.length ? `${h2(`Target ${S.targetMonth}`, 'order value, month to date')}${table([['Channel'], ['Actual', 1], ['Target', 1], ['Achieved', 1], ['Month-end projection', 1]], S.targets.map((t) => [`${dot(t.color)}${esc(t.label)}`, rp(t.value), rp(t.target), `<b>${pc(t.pct)}</b>`, rp(t.projected)]))}` : ''}
-  ${h2(`Trend by ${unit}`, `${dot('#2a78d6')}order value ${dot('#0e8a4f')}income value`)}
+  ${h2(`Trend by ${unit}`, `order value per channel: ${S.channels.map((c) => `${dot(c.color)}${esc(c.label)}`).join(' ')}`)}
   ${table([['Period'], [''], ['Order value', 1], ['Orders', 1], ['Units', 1], ['Income value', 1], ['Ads', 1], ['ROAS', 1], ['Live', 1], ['Offline', 1]],
-    S.trend.map((t) => [esc(trendLabel(t)), bars([[t.omzet, '#2a78d6'], [t.net, '#0e8a4f']], maxT), `<b>${rp(t.omzet)}</b>`, n(t.orders), n(t.units), rp(t.net), rp(t.ads), x(t.ads ? t.adRev / t.ads : NaN), t.live ? rp(t.live) : '–', t.offline ? rp(t.offline) : '–']))}
+    S.trend.map((t) => [esc(trendLabel(t)), `<div style="width:${maxO ? (t.omzet / maxO) * 100 : 0}%;min-width:2px"><div class="mix" style="height:8px;margin:4px 0 0">${Object.entries(t.byCh || {}).filter(([, v]) => v > 0).map(([k, v]) => `<i style="width:${(v / (t.omzet || 1)) * 100}%;background:${SALES_CH[k]?.color || '#888'}"></i>`).join('')}</div></div>`, `<b>${rp(t.omzet)}</b>`, n(t.orders), n(t.units), rp(t.net), rp(t.ads), x(t.ads ? t.adRev / t.ads : NaN), t.live ? rp(t.live) : '–', t.offline ? rp(t.offline) : '–']))}
   ${h2('Best sellers', 'by units sold')}
   ${table([['Product'], ['Units', 1], ['Order value', 1], ['Share', 1]], S.products.slice(0, 10).map((p, i) => [`<span class="rank">${i + 1}</span>${esc(p.name)}`, n(p.units), rp(p.revenue), pc(m.units ? p.units / m.units : NaN)]), null, 'No products sold.')}
   <div class="avoid">
-  ${h2('Data sources', 'where every number comes from')}
-  ${table([['Figure'], ['Source'], ['Date used']], [
-    ['Order value, orders, units, cancelled, AOV', 'Order export of each marketplace (completed + in process; cancelled counted separately)', 'Order created date'],
-    ['Income value', 'Income / settlement export of each marketplace (money received in the seller balance)', 'Payout release date'],
-    ['Ad spend, ad GMV, ROAS', 'Shopee & TikTok Seller Centre; Meta, CPAS & TikTok Ads Manager entered manually', 'Ad date'],
-    ['Offline revenue & units', 'Offline sales menu (completed transactions)', 'Transaction date'],
-    ['TikTok LIVE', 'Creator Live Performance export', 'Live date'],
-  ])}
-  ${table([['Channel'], ['Latest order file'], ['Latest income file']],
-    cov.map((c) => [`${dot(c.color)}${esc(c.label)}`, enDate(c.lastOrder), enDate(c.lastIncome)]))}
+  ${h2('Total income (online + offline)', 'e-commerce income value + offline revenue')}
+  ${table([['Source'], ['Amount', 1], ['Share', 1], [R.period(P.from, P.to), 1], ['Change', 1]], [
+    [`${dot('#2a78d6')}E-commerce income value`, rp(inc.payout), pc(inc.payout + off.omzet ? inc.payout / (inc.payout + off.omzet) : NaN), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
+    [`${dot('#0e8a8a')}Offline revenue`, rp(off.omzet), pc(inc.payout + off.omzet ? off.omzet / (inc.payout + off.omzet) : NaN), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
+  ], ['Total income', `<b>${rp(inc.payout + off.omzet)}</b>`, '100%', rp(P.inc.payout + P.off.omzet), chg(inc.payout + off.omzet, P.inc.payout + P.off.omzet)])}
   </div>`;
     R.open({ title: 'Sales Report', period: `${R.period(range.from, range.to)} · ${n(len)} days`,
       meta: [['Period', R.period(range.from, range.to)], ['Compared with', R.period(P.from, P.to)], ['Channels', esc(S.channels.map((c) => c.label).join(', ') || '–')]],
