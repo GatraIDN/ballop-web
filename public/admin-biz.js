@@ -518,12 +518,48 @@
           <tbody>${rows.map((x) => `<tr><td>${esc(x.name)}</td><td class="num">${money(x.spend)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td><td class="num">${x.orders ? money(x.spend / x.orders) : '–'}</td><td class="num">${dash(x.impressions)}</td><td class="num">${x.impressions ? pct(x.impClicks / x.impressions) : '–'}</td><td class="num">${x.clicks ? money(x.spendClicked / x.clicks) : '–'}</td></tr>`).join('')}</tbody>
         </table></div>`;
     const cd = calDays();
+    // ad type of a row: Seller Centre imports carry it in the note ("Iklan Produk · dari Seller Centre"), manual rows use the campaign
+    const adType = (a) => (/dari Seller Centre/.test(a.note || '') ? (a.note || '').split(' · ')[0] : /cpas/i.test(a.campaign) ? 'CPAS (Meta × Shopee)' : /gmv max/i.test(a.campaign) ? 'GMV Max' : a.channel === 'meta' ? 'Meta Ads' : a.channel === 'tiktok' ? 'TikTok Ads Manager' : a.campaign || 'Lainnya');
+    const adAgg = (rows, key) => { const g = {}; rows.forEach((a) => { const k = key(a); const x = g[k] = g[k] || { k, ch: a.channel, spend: 0, revenue: 0, orders: 0, impressions: 0, clicks: 0, impClicks: 0, spendClicked: 0, days: new Set() };
+      x.spend += a.spend; x.revenue += a.revenue; x.orders += a.orders; x.days.add(a.date); if (a.impressions) { x.impressions += a.impressions; x.impClicks += a.clicks; } if (a.clicks) { x.clicks += a.clicks; x.spendClicked += a.spend; } }); return Object.values(g); };
+    const adsExtra = () => {
+      const rows = m.adRows, tot = m.adTot;
+      const types = adAgg(rows, adType).sort((a, b) => b.spend - a.spend);
+      const days = adAgg(rows, (a) => a.date).sort((a, b) => b.k.localeCompare(a.k));
+      const nDays = daysBetween(from, to), filled = days.length;
+      const tacos = m.revenue ? tot.spend / m.revenue : NaN, ofNet = inc.payout ? tot.spend / inc.payout : NaN;
+      const card = (l, v, sub) => `<div class="kpi solid"><div class="k-label">${l}</div><div class="k-value">${v}</div><div class="k-delta">${sub}</div></div>`;
+      const ctr = (x) => (x.impressions ? pct(x.impClicks / x.impressions) : '–'), cpc = (x) => (x.clicks ? money(x.spendClicked / x.clicks) : '–');
+      return `
+      <div class="kpis">
+        ${card('Iklan ÷ omzet pesanan', pct(tacos), `${money(tot.spend)} dari omzet ${money(m.revenue)}`)}
+        ${card('Iklan ÷ penghasilan bersih', pct(ofNet), `penghasilan ${money(inc.payout)}`)}
+        ${card('Rata-rata spend / hari', money(filled ? tot.spend / filled : 0), `${num(filled)} dari ${num(nDays)} hari ada data`)}
+        ${card('Jenis iklan aktif', num(types.length), esc(types.slice(0, 3).map((t) => t.k).join(', ')))}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Per jenis iklan</h2><span class="muted small">Shopee & TikTok dari Seller Centre · CPAS, Meta & TikTok Ads Manager dari input manual</span></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Jenis iklan</th><th class="num">Spend</th><th class="num">Share</th><th class="num">GMV iklan</th><th class="num">ROAS</th><th class="num">Order</th><th class="num">Cost / order</th><th class="num">Impresi</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">CPC</th></tr></thead>
+          <tbody>${types.map((x) => `<tr><td><span class="ch"><i style="background:${(ADS_CH[x.ch] || ADS_CH.other).color}"></i>${esc(x.k)}</span></td><td class="num"><b>${money(x.spend)}</b></td><td class="num">${pct(tot.spend ? x.spend / tot.spend : NaN)}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td><td class="num">${x.orders ? money(x.spend / x.orders) : '–'}</td><td class="num">${dash(x.impressions)}</td><td class="num">${dash(x.clicks)}</td><td class="num">${ctr(x)}</td><td class="num">${cpc(x)}</td></tr>`).join('')}
+          <tr class="tot"><td>Total</td><td class="num">${money(tot.spend)}</td><td class="num">100%</td><td class="num">${money(tot.revenue)}</td><td class="num">${ratio(m.adRoas)}</td><td class="num">${dash(tot.orders)}</td><td class="num">${tot.orders ? money(tot.spend / tot.orders) : '–'}</td><td class="num">${dash(tot.impressions)}</td><td class="num">${dash(tot.clicks)}</td><td class="num">${tot.impressions ? pct(tot.impClicks / tot.impressions) : '–'}</td><td class="num">${tot.clicks ? money(tot.spendClicked / tot.clicks) : '–'}</td></tr></tbody>
+        </table></div>
+      </section>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Harian</h2><span class="muted small">semua channel · terbaru di atas</span></div>
+        <div class="table-wrap" style="max-height:420px;overflow:auto"><table class="data">
+          <thead><tr><th>Tanggal</th><th class="num">Spend</th><th class="num">Shopee</th><th class="num">TikTok</th><th class="num">Lainnya</th><th class="num">GMV iklan</th><th class="num">ROAS</th><th class="num">Order</th></tr></thead>
+          <tbody>${days.map((x) => { const on = (ch) => rows.filter((a) => a.date === x.k && a.channel === ch).reduce((t, a) => t + a.spend, 0); const sh = on('shopee'), tt = on('tiktok'); return `<tr><td>${fmtDate(x.k)}</td><td class="num"><b>${money(x.spend)}</b></td><td class="num">${sh ? money(sh) : '–'}</td><td class="num">${tt ? money(tt) : '–'}</td><td class="num">${x.spend - sh - tt ? money(x.spend - sh - tt) : '–'}</td><td class="num">${x.revenue ? money(x.revenue) : '–'}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td><td class="num">${dash(x.orders)}</td></tr>`; }).join('')}</tbody>
+        </table></div>
+      </section>`;
+    };
     const adsDashboard = () => {
       const chs = Object.entries(ADS_CH).filter(([k]) => m.byAd[k]).sort((a, b) => m.byAd[b[0]].spend - m.byAd[a[0]].spend);
       if (!chs.length) return '<p class="muted">Belum ada data iklan di periode ini.</p>';
       return `
       <h2 class="ads-h">Semua channel</h2>
       ${adKpis(m.adTot, true)}
+      ${adsExtra()}
       ${calendar({ title: 'GMV iklan (atribusi)', days: cd.gmv, unit: 'order' })}
       ${calendar({ title: 'Spending iklan', days: cd.spend, unit: '', extra: (x) => `ROAS ${ratio(x.v ? x.rev / x.v : NaN)}` })}
       <section class="panel solid">
