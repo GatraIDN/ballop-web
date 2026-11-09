@@ -882,7 +882,7 @@
       const o = m.byCh[k], s = m.byState[k], i = inc.byCh[k], a = m.byAd[k];
       if (!o && !s && !i && !a) return null;
       const c = { key: k, label: SALES_CH[k]?.label || k, color: SALES_CH[k]?.color || '#888', omzet: o?.revenue || 0, units: o?.units || 0, orders: o?.orders || 0,
-        all: s?.all || 0, cancelled: s?.cancelled || 0, returned: s?.returned || 0, gmv: i?.price || 0, net: i?.payout || 0, fees: Math.abs(i?.fees || 0),
+        all: s?.all || 0, cancelled: s?.cancelled || 0, cancelValue: s?.cancelValue || 0, returned: s?.returned || 0, gmv: i?.price || 0, net: i?.payout || 0, fees: Math.abs(i?.fees || 0),
         adSpend: a?.spend || 0, adRevenue: a?.revenue || 0, topup: Math.abs(i?.topup || 0) };
       // contribution margin: money in (payout, or omzet for channels without a payout file) − HPP − ad spend
       const base = k === 'offline' || !i ? c.omzet : c.net + (c.adSpend ? c.topup : 0);
@@ -957,75 +957,53 @@
     const maxT = Math.max(1, ...S.trend.map((t) => Math.max(t.omzet, t.net)));
     const maxP = Math.max(1, ...S.products.slice(0, 8).map((p) => p.units));
     return `
-      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p>Gabungan Shopee, TikTok Shop, Tokopedia, offline, iklan dan live untuk periode yang dipilih. Omzet pesanan = tanggal pesanan dibuat; penghasilan bersih = uang yang sudah masuk ke saldo setelah semua potongan (tanggal dana dilepas).</p></div></div>
+      <div class="sec-head" style="--sec:#111318"><div><h2>Ringkasan semua channel</h2><p><b>Order value</b> = dari file order (tanggal pesanan dibuat, pesanan selesai + diproses). <b>Income value</b> = dari file income (uang yang masuk ke saldo, tanggal dana dilepas).</p></div></div>
       <div class="kpis">
-        ${kpi('Omzet pesanan', money(m.revenue), delta(m.revenue, P.m.revenue), true, SRC.omzet)}
-        ${kpi('GMV kotor', money(inc.price), delta(inc.price, P.inc.price), false, SRC.gmv)}
-        ${kpi('Penghasilan bersih', money(inc.payout), delta(inc.payout, P.inc.payout), false, SRC.net)}
-        ${kpi('Total fee marketplace', money(S.allFees), `<div class="k-delta">${pct(S.allFeeRate)} dari GMV kotor</div>${deltaPt(S.allFeeRate, P.allFeeRate, true)}`, false, 'Semua potongan di export income: fee admin, layanan, program, voucher, ongkir, refund, penyesuaian. GMV kotor − angka ini = penghasilan bersih')}
-        ${kpi('Pesanan · unit', `${num(m.orders)} · ${num(m.units)}`, delta(m.orders, P.m.orders), false, SRC.orders)}
-        ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov), false, SRC.aov)}
-        ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true), false, SRC.ads)}
-        ${kpi('Penghasilan ÷ GMV kotor', pct(inc.price ? inc.payout / inc.price : NaN), deltaPt(inc.price ? inc.payout / inc.price : NaN, P.inc.price ? P.inc.payout / P.inc.price : NaN), false, SRC.ratio)}
+        ${kpi('Order value', money(m.revenue), delta(m.revenue, P.m.revenue), true, `file order · ${num(m.orders)} pesanan`)}
+        ${kpi('Income value', money(inc.payout), delta(inc.payout, P.inc.payout), false, `file income · ${num(inc.orders)} pesanan cair`)}
+        ${kpi('Pesanan · unit', `${num(m.orders)} · ${num(onUnits)}`, delta(m.orders, P.m.orders), false, 'file order · unit = pasang')}
+        ${kpi('Batal', `${num(m.cancelled)} · ${money(m.cancelValue)}`, delta(m.cancelValue, P.m.cancelValue, true), false, 'file order · jumlah pesanan · nilai')}
+        ${kpi('AOV', money(m.aov), delta(m.aov, P.m.aov), false, 'order value ÷ pesanan')}
+        ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true), false, 'Seller Centre + input manual')}
+        ${kpi('Stock keluar offline', `${num(offUnits)} pcs`, delta(offUnits, P.off.units), false, 'menu Penjualan offline')}
+        ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, P.off.omzet), false, `${num(off.trx)} transaksi`)}
       </div>
-      <section class="panel solid defs">
-        <div class="panel-head"><h2>Arti angka uang</h2></div>
-        <div class="defs-grid">
-          <div><b>Omzet pesanan (order revenue)</b><p>Nilai semua pesanan yang masuk di periode ini (selesai + diproses), sudah dipotong diskon penjual, <u>belum</u> dipotong fee. Pakai tanggal pesanan dibuat. Batal & retur tidak dihitung. = berapa yang terjual.</p></div>
-          <div><b>GMV kotor (gross GMV)</b><p>Harga produk dari pesanan yang dananya sudah cair ke saldo di periode ini. Pakai tanggal dana dilepas, jadi bisa berisi pesanan dari hari-hari sebelumnya.</p></div>
-          <div><b>Penghasilan bersih (net income)</b><p>Uang yang benar-benar diterima: GMV kotor dikurangi fee marketplace, voucher, ongkir & refund. = berapa yang kita dapat.</p></div>
-          <div><b>Nilai batal (cancelled value)</b><p>${num(m.cancelled)} pesanan batal senilai <b>${money(m.cancelValue)}</b> (${cmpLabel}: ${num(P.m.cancelled)} · ${money(P.m.cancelValue)}). Tidak masuk omzet pesanan.</p></div>
-        </div>
-      </section>
-      <p class="muted small cmp-note">▲▼ dibanding tanggal yang sama bulan lalu: <b>${rangeLabel(S)}</b> vs <b>${rangeLabel(P)}</b>. Persentase dibanding dalam poin.</p>
-      <div class="kpis">
-        ${kpi('Stock keluar online', `${num(onUnits)} pasang`, delta(onUnits, onUnitsP), false, 'Export order marketplace · unit pesanan selesai + diproses')}
-        ${kpi('Stock keluar offline', `${num(offUnits)} pcs`, delta(offUnits, P.off.units), false, SRC.offline)}
-        ${kpi('Total stock keluar', `${num(onUnits + offUnits)} pcs`, delta(onUnits + offUnits, onUnitsP + P.off.units), false, 'Online + offline')}
-        ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, P.off.omzet), false, `${num(off.trx)} transaksi · ${Object.entries(off.byType).map(([k, q]) => `${k} ${num(q)}`).join(' · ') || 'belum ada'}`)}
-      </div>
+      <p class="muted small cmp-note">▲▼ dibanding tanggal yang sama bulan lalu: <b>${rangeLabel(S)}</b> vs <b>${rangeLabel(P)}</b>.</p>
       <section class="panel solid">
-        <div class="panel-head"><h2>Sumber angka & data terakhir</h2><span class="muted small">pesanan pakai tanggal pesanan · penghasilan pakai tanggal dana dilepas, jadi pesanan baru belum tentu sudah cair</span></div>
+        <div class="panel-head"><h2>Per channel</h2><span class="muted small">order value · income value · iklan</span></div>
+        <div class="mixbar">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}" title="${esc(c.label)} ${pct(c.omzet / totOmzet)}"></i>`).join('')}</div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Channel</th><th class="num">Pesanan (export order)</th><th>Order terakhir di data</th><th class="num">Pesanan cair (export income)</th><th>Dana terakhir di data</th></tr></thead>
-          <tbody>${cov.map((c) => `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num">${num(c.orders)}</td><td>${c.lastOrder ? fmtDate(c.lastOrder) : '–'}${c.lastOrder && c.lastOrder < addDays(S.to, -1) ? ' <span class="badge warn">belum update</span>' : ''}</td><td class="num">${num(c.incOrders)}</td><td>${c.lastIncome ? fmtDate(c.lastIncome) : '–'}${c.lastIncome && c.lastIncome < addDays(S.to, -1) ? ' <span class="badge warn">belum update</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">Belum ada file.</td></tr>'}</tbody>
+          <thead><tr><th>Channel</th><th class="num">Order value</th><th class="num">Share</th><th class="num">Pesanan</th><th class="num">Unit</th><th class="num">Batal</th><th class="num">Nilai batal</th><th class="num">Income value</th><th class="num">Iklan</th><th class="num">ROAS</th></tr></thead>
+          <tbody>${S.channels.map((c) => `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num"><b>${money(c.omzet)}</b></td><td class="num">${pct(c.omzet / totOmzet)}</td><td class="num">${num(c.orders)}</td><td class="num">${num(c.units)}</td><td class="num">${num(c.cancelled)}</td><td class="num">${c.cancelValue ? money(c.cancelValue) : '–'}</td><td class="num"><b>${c.net ? money(c.net) : '–'}</b></td><td class="num">${c.adSpend ? money(c.adSpend) : '–'}</td><td class="num">${ratio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Belum ada data di periode ini.</td></tr>'}
+          ${S.channels.length > 1 ? `<tr class="tot"><td><b>Total</b></td><td class="num"><b>${money(m.revenue)}</b></td><td class="num">100%</td><td class="num">${num(m.orders)}</td><td class="num">${num(m.units)}</td><td class="num">${num(m.cancelled)}</td><td class="num">${money(m.cancelValue)}</td><td class="num"><b>${money(inc.payout)}</b></td><td class="num">${money(m.adSpend)}</td><td class="num">${ratio(m.adRoas)}</td></tr>` : ''}</tbody>
         </table></div>
       </section>
       <section class="panel solid">
-        <div class="panel-head"><h2>Per channel</h2><span class="muted small">pesanan masuk · penghasilan bersih · iklan</span></div>
-        <div class="mixbar">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}" title="${esc(c.label)} ${pct(c.omzet / totOmzet)}"></i>`).join('')}</div>
+        <div class="panel-head"><h2>Data terakhir</h2><span class="muted small">sampai tanggal berapa file order & income sudah di-import</span></div>
         <div class="table-wrap"><table class="data">
-          <thead><tr><th>Channel</th><th class="num">Omzet pesanan</th><th class="num">Share</th><th class="num">Pesanan</th><th class="num">Unit</th><th class="num">Batal+retur</th><th class="num">GMV kotor</th><th class="num">Fee</th><th class="num">Penghasilan bersih</th><th class="num">Iklan</th><th class="num">ROAS</th></tr></thead>
-          <tbody>${S.channels.map((c) => `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td class="num"><b>${money(c.omzet)}</b></td><td class="num">${pct(c.omzet / totOmzet)}</td><td class="num">${num(c.orders)}</td><td class="num">${num(c.units)}</td><td class="num">${c.all ? pct((c.cancelled + c.returned) / c.all) : '–'}</td><td class="num">${c.gmv ? money(c.gmv) : '–'}</td><td class="num">${c.gmv ? `${money(c.fees)} <small class="muted">${pct(c.fees / c.gmv)}</small>` : '–'}</td><td class="num"><b>${c.net ? money(c.net) : '–'}</b></td><td class="num">${c.adSpend ? money(c.adSpend) : '–'}</td><td class="num">${ratio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}</td></tr>`).join('') || '<tr><td colspan="11" class="muted">Belum ada data di periode ini.</td></tr>'}
-          ${S.channels.length > 1 ? `<tr class="tot"><td><b>Total</b></td><td class="num"><b>${money(m.revenue)}</b></td><td class="num">100%</td><td class="num">${num(m.orders)}</td><td class="num">${num(m.units)}</td><td class="num">${pct(S.cancelRate)}</td><td class="num">${money(inc.price)}</td><td class="num">${money(Math.abs(inc.fees))}</td><td class="num"><b>${money(inc.payout)}</b></td><td class="num">${money(m.adSpend)}</td><td class="num">${ratio(m.adRoas)}</td></tr>` : ''}</tbody>
+          <thead><tr><th>Channel</th><th>File order terakhir</th><th>File income terakhir</th></tr></thead>
+          <tbody>${cov.map((c) => `<tr><td><span class="ch"><i style="background:${c.color}"></i>${esc(c.label)}</span></td><td>${c.lastOrder ? fmtDate(c.lastOrder) : '–'}${c.lastOrder && c.lastOrder < addDays(S.to, -1) ? ' <span class="badge warn">belum update</span>' : ''}</td><td>${c.lastIncome ? fmtDate(c.lastIncome) : '–'}${c.lastIncome && c.lastIncome < addDays(S.to, -1) ? ' <span class="badge warn">belum update</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="muted">Belum ada file.</td></tr>'}</tbody>
         </table></div>
       </section>
       ${S.targets.length ? `<section class="panel solid">
-        <div class="panel-head"><h2>Target ${S.targetMonth}</h2><span class="muted small">omzet pesanan bulan berjalan · garis = posisi hari ini</span></div>
+        <div class="panel-head"><h2>Target ${S.targetMonth}</h2><span class="muted small">order value bulan berjalan · garis = posisi hari ini</span></div>
         ${S.targets.map((t) => `<div class="tgt-row"><span class="ch"><i style="background:${t.color}"></i>${esc(t.label)}</span>
           <div class="track"><i style="width:${Math.min(100, t.pct * 100)}%;background:${t.color}"></i><em style="left:${S.dayPct * 100}%"></em></div>
           <span class="tgt-val"><b>${pct(t.pct)}</b> · ${compact(t.value)} / ${compact(t.target)} · proyeksi ${compact(t.projected)}</span></div>`).join('')}
       </section>` : '<p class="muted small">Isi target per channel di Pengaturan untuk melihat progres target.</p>'}
       <section class="panel solid">
-        <div class="panel-head"><h2>Tren per ${S.trend.length && daysBetween(S.from, S.to) > 62 ? 'bulan' : daysBetween(S.from, S.to) > 14 ? 'minggu' : 'hari'}</h2><span class="legend"><span><i style="background:#2a78d6"></i>Omzet pesanan</span><span><i style="background:#0e8a4f"></i>Penghasilan bersih</span></span></div>
+        <div class="panel-head"><h2>Tren per ${S.trend.length && daysBetween(S.from, S.to) > 62 ? 'bulan' : daysBetween(S.from, S.to) > 14 ? 'minggu' : 'hari'}</h2><span class="legend"><span><i style="background:#2a78d6"></i>Order value</span><span><i style="background:#0e8a4f"></i>Income value</span></span></div>
         <div class="table-wrap"><table class="data trend">
-          <thead><tr><th>Periode</th><th style="width:28%"></th><th class="num">Omzet pesanan</th><th class="num">Pesanan</th><th class="num">GMV kotor</th><th class="num">Penghasilan bersih</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Live</th><th class="num">Offline</th></tr></thead>
-          <tbody>${S.trend.map((t) => `<tr><td>${esc(t.label)}</td><td><div class="tbar"><i style="width:${(t.omzet / maxT) * 100}%;background:#2a78d6"></i><i style="width:${(t.net / maxT) * 100}%;background:#0e8a4f"></i></div></td><td class="num"><b>${money(t.omzet)}</b></td><td class="num">${num(t.orders)}</td><td class="num">${money(t.gmv)}</td><td class="num">${money(t.net)}</td><td class="num">${money(t.ads)}</td><td class="num">${ratio(t.ads ? t.adRev / t.ads : NaN)}</td><td class="num">${t.live ? compact(t.live) : '–'}</td><td class="num">${t.offline ? compact(t.offline) : '–'}</td></tr>`).join('')}</tbody>
+          <thead><tr><th>Periode</th><th style="width:28%"></th><th class="num">Order value</th><th class="num">Pesanan</th><th class="num">Income value</th><th class="num">Iklan</th><th class="num">ROAS</th><th class="num">Live</th><th class="num">Offline</th></tr></thead>
+          <tbody>${S.trend.map((t) => `<tr><td>${esc(t.label)}</td><td><div class="tbar"><i style="width:${(t.omzet / maxT) * 100}%;background:#2a78d6"></i><i style="width:${(t.net / maxT) * 100}%;background:#0e8a4f"></i></div></td><td class="num"><b>${money(t.omzet)}</b></td><td class="num">${num(t.orders)}</td><td class="num">${money(t.net)}</td><td class="num">${money(t.ads)}</td><td class="num">${ratio(t.ads ? t.adRev / t.ads : NaN)}</td><td class="num">${t.live ? compact(t.live) : '–'}</td><td class="num">${t.offline ? compact(t.offline) : '–'}</td></tr>`).join('')}</tbody>
         </table></div>
       </section>
       <div class="grid-3">
-        <section class="panel solid"><div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">unit · omzet pesanan</span></div>
+        <section class="panel solid"><div class="panel-head"><h2>Produk terlaris</h2><span class="muted small">unit · order value</span></div>
           <div class="hbar">${S.products.slice(0, 8).map((p) => `<div class="hbar-row"><span class="hb-name" title="${esc(p.name)}">${esc(p.name)}</span><span class="hb-track"><i style="width:${(p.units / maxP) * 100}%;background:${p.color || '#2a78d6'}"></i></span><span class="hb-val">${num(p.units)} · ${compact(p.revenue)}</span></div>`).join('') || '<p class="muted">Belum ada produk terjual.</p>'}</div>
         </section>
-        <section class="panel solid"><div class="panel-head"><h2>Dari GMV ke penghasilan</h2><span class="muted small">${num(inc.orders)} pesanan cair · export income</span></div>
-          <table class="pl">
-            <tr><td>GMV kotor (harga produk)</td><td>${money(inc.price)}</td></tr>
-            ${steps.map(([k, v]) => `<tr class="sub"><td>${esc(k)}</td><td>${v < 0 ? '−' : '+'}${money(Math.abs(v))}</td></tr>`).join('')}
-            <tr class="total"><td>Penghasilan bersih</td><td>${money(inc.payout)}</td></tr>
-            <tr class="sub"><td>Biaya iklan</td><td>${money(m.adSpend)}</td></tr>
-            <tr class="sub"><td>Biaya operasional</td><td>${money(m.expenses)}</td></tr>
-          </table>
-          <div class="alert-list" style="margin-top:10px">
+        <section class="panel solid"><div class="panel-head"><h2>Live & offline</h2></div>
+          <div class="alert-list">
             <div><span>TikTok LIVE · ${num(live.sessions)} sesi</span><b>${money(live.gmv)}</b></div>
             <div><span>Offline · ${num(off.trx)} transaksi · ${num(off.units)} pcs keluar</span><b>${money(off.omzet)}</b></div>
           </div>
@@ -1057,80 +1035,56 @@
     const trendLabel = (t) => (unit === 'month' ? t.label : t.from === t.to ? R.longDate(t.from) : `${R.longDate(t.from)} – ${R.longDate(t.to)}`);
     const cmp = `vs ${R.period(P.from, P.to)}`;
     const body = `
-  <div class="box avoid" style="margin-top:12px">
-    <p><b>What the three money figures mean</b></p>
-    <p><b>Order revenue</b> — value of every order placed in the period (completed + in process), after seller discounts, before marketplace fees. Counted on the <i>order date</i>. Cancelled and returned orders are not included. Shows how much we sold.</p>
-    <p><b>Gross GMV</b> — product price of the orders whose money was paid out to our seller balance in the period. Counted on the <i>payout date</i>, so it covers orders placed earlier that finished now.</p>
-    <p><b>Net income</b> — the money actually received: gross GMV minus marketplace fees, vouchers, shipping and refunds. Same orders and dates as gross GMV. Shows how much we earned.</p>
-    <p class="muted">Order revenue and gross GMV differ because new orders are only paid out after delivery (usually several days later), and cancelled orders never are. <b>Cancelled value</b> = value of orders cancelled in the period (not part of order revenue).</p>
-  </div>
-  ${h2('Key figures', `▲▼ compared with the same dates last month (${R.period(P.from, P.to)}) · ratios in percentage points`)}
+  ${h2('Key figures', `▲▼ compared with the same dates last month (${R.period(P.from, P.to)})`)}
   ${tiles([
-    tile('Order revenue', rp(m.revenue), `${n(m.orders)} orders ${chg(m.revenue, P.m.revenue)}`, true),
-    tile('Gross GMV', rp(inc.price), `${n(inc.orders)} paid-out orders ${chg(inc.price, P.inc.price)}`),
-    tile('Net income', rp(inc.payout), `after all deductions ${chg(inc.payout, P.inc.payout)}`),
-    tile('Net income ÷ GMV', pc(inc.price ? inc.payout / inc.price : NaN), chgPt(inc.price ? inc.payout / inc.price : NaN, P.inc.price ? P.inc.payout / P.inc.price : NaN)),
-    tile('Units sold online', `${n(onU(S))} pairs`, chg(onU(S), onU(P))),
-    tile('Units out offline', `${n(off.units)} pcs`, `${n(off.trx)} transactions ${chg(off.units, P.off.units)}`),
+    tile('Order value', rp(m.revenue), `order file · ${n(m.orders)} orders ${chg(m.revenue, P.m.revenue)}`, true),
+    tile('Income value', rp(inc.payout), `income file · ${n(inc.orders)} paid-out orders ${chg(inc.payout, P.inc.payout)}`, true),
+    tile('Orders · units', `${n(m.orders)} · ${n(onU(S))}`, chg(m.orders, P.m.orders)),
+    tile('Cancelled', `${n(m.cancelled)} · ${rp(m.cancelValue)}`, `orders · value ${chg(m.cancelValue, P.m.cancelValue, true)}`),
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
-    tile('Marketplace fees (all)', rp(S.allFees), `${pc(S.allFeeRate)} of GMV ${chgPt(S.allFeeRate, P.allFeeRate, true)} · GMV − fees = net income`),
-    tile('Cancel + return rate', pc(S.cancelRate), `${n(m.cancelled + m.returnOrders)} orders ${chgPt(S.cancelRate, P.cancelRate, true)}`),
-    tile('Ad spend · ROAS', `${rp(m.adSpend)}`, `ROAS ${x(m.adRoas)} · ad GMV ${rp(m.adRevenue)} ${chg(m.adSpend, P.m.adSpend, true)}`),
-    tile('Cancelled orders', `${n(m.cancelled)} orders`, `value ${rp(m.cancelValue)} ${chg(m.cancelValue, P.m.cancelValue, true)}`),
+    tile('Ad spend · ROAS', rp(m.adSpend), `ROAS ${x(m.adRoas)} ${chg(m.adSpend, P.m.adSpend, true)}`),
+    tile('Units out offline', `${n(off.units)} pcs`, `${n(off.trx)} transactions ${chg(off.units, P.off.units)}`),
     tile('Offline revenue', rp(off.omzet), chg(off.omzet, P.off.omzet)),
   ])}
   <div class="avoid">
   ${h2('Comparison', cmp)}
   ${table([['Metric'], [R.period(S.from, S.to), 1], [R.period(P.from, P.to), 1], ['Change', 1]], [
-    ['Order revenue', rp(m.revenue), rp(P.m.revenue), chg(m.revenue, P.m.revenue)],
+    ['Order value', rp(m.revenue), rp(P.m.revenue), chg(m.revenue, P.m.revenue)],
+    ['Income value', rp(inc.payout), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
     ['Orders', n(m.orders), n(P.m.orders), chg(m.orders, P.m.orders)],
     ['Units sold online', n(onU(S)), n(onU(P)), chg(onU(S), onU(P))],
-    ['Units out offline', n(off.units), n(P.off.units), chg(off.units, P.off.units)],
-    ['Gross GMV', rp(inc.price), rp(P.inc.price), chg(inc.price, P.inc.price)],
-    ['Net income', rp(inc.payout), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
-    ['Net income ÷ GMV', pc(inc.price ? inc.payout / inc.price : NaN), pc(P.inc.price ? P.inc.payout / P.inc.price : NaN), chgPt(inc.price ? inc.payout / inc.price : NaN, P.inc.price ? P.inc.payout / P.inc.price : NaN)],
-    ['Marketplace fees (all deductions)', rp(S.allFees), rp(P.allFees), chg(S.allFees, P.allFees, true)],
-    ['Ad spend', rp(m.adSpend), rp(P.m.adSpend), chg(m.adSpend, P.m.adSpend, true)],
-    ['Offline revenue', rp(off.omzet), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
     ['Cancelled orders', n(m.cancelled), n(P.m.cancelled), chg(m.cancelled, P.m.cancelled, true)],
     ['Cancelled value', rp(m.cancelValue), rp(P.m.cancelValue), chg(m.cancelValue, P.m.cancelValue, true)],
+    ['Ad spend', rp(m.adSpend), rp(P.m.adSpend), chg(m.adSpend, P.m.adSpend, true)],
+    ['Units out offline', n(off.units), n(P.off.units), chg(off.units, P.off.units)],
+    ['Offline revenue', rp(off.omzet), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
   ])}
   </div>
   <div class="avoid">
-  ${h2('Performance by channel', 'order revenue = order date · net income = payout release date')}
+  ${h2('By channel')}
   <div class="mix">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}"></i>`).join('')}</div>
-  ${table([['Channel'], ['Order revenue', 1], ['Share', 1], ['Orders', 1], ['Units', 1], ['Cancel+return', 1], ['Gross GMV', 1], ['Fees', 1], ['Net income', 1], ['Ads', 1], ['ROAS', 1]],
-    [...S.channels.map((c) => [`${dot(c.color)}${esc(c.label)}`, `<b>${rp(c.omzet)}</b>`, pc(c.omzet / totOmzet), n(c.orders), n(c.units), c.all ? pc((c.cancelled + c.returned) / c.all) : '–', c.gmv ? rp(c.gmv) : '–', c.gmv ? pc(c.fees / c.gmv) : '–', `<b>${c.net ? rp(c.net) : '–'}</b>`, c.adSpend ? rp(c.adSpend) : '–', x(c.adSpend ? c.adRevenue / c.adSpend : NaN)]),
-      ...S.adOnly.map((a) => [`${dot('#999')}${esc(a.label)} <span class="muted">(ads)</span>`, '–', '–', '–', '–', '–', '–', '–', '–', rp(a.spend), x(a.spend ? a.revenue / a.spend : NaN)])],
-    ['Total', rp(m.revenue), '100%', n(m.orders), n(m.units), pc(S.cancelRate), rp(inc.price), pc(S.feeRate), rp(inc.payout), rp(m.adSpend), x(m.adRoas)])}
+  ${table([['Channel'], ['Order value', 1], ['Share', 1], ['Orders', 1], ['Units', 1], ['Cancelled', 1], ['Cancelled value', 1], ['Income value', 1], ['Ads', 1], ['ROAS', 1]],
+    [...S.channels.map((c) => [`${dot(c.color)}${esc(c.label)}`, `<b>${rp(c.omzet)}</b>`, pc(c.omzet / totOmzet), n(c.orders), n(c.units), n(c.cancelled), c.cancelValue ? rp(c.cancelValue) : '–', `<b>${c.net ? rp(c.net) : '–'}</b>`, c.adSpend ? rp(c.adSpend) : '–', x(c.adSpend ? c.adRevenue / c.adSpend : NaN)]),
+      ...S.adOnly.map((a) => [`${dot('#999')}${esc(a.label)} <span class="muted">(ads)</span>`, '–', '–', '–', '–', '–', '–', '–', rp(a.spend), x(a.spend ? a.revenue / a.spend : NaN)])],
+    ['Total', rp(m.revenue), '100%', n(m.orders), n(m.units), n(m.cancelled), rp(m.cancelValue), rp(inc.payout), rp(m.adSpend), x(m.adRoas)])}
   </div>
-  ${S.targets.length ? `${h2(`Target ${S.targetMonth}`, 'order revenue, month to date')}${table([['Channel'], ['Actual', 1], ['Target', 1], ['Achieved', 1], ['Month-end projection', 1]], S.targets.map((t) => [`${dot(t.color)}${esc(t.label)}`, rp(t.value), rp(t.target), `<b>${pc(t.pct)}</b>`, rp(t.projected)]))}` : ''}
-  ${h2(`Trend by ${unit}`, `${dot('#2a78d6')}order revenue ${dot('#0e8a4f')}net income`)}
-  ${table([['Period'], [''], ['Order revenue', 1], ['Orders', 1], ['Units', 1], ['Gross GMV', 1], ['Net income', 1], ['Ads', 1], ['ROAS', 1], ['Live', 1], ['Offline', 1]],
-    S.trend.map((t) => [esc(trendLabel(t)), bars([[t.omzet, '#2a78d6'], [t.net, '#0e8a4f']], maxT), `<b>${rp(t.omzet)}</b>`, n(t.orders), n(t.units), rp(t.gmv), rp(t.net), rp(t.ads), x(t.ads ? t.adRev / t.ads : NaN), t.live ? rp(t.live) : '–', t.offline ? rp(t.offline) : '–']))}
-  <div class="two">
-    <div>${h2('Best sellers', 'by units sold')}
-      ${table([['Product'], ['Units', 1], ['Revenue', 1], ['Share', 1]], S.products.slice(0, 10).map((p, i) => [`<span class="rank">${i + 1}</span>${esc(p.name)}`, n(p.units), rp(p.revenue), pc(m.units ? p.units / m.units : NaN)]), null, 'No products sold.')}</div>
-    <div>${h2('From GMV to net income', `${n(inc.orders)} paid-out orders · income export`)}
-      <table class="pl"><tbody>
-        <tr><td>Gross GMV (product price)</td><td class="n">${rp(inc.price)}</td></tr>
-        ${steps.map(([k, v]) => `<tr class="sub"><td>${esc(EN[k] || k)}</td><td class="n">${v < 0 ? '−' : '+'}${rp(Math.abs(v))}</td></tr>`).join('')}
-        <tr class="total"><td>Net income</td><td class="n">${rp(inc.payout)}</td></tr>
-        <tr class="sub"><td>Ad spend</td><td class="n">${rp(m.adSpend)}</td></tr>
-        <tr class="sub"><td>Operating costs</td><td class="n">${rp(m.expenses)}</td></tr>
-      </tbody></table></div>
-  </div>
+  ${S.targets.length ? `${h2(`Target ${S.targetMonth}`, 'order value, month to date')}${table([['Channel'], ['Actual', 1], ['Target', 1], ['Achieved', 1], ['Month-end projection', 1]], S.targets.map((t) => [`${dot(t.color)}${esc(t.label)}`, rp(t.value), rp(t.target), `<b>${pc(t.pct)}</b>`, rp(t.projected)]))}` : ''}
+  ${h2(`Trend by ${unit}`, `${dot('#2a78d6')}order value ${dot('#0e8a4f')}income value`)}
+  ${table([['Period'], [''], ['Order value', 1], ['Orders', 1], ['Units', 1], ['Income value', 1], ['Ads', 1], ['ROAS', 1], ['Live', 1], ['Offline', 1]],
+    S.trend.map((t) => [esc(trendLabel(t)), bars([[t.omzet, '#2a78d6'], [t.net, '#0e8a4f']], maxT), `<b>${rp(t.omzet)}</b>`, n(t.orders), n(t.units), rp(t.net), rp(t.ads), x(t.ads ? t.adRev / t.ads : NaN), t.live ? rp(t.live) : '–', t.offline ? rp(t.offline) : '–']))}
+  ${h2('Best sellers', 'by units sold')}
+  ${table([['Product'], ['Units', 1], ['Order value', 1], ['Share', 1]], S.products.slice(0, 10).map((p, i) => [`<span class="rank">${i + 1}</span>${esc(p.name)}`, n(p.units), rp(p.revenue), pc(m.units ? p.units / m.units : NaN)]), null, 'No products sold.')}
   <div class="avoid">
   ${h2('Data sources', 'where every number comes from')}
   ${table([['Figure'], ['Source'], ['Date used']], [
-    ['Order revenue, orders, units, AOV', 'Order export of each marketplace (completed + in process)', 'Order created date'],
-    ['Gross GMV, fees, net income', 'Income / settlement export of each marketplace', 'Payout release date'],
+    ['Order value, orders, units, cancelled, AOV', 'Order export of each marketplace (completed + in process; cancelled counted separately)', 'Order created date'],
+    ['Income value', 'Income / settlement export of each marketplace (money received in the seller balance)', 'Payout release date'],
     ['Ad spend, ad GMV, ROAS', 'Shopee & TikTok Seller Centre; Meta, CPAS & TikTok Ads Manager entered manually', 'Ad date'],
     ['Offline revenue & units', 'Offline sales menu (completed transactions)', 'Transaction date'],
     ['TikTok LIVE', 'Creator Live Performance export', 'Live date'],
   ])}
-  ${table([['Channel'], ['Orders in period', 1], ['Latest order data'], ['Paid-out orders', 1], ['Latest income data']],
-    cov.map((c) => [`${dot(c.color)}${esc(c.label)}`, n(c.orders), enDate(c.lastOrder), n(c.incOrders), enDate(c.lastIncome)]))}
+  ${table([['Channel'], ['Latest order file'], ['Latest income file']],
+    cov.map((c) => [`${dot(c.color)}${esc(c.label)}`, enDate(c.lastOrder), enDate(c.lastIncome)]))}
   </div>`;
     R.open({ title: 'Sales Report', period: `${R.period(range.from, range.to)} · ${n(len)} days`,
       meta: [['Period', R.period(range.from, range.to)], ['Compared with', R.period(P.from, P.to)], ['Channels', esc(S.channels.map((c) => c.label).join(', ') || '–')]],
@@ -1173,12 +1127,11 @@
     return [
       `Selamat pagi mister, berikut report Ballop E-Commerce periode ${period} :`, '',
       '*Ringkasan online (Shopee, TikTok Shop, Tokopedia)*',
-      L(`Omzet pesanan : ${repMoney(c.omzet)}`),
+      L(`Order value : ${repMoney(c.omzet)}`),
       L(`Jumlah pesanan : ${num(c.orders)} pesanan (${num(c.units)} pasang)`),
       L(`AOV : ${c.orders ? repMoney(c.omzet / c.orders) : '-'}`),
-      L(`GMV kotor : ${repMoney(c.gmv)}`),
-      L(`Fee marketplace : ${repMoney(c.fees)} (${pc(c.gmv ? c.fees / c.gmv : NaN)})`),
-      L(`Penghasilan bersih : ${repMoney(c.net)}`),
+      L(`Pesanan batal : ${num(c.cancelled)} pesanan (${repMoney(S.m.cancelValue)})`),
+      L(`Income value : ${repMoney(c.net)}`),
       L(`Biaya iklan : ${repMoney(c.adSpend)}`),
       L(`GMV iklan : ${repMoney(c.adRevenue)}`),
       L(`ROAS iklan : ${repRatio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}`),
