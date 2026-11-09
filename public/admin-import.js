@@ -176,7 +176,7 @@ window.MarketImport = (() => {
         if (!/^\d{6,}$/.test(idv)) return null;
         const type = text(g('Transaction type', 'Type', 'Jenis transaksi'));
         const payout = toNum(g('Total settlement amount', 'Jumlah penyelesaian pembayaran', 'Total Pendapatan'));
-        const base = { key: `tiktok:${idv}:${type}`, channel: /tokopedia/i.test(text(g('Order source', 'Sumber pesanan'))) ? 'tokopedia' : 'tiktok', releaseDate: toDate(g('Order settled time', 'Waktu penyelesaian', 'Waktu pembayaran pesanan')), payout };
+        const base = { key: `tiktok:${idv}:${/^(order|pesanan)$/i.test(type) ? "Order" : type}`, channel: /tokopedia/i.test(text(g('Order source', 'Sumber pesanan'))) ? 'tokopedia' : 'tiktok', releaseDate: toDate(g('Order settled time', 'Waktu penyelesaian', 'Waktu pembayaran pesanan')), payout };
         // ads paid from the balance, marketing packages, reimbursements ...
         if (!/^(order|pesanan)$/i.test(type)) return { ...base, orderId: text(g('Related order ID', 'ID pesanan terkait')) || idv, type: 'Penyesuaian', date: base.releaseDate, fees: 0, detail: { [type]: payout } };
         const detail = {};
