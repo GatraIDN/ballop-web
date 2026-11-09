@@ -967,6 +967,15 @@
         ${kpi('Biaya iklan · ROAS', `${compact(m.adSpend)} · ${ratio(m.adRoas)}`, delta(m.adSpend, P.m.adSpend, true, true), false, SRC.ads)}
         ${kpi('Penghasilan ÷ GMV kotor', pct(inc.price ? inc.payout / inc.price : NaN), deltaPt(inc.price ? inc.payout / inc.price : NaN, P.inc.price ? P.inc.payout / P.inc.price : NaN), false, SRC.ratio)}
       </div>
+      <section class="panel solid defs">
+        <div class="panel-head"><h2>Arti angka uang</h2></div>
+        <div class="defs-grid">
+          <div><b>Omzet pesanan (order revenue)</b><p>Nilai semua pesanan yang masuk di periode ini (selesai + diproses), sudah dipotong diskon penjual, <u>belum</u> dipotong fee. Pakai tanggal pesanan dibuat. Batal & retur tidak dihitung. = berapa yang terjual.</p></div>
+          <div><b>GMV kotor (gross GMV)</b><p>Harga produk dari pesanan yang dananya sudah cair ke saldo di periode ini. Pakai tanggal dana dilepas, jadi bisa berisi pesanan dari hari-hari sebelumnya.</p></div>
+          <div><b>Penghasilan bersih (net income)</b><p>Uang yang benar-benar diterima: GMV kotor dikurangi fee marketplace, voucher, ongkir & refund. = berapa yang kita dapat.</p></div>
+          <div><b>Nilai batal (cancelled value)</b><p>${num(m.cancelled)} pesanan batal senilai <b>${money(m.cancelValue)}</b> (${cmpLabel}: ${num(P.m.cancelled)} · ${money(P.m.cancelValue)}). Tidak masuk omzet pesanan.</p></div>
+        </div>
+      </section>
       <p class="muted small cmp-note">▲▼ dibanding tanggal yang sama bulan lalu: <b>${rangeLabel(S)}</b> vs <b>${rangeLabel(P)}</b>. Persentase dibanding dalam poin.</p>
       <div class="kpis">
         ${kpi('Stock keluar online', `${num(onUnits)} pasang`, delta(onUnits, onUnitsP), false, 'Export order marketplace · unit pesanan selesai + diproses')}
@@ -1047,6 +1056,13 @@
     const trendLabel = (t) => (unit === 'month' ? t.label : t.from === t.to ? R.longDate(t.from) : `${R.longDate(t.from)} – ${R.longDate(t.to)}`);
     const cmp = `vs ${R.period(P.from, P.to)}`;
     const body = `
+  <div class="box avoid" style="margin-top:12px">
+    <p><b>What the three money figures mean</b></p>
+    <p><b>Order revenue</b> — value of every order placed in the period (completed + in process), after seller discounts, before marketplace fees. Counted on the <i>order date</i>. Cancelled and returned orders are not included. Shows how much we sold.</p>
+    <p><b>Gross GMV</b> — product price of the orders whose money was paid out to our seller balance in the period. Counted on the <i>payout date</i>, so it covers orders placed earlier that finished now.</p>
+    <p><b>Net income</b> — the money actually received: gross GMV minus marketplace fees, vouchers, shipping and refunds. Same orders and dates as gross GMV. Shows how much we earned.</p>
+    <p class="muted">Order revenue and gross GMV differ because new orders are only paid out after delivery (usually several days later), and cancelled orders never are. <b>Cancelled value</b> = value of orders cancelled in the period (not part of order revenue).</p>
+  </div>
   ${h2('Key figures', `▲▼ compared with the same dates last month (${R.period(P.from, P.to)}) · ratios in percentage points`)}
   ${tiles([
     tile('Order revenue', rp(m.revenue), `${n(m.orders)} orders ${chg(m.revenue, P.m.revenue)}`, true),
@@ -1058,8 +1074,8 @@
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
     tile('Marketplace fees', rp(Math.abs(inc.fees)), `${pc(S.feeRate)} of GMV ${chgPt(S.feeRate, P.feeRate, true)}`),
     tile('Cancel + return rate', pc(S.cancelRate), `${n(m.cancelled + m.returnOrders)} orders ${chgPt(S.cancelRate, P.cancelRate, true)}`),
-    tile('Ad spend', rp(m.adSpend), chg(m.adSpend, P.m.adSpend, true)),
-    tile('Ad ROAS', x(m.adRoas), `ad GMV ${rp(m.adRevenue)} ${chg(m.adRoas, P.m.adRoas)}`),
+    tile('Ad spend · ROAS', `${rp(m.adSpend)}`, `ROAS ${x(m.adRoas)} · ad GMV ${rp(m.adRevenue)} ${chg(m.adSpend, P.m.adSpend, true)}`),
+    tile('Cancelled orders', `${n(m.cancelled)} orders`, `value ${rp(m.cancelValue)} ${chg(m.cancelValue, P.m.cancelValue, true)}`),
     tile('Offline revenue', rp(off.omzet), chg(off.omzet, P.off.omzet)),
   ])}
   <div class="avoid">
@@ -1075,6 +1091,8 @@
     ['Marketplace fees', rp(Math.abs(inc.fees)), rp(Math.abs(P.inc.fees)), chg(Math.abs(inc.fees), Math.abs(P.inc.fees), true)],
     ['Ad spend', rp(m.adSpend), rp(P.m.adSpend), chg(m.adSpend, P.m.adSpend, true)],
     ['Offline revenue', rp(off.omzet), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
+    ['Cancelled orders', n(m.cancelled), n(P.m.cancelled), chg(m.cancelled, P.m.cancelled, true)],
+    ['Cancelled value', rp(m.cancelValue), rp(P.m.cancelValue), chg(m.cancelValue, P.m.cancelValue, true)],
   ])}
   </div>
   <div class="avoid">

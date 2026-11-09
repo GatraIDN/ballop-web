@@ -1055,3 +1055,8 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .kpi .k-src { margin-top: 8px; font-size: 10.5px; line-height: 1.35; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 6px; }
 .kpi.hero .k-src { color: rgba(255,255,255,.62); border-top-color: rgba(255,255,255,.2); }
 .cmp-note { margin: 6px 2px 14px; }
+
+.defs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.defs-grid p { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+@media (max-width: 960px) { .defs-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .defs-grid { grid-template-columns: 1fr; } }
