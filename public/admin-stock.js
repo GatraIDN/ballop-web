@@ -212,36 +212,57 @@
     ].join('\n');
   }
 
-  // PDF: current stock only — sisa (tipis), habis, terbanyak
+  // PDF (English): current stock, its condition, and what went out offline this month
   function stockPdf() {
     const P = window.PdfReport;
     const rows = rowsAll();
     const D = sumData(rows);
+    const n = P.num;
     const nm = (g) => `<b>${esc(g.product)}</b>${g.color ? ` · ${esc(g.color)}` : ''}`;
-    const chips = (list, cls) => list.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join(' ');
-    const pdfLegend = szLegend();
     const asOf = rows.map((r) => r.date).filter(Boolean).sort().pop() || today();
     const dmg = rows.reduce((t, r) => t + (r.damaged || 0), 0);
-    const tipisN = D.tipis.reduce((t, g) => t + g.tipis.length, 0);
+    const cnt = { aman: [0, 0], tipis: [0, 0], habis: [0, 0] };
+    rows.forEach((r) => { const k = status(r.available || 0); cnt[k][0]++; cnt[k][1] += Math.max(0, r.available || 0); });
+    const sizeRowEn = (g, kind) => sizeRow(g, kind).replace(/HABIS semua size/, 'OUT in every size').replace(/(\d+) size habis · sisa/, '$1 sizes out · left').replace(/(\d+) size tipis · sisa/, '$1 sizes low · left').replace(/>habis</g, '>out<').replace(/ pcs</g, ' pcs<');
+    const legend = `<div class="sz-legend"><span class="sz out"><b>40</b><i>out</i></span> out of stock <span class="sz low"><b>40</b><i>3</i></span> low (≤ ${low()}) <span class="sz ok"><b>40</b><i>12</i></span> safe</div>`;
+    // offline stock out: completed offline sales from the 1st of the month to the stock date
+    const mFrom = `${asOf.slice(0, 8)}01`;
+    const offRows = (B.data.offline || []).filter((x) => x.status === 'completed' && x.date >= mFrom && x.date <= asOf);
+    const offUnits = offRows.reduce((t, x) => t + (x.qty || 0), 0);
+    const TYPE = { toko: 'Store', distributor: 'Distributor', reseller: 'Reseller', event: 'Event / bazaar' };
+    const byType = {}, byProd = {};
+    offRows.forEach((x) => { const t = TYPE[x.type] || x.type || 'Other'; byType[t] = byType[t] || { q: 0, trx: new Set() }; byType[t].q += x.qty || 0; byType[t].trx.add(x.invoice || x.id); const p = B.pname(x.productId); byProd[p] = (byProd[p] || 0) + (x.qty || 0); });
     const body = `
-      ${P.h2('Ringkasan stok', `per ${fmtDate(asOf)}`)}
+      ${P.h2('Stock summary', `as of ${P.longDate(asOf)}`)}
       ${P.tiles([
-        P.tile('Total stok good', `${num(D.totGood)} pcs`, `${num(rows.length)} SKU · ${num(D.gs.length)} produk × warna`, true),
-        P.tile('Damaged', `${num(dmg)} pcs`),
-        P.tile('Model habis total', num(D.habisAll.length), 'semua size kosong'),
-        P.tile('Model size bolong', num(D.habisPart.length), 'sebagian size habis'),
-        P.tile('SKU tipis', num(tipisN), `good ≤ ${low()} per size`),
+        P.tile('Good stock', `${n(D.totGood)} pcs`, `${n(rows.length)} SKUs · ${n(D.gs.length)} models`, true),
+        P.tile('Damaged', `${n(dmg)} pcs`, `${P.pct(D.totGood + dmg ? dmg / (D.totGood + dmg) : NaN)} of all stock`),
+        P.tile('Out offline (MTD)', `${n(offUnits)} pcs`, `${P.longDate(mFrom)} – ${P.longDate(asOf)}`),
+        P.tile('Models out of stock', n(D.habisAll.length), 'every size empty'),
+        P.tile('Models with gaps', n(D.habisPart.length), 'some sizes empty'),
       ], 5)}
-      ${P.h2('📦 Stok semua model', `${num(D.gs.length)} model · urut abjad, yang habis di bawah`)}
-      ${P.table([['Model'], ['Size', 1], ['Stok', 1]], [...D.gs].sort((x, y) => (x.good <= 0) - (y.good <= 0) || `${x.product} ${x.color}`.localeCompare(`${y.product} ${y.color}`)).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, num(g.sizes.length), g.good > 0 ? `<b>${num(g.good)}</b> pcs` : '<span class="chip bad">habis</span>']), ['Total', num(D.gs.reduce((t, g) => t + g.sizes.length, 0)), `${num(D.totGood)} pcs`])}
-      ${P.h2('⛔ Sudah habis', `${num(D.habisAll.length)} model kosong · ${num(D.habisPart.length)} model size bolong`)}
-      ${pdfLegend}<div class="szl">${[...D.habisAll, ...D.habisPart].map((g) => sizeRow(g, 'habis')).join('') || '<p class="muted">Tidak ada yang habis.</p>'}</div>
-      ${P.h2('⚠ Stok tipis', `good ≤ ${low()} per size`)}
-      <div class="szl">${D.tipis.filter((g) => !g.habis.length).map((g) => sizeRow(g, 'tipis')).join('') || '<p class="muted">Tidak ada model yang hanya tipis.</p>'}</div>
+      <div class="two">
+        <div>${P.h2('Stock condition', 'per SKU (size)')}
+          ${P.table([['Condition'], ['SKUs', 1], ['Pcs', 1], ['Share of SKUs', 1]], [
+            ['<span class="chip ok">Safe</span> more than ' + low() + ' pcs', n(cnt.aman[0]), n(cnt.aman[1]), P.pct(rows.length ? cnt.aman[0] / rows.length : NaN)],
+            ['<span class="chip warn">Low</span> 1–' + low() + ' pcs', n(cnt.tipis[0]), n(cnt.tipis[1]), P.pct(rows.length ? cnt.tipis[0] / rows.length : NaN)],
+            ['<span class="chip bad">Out of stock</span>', n(cnt.habis[0]), '0', P.pct(rows.length ? cnt.habis[0] / rows.length : NaN)],
+            ['<span class="chip">Damaged</span> (damaged warehouse)', '–', n(dmg), '–'],
+          ], ['Total good', n(rows.length), n(D.totGood), '100%'])}</div>
+        <div>${P.h2('Offline stock out', `${P.longDate(mFrom)} – ${P.longDate(asOf)}`)}
+          ${P.table([['Channel'], ['Transactions', 1], ['Pcs out', 1]], Object.entries(byType).sort((a, b2) => b2[1].q - a[1].q).map(([t, v]) => [esc(t), n(v.trx.size), `<b>${n(v.q)}</b>`]), offRows.length ? ['Total', n(new Set(offRows.map((x) => x.invoice || x.id)).size), n(offUnits)] : null, 'No offline sales this month.')}
+          ${Object.keys(byProd).length ? P.table([['Product (offline)'], ['Pcs', 1]], Object.entries(byProd).sort((a, b2) => b2[1] - a[1]).slice(0, 8).map(([p, q]) => [esc(p), n(q)])) : ''}</div>
+      </div>
+      ${P.h2('📦 Stock by model', `${n(D.gs.length)} models · A–Z, out of stock at the bottom`)}
+      ${P.table([['Model'], ['Sizes', 1], ['Condition'], ['Stock', 1]], [...D.gs].sort((x, y) => (x.good <= 0) - (y.good <= 0) || `${x.product} ${x.color}`.localeCompare(`${y.product} ${y.color}`)).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, n(g.sizes.length), g.good <= 0 ? '<span class="chip bad">out</span>' : g.habis.length ? `<span class="chip bad">${n(g.habis.length)} sizes out</span>` : g.tipis.length ? `<span class="chip warn">${n(g.tipis.length)} sizes low</span>` : '<span class="chip ok">safe</span>', g.good > 0 ? `<b>${n(g.good)}</b> pcs` : '0']), ['Total', n(D.gs.reduce((t, g) => t + g.sizes.length, 0)), '', `${n(D.totGood)} pcs`])}
+      ${P.h2('⛔ Out of stock', `${n(D.habisAll.length)} models empty · ${n(D.habisPart.length)} models with size gaps`)}
+      ${legend}<div class="szl">${[...D.habisAll, ...D.habisPart].map((g) => sizeRowEn(g, 'habis')).join('') || '<p class="muted">Nothing out of stock.</p>'}</div>
+      ${P.h2('⚠ Low stock', `good ≤ ${low()} per size`)}
+      <div class="szl">${D.tipis.filter((g) => !g.habis.length).map((g) => sizeRowEn(g, 'tipis')).join('') || '<p class="muted">No models that are only low.</p>'}</div>
       <style>${SZ_PDF_CSS}</style>`;
-    P.open({ title: 'Laporan Stok Gudang', period: `per ${fmtDate(asOf)}`,
-      meta: [['Stok per', fmtDate(asOf)], ['Gudang', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
-      body, note: 'Good = gudang NORMAL, damaged = gudang DAMAGED, dari file stock balance terakhir yang di-import.' });
+    P.open({ title: 'Warehouse Stock Report', period: `as of ${P.longDate(asOf)}`,
+      meta: [['Stock as of', P.longDate(asOf)], ['Warehouse', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')], ['Offline out', `${n(offUnits)} pcs this month`]],
+      body, note: 'Good = NORMAL warehouse, damaged = DAMAGED warehouse, from the latest imported 3PL stock balance file. Offline out = completed sales in the Offline sales menu.' });
   }
 
   // ---------- daily import of the 3PL stock balance export ----------

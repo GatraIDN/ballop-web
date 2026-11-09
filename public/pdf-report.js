@@ -3,23 +3,28 @@
 // the viewer saves it as PDF with the browser's print dialog. body uses the helpers below.
 (() => {
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const longDate = (s) => { const [y, m, d] = String(s).split('-').map(Number); return `${d} ${MONTHS[m - 1]} ${y}`; };
   const period = (from, to) => (from === to ? longDate(from) : `${longDate(from)} – ${longDate(to)}`);
-  const rp = (n) => `Rp ${Math.round(n || 0).toLocaleString('id-ID')}`;
-  const num = (n) => Math.round(n || 0).toLocaleString('id-ID');
-  const pct = (n, d = 1) => (Number.isFinite(n) ? `${(n * 100).toLocaleString('id-ID', { maximumFractionDigits: d })}%` : '–');
+  const rp = (n) => `Rp ${Math.round(n || 0).toLocaleString('en-US')}`;
+  const num = (n) => Math.round(n || 0).toLocaleString('en-US');
+  const pct = (n, d = 1) => (Number.isFinite(n) ? `${(n * 100).toLocaleString('en-US', { maximumFractionDigits: d })}%` : '–');
   // ▲▼ change vs a previous value; inv = lower is better
   const chg = (a, b, inv) => {
     if (!b || !Number.isFinite(a) || !Number.isFinite(b)) return '';
     const d = (a - b) / Math.abs(b), good = inv ? d < 0 : d > 0;
     return `<span class="chg ${d === 0 ? '' : good ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${pct(Math.abs(d))}</span>`;
   };
+  const chgPt = (a, b, inv) => {
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+    const d = (a - b) * 100, good = inv ? d < 0 : d > 0;
+    return `<span class="chg ${Math.abs(d) < 0.05 ? '' : good ? 'up' : 'down'}">${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toLocaleString('en-US', { maximumFractionDigits: 1 })} pts</span>`;
+  };
   const tile = (label, value, sub = '', hero = false) => `<div class="tile${hero ? ' hero' : ''}"><span>${label}</span><b>${value}</b><small>${sub}</small></div>`;
   const tiles = (list, cols = 4) => `<div class="tiles" style="grid-template-columns:repeat(${cols},1fr)">${list.join('')}</div>`;
   const h2 = (title, small = '') => `<h2>${title}${small ? ` <small>${small}</small>` : ''}</h2>`;
   // cols: [label, 'n' for numeric]; rows: arrays of cell html; foot: optional total row
-  const table = (cols, rows, foot, empty = 'Tidak ada data.') => `<table><thead><tr>${cols.map(([l, n]) => `<th${n ? ' class="n"' : ''}>${l}</th>`).join('')}</tr></thead>
+  const table = (cols, rows, foot, empty = 'No data.') => `<table><thead><tr>${cols.map(([l, n]) => `<th${n ? ' class="n"' : ''}>${l}</th>`).join('')}</tr></thead>
     <tbody>${rows.length ? rows.map((r) => `<tr>${r.map((c, i) => `<td${cols[i]?.[1] ? ' class="n"' : ''}>${c ?? ''}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${cols.length}" class="empty">${empty}</td></tr>`}
     ${foot ? `<tr class="tot">${foot.map((c, i) => `<td${cols[i]?.[1] ? ' class="n"' : ''}>${c ?? ''}</td>`).join('')}</tr>` : ''}</tbody></table>`;
   const dot = (color) => `<span class="dot" style="background:${color}"></span>`;
@@ -86,13 +91,13 @@
     const made = `${longDate(`${y}-${mo}-${d}`)}, ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const logo = `${location.origin}/img/ballop-wordmark-dark.png`;
     const docTitle = fileName || `BALLOP ${title} ${per || ''}`.trim();
-    const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(docTitle)}</title>
+    const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(docTitle)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>${CSS}</style></head><body class="${onePage ? 'one-page' : ''}">
-<div class="bar"><button onclick="window.print()">⬇ Simpan PDF / Print</button><button class="alt" onclick="window.close()">Tutup</button><span>Pilih "Save as PDF" di dialog print${onePage ? ' · otomatis muat 1 lembar' : ''}</span></div>
+<div class="bar"><button onclick="window.print()">⬇ Save PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose "Save as PDF" in the print dialog${onePage ? ' · fits one page automatically' : ''}</span></div>
 <div class="page">
   <header class="top"><img src="${logo}" alt="BALLOP"><div class="meta"><b>${esc(title)}</b>${esc(per || '')}</div></header>
-  <div class="lead">${[...meta, ['Dibuat', made]].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join('')}</div>
+  <div class="lead">${[...meta, ['Generated', made]].map(([l, v]) => `<div><span>${esc(l)}</span><b>${v}</b></div>`).join('')}</div>
   ${body}
   ${sign ? `<div class="sign">${sign.map((s) => `<div><i></i>${esc(s)}</div>`).join('')}</div>` : ''}
   <div class="note"><span>${note || ''}</span><span>BALLOP · ballop.web.id</span></div>
@@ -109,5 +114,5 @@ ${onePage ? `<script>
     return html;
   }
 
-  window.PdfReport = { open, esc, rp, num, pct, chg, tile, tiles, h2, table, dot, bars, longDate, period };
+  window.PdfReport = { open, esc, rp, num, pct, chg, chgPt, tile, tiles, h2, table, dot, bars, longDate, period };
 })();

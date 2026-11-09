@@ -1050,3 +1050,8 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .sz.low i { color: #8a5a00; font-weight: 700; }
 .sz-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
 .sz-legend .sz { min-width: 38px; padding: 2px 5px; }
+
+/* Ringkasan: source line under each KPI */
+.kpi .k-src { margin-top: 8px; font-size: 10.5px; line-height: 1.35; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 6px; }
+.kpi.hero .k-src { color: rgba(255,255,255,.62); border-top-color: rgba(255,255,255,.2); }
+.cmp-note { margin: 6px 2px 14px; }
