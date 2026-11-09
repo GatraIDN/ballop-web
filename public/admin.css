@@ -1083,3 +1083,8 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .kpi .k-src { font-size: 11.5px; color: var(--ink-2); opacity: .75; }
 .kpi .k-label { font-size: 12.5px; color: var(--ink-2); }
 .sec-head p { font-size: 13.5px; line-height: 1.5; }
+
+/* CS daily table: calmer rows */
+.cs-daily td { padding-top: 9px; padding-bottom: 9px; }
+.cs-daily td:first-child { white-space: nowrap; color: var(--muted); font-weight: 600; }
+.cs-daily tbody tr:hover { background: color-mix(in srgb, var(--line) 35%, transparent); }

@@ -50,6 +50,8 @@
   const longDay = (d) => { const [y, m, n] = d.split('-').map(Number); return `${n} ${MONTHS[m - 1]} ${y}`; };
   const st = { month: today().slice(0, 7) };
   const sst = { ch: 'all', range: 'mtd', from: '', to: '', limit: 150 };
+  let showDaily = false;
+  try { showDaily = localStorage.getItem('ballopCsDaily') === '1'; } catch {}
   const canEdit = () => window.A.can('cs') && !window.A.me?.readOnly;
   const who = () => window.A.me?.user?.name || window.A.me?.user?.username || 'admin';
   const stamp = () => { const d = new Date(); return `${today()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
@@ -92,6 +94,7 @@
       <section class="panel solid cs-sum">
         <div class="panel-head"><h2>Ringkasan analitik chat</h2>
           <span class="dh-actions"><span class="seg glass">${[['all', 'Gabungan'], ...CHS.map((k) => [k, CH[k].label])].map(([k, l]) => `<button type="button" data-sch="${k}" class="${sst.ch === k ? 'on' : ''}">${l}</button>`).join('')}</span>
+          <button class="btn sm" type="button" id="csDailyToggle">${showDaily ? '▴ Sembunyikan tabel harian' : '▾ Tampilkan tabel harian'}</button>
           <button class="btn sm btn-export" type="button" id="csPdfPeriod">⬇ Export PDF</button></span></div>
         ${B.rangeBar(sst)}
         <div class="st-cards" style="margin-top:12px">
@@ -103,10 +106,10 @@
           ${card('Penjualan dari chat', money(t.sales), `${num(t.buyers)} pembeli`)}
           ${sst.ch !== 'tiktok' ? card('⚡ Penjualan flash sale', money(t.fsSales), `${num(t.fsOrders)} pesanan · ${num(t.fsViews)} produk dilihat`) : ''}
         </div>
-        <div class="table-wrap" style="margin-top:12px"><table class="data">
+        ${showDaily ? `<div class="table-wrap" style="margin-top:12px"><table class="data cs-daily">
           <thead><tr><th>Tanggal</th><th>Channel</th><th class="num">Pengunjung</th><th class="num">Chat</th><th class="num">Dibalas</th><th class="num">Waktu respon</th><th class="num">CSAT</th><th class="num">Pesanan</th><th class="num">Penjualan</th><th class="num">Konversi</th><th></th></tr></thead>
-          <tbody>${days.flatMap((d) => CHS.filter((k) => sst.ch === 'all' || sst.ch === k).map((k) => rep(d, k)).filter(Boolean)).map((x) => `<tr data-csday="${x.date}" style="cursor:pointer"><td>${fmtDate(x.date)}</td><td>${chTag(x.channel)}</td><td class="num">${x.visitors ? num(x.visitors) : '–'}</td><td class="num">${num(x.chats)}</td><td class="num">${pctTxt(x.responseRate)}</td><td class="num">${fmtMin(x.responseTime)}</td><td class="num">${x.csat ? pctTxt(x.csat) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.sales || 0)}</td><td class="num">${x.chatConv ? pctTxt(x.chatConv) : '–'}</td><td><button class="btn sm" type="button" data-cspdf="${x.date}">PDF</button></td></tr>`).join('') || '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">Belum ada laporan di periode ini.</td></tr>'}</tbody>
-        </table></div>
+          <tbody>${days.flatMap((d) => CHS.filter((k) => sst.ch === 'all' || sst.ch === k).map((k) => rep(d, k)).filter((x) => x && (x.chats || x.visitors || x.orders || x.sales))).map((x) => `<tr data-csday="${x.date}" style="cursor:pointer"><td>${fmtDate(x.date)}</td><td>${chTag(x.channel)}</td><td class="num">${x.visitors ? num(x.visitors) : '–'}</td><td class="num">${num(x.chats)}</td><td class="num">${pctTxt(x.responseRate)}</td><td class="num">${fmtMin(x.responseTime)}</td><td class="num">${x.csat ? pctTxt(x.csat) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.sales || 0)}</td><td class="num">${x.chatConv ? pctTxt(x.chatConv) : '–'}</td><td><button class="btn sm" type="button" data-cspdf="${x.date}">PDF</button></td></tr>`).join('') || '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px">Belum ada laporan di periode ini.</td></tr>'}</tbody>
+        </table></div><p class="muted small" style="margin:8px 2px 0">Channel tanpa chat di hari itu tidak ditampilkan.</p>` : ''}
       </section>`;
   }
 
@@ -232,8 +235,6 @@
         <div class="st-card warn"><span>Flash sale</span><b>${num(s.fsDays)} hari</b><small>${num(s.fsItems)} produk · ${num(s.fsOk)} disetujui</small></div>
         <div class="st-card"><span>Terjual di flash sale</span><b>${num(s.fsSold)}</b><small>pcs</small></div>
       </div>
-      <div class="cs-chs">${CHS.map((k) => chCard(k, monthStats(rows.filter((r) => r.channel === k), []))).join('')}</div>
-      ${summaryPanel()}
       <section class="panel solid d-cal">
         <div class="panel-head"><h2>Kalender laporan · ${MONTHS[m - 1]} ${y}</h2>
           <span class="cal-nav"><button class="btn sm" type="button" data-csm="-1" aria-label="Bulan sebelumnya">‹</button><button class="btn sm" type="button" data-csm="0">Bulan ini</button><button class="btn sm" type="button" data-csm="1" aria-label="Bulan berikutnya">›</button></span></div>
@@ -241,6 +242,9 @@
         <div class="dc-grid">${cells.join('')}</div>
         <div class="dc-legend"><span><i class="done"></i>Lengkap (semua channel + flash sale)</span><span><i class="part"></i>Sebagian</span><span><i class="todo"></i>Belum ada</span><span class="muted">S = Shopee Official · G = Shopee Global · T = TikTok · ⚡ = produk flash sale</span></div>
       </section>
+      <div class="cs-chs">${CHS.map((k) => chCard(k, monthStats(rows.filter((r) => r.channel === k), []))).join('')}</div>
+      ${summaryPanel()}
+
       <div class="grid-3">
         <section class="panel solid"><div class="panel-head"><h2>Flash sale ${MONTHS[m - 1]}</h2><span class="muted small">${num(fs.length)} produk</span></div>
           <div class="table-wrap"><table class="data"><thead><tr><th>Tanggal</th><th>Sesi</th><th>Produk</th><th class="num">Harga normal</th><th class="num">Harga FS</th><th class="num">Diskon</th><th class="num">Stok</th><th class="num">Terjual</th><th>Status</th></tr></thead>
@@ -261,6 +265,7 @@
     $$('[data-sch]', v).forEach((b) => b.addEventListener('click', () => { sst.ch = b.dataset.sch; render(); }));
     B.bindRangeBar(v.querySelector('.cs-sum'), sst, render);
     $('#csPdfPeriod').addEventListener('click', periodPdf);
+    $('#csDailyToggle')?.addEventListener('click', () => { showDaily = !showDaily; try { localStorage.setItem('ballopCsDaily', showDaily ? '1' : '0'); } catch {} render(); });
   }
 
   // one popup per date: Shopee / TikTok report + flash sale list, all saved together
