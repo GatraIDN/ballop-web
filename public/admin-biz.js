@@ -49,7 +49,7 @@
   const CONTENT = { menunggu: 'Menunggu', brief: 'Brief dikirim', draft: 'Draft', revisi: 'Revisi', posted: 'Sudah posting', tidak: 'Tidak posting' };
   const CASH_CATS = ['Penjualan offline', 'Penghasilan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
 
-  const COLLS = ['sales', 'stock', 'ads', 'expenses', 'orders', 'settlements', 'live', 'stockdaily', 'csdaily', 'flashsale', 'listings', 'offline', 'stock3pl', 'stockhist', 'kol', 'cashflow', 'contents', 'contentplans'];
+  const COLLS = ['sales', 'stock', 'ads', 'adbudget', 'expenses', 'orders', 'settlements', 'live', 'stockdaily', 'csdaily', 'flashsale', 'listings', 'offline', 'stock3pl', 'stockhist', 'kol', 'cashflow', 'contents', 'contentplans'];
   const extraViews = {}; // views added by other admin modules (admin-konten.js)
   const data = Object.fromEntries(COLLS.map((c) => [c, []]));
   let loaded = false;
@@ -633,6 +633,8 @@
         value: money(inc.payout), meta: `${num(inc.orders)} pesanan selesai · fee ${inc.price ? pct(Math.abs(inc.fees) / inc.price) : '–'}`, d: delta(inc.payout, incP.payout) },
       ads: { label: 'Iklan', sub: 'spending & atribusi platform iklan', color: '#e8552b', icon: '◎',
         value: money(m.adSpend), meta: `ROAS ${ratio(m.adRoas)} · GMV ${compact(m.adRevenue)}`, d: delta(m.adSpend, p.adSpend, true, true) },
+      budget: { label: 'Ads budget', sub: 'saldo akun iklan', color: '#c2410c', icon: '◍',
+        value: money(budgetLast() ? BUDGET.reduce((t, [k]) => t + (budgetLast()[k] || 0), 0) : 0), meta: budgetLast() ? `per ${fmtDate(budgetLast().date)}` : 'belum diisi', d: '' },
       offline: { label: 'Offline', sub: 'toko, distributor, reseller, event', color: '#0e8a8a', icon: '⌂',
         value: money(off.omzet), meta: `${num(off.trx)} transaksi · ${num(off.units)} pcs`, d: delta(off.omzet, offP.omzet) },
       live: { label: 'Live', sub: 'TikTok LIVE (GMV atribusi)', color: '#6250d6', icon: '●',
@@ -810,7 +812,7 @@
           <span class="ov-meta">${s.meta}</span>
           ${s.d}
         </button>`).join('')}</div>
-      <div class="sec-body">${dashTab === 'overview' ? overviewTab(S, SP) : dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : dashTab === 'offline' ? offlineTab() : orderTab()}</div>
+      <div class="sec-body">${dashTab === 'overview' ? overviewTab(S, SP) : dashTab === 'ads' ? `${secHead('Iklan', 'Spending dan angka atribusi dari dashboard iklan (bukan omzet real).', ['ads', 'Data iklan'])}${adsDashboard(m, p)}` : dashTab === 'income' ? incomeTab() : dashTab === 'live' ? liveTab() : dashTab === 'offline' ? offlineTab() : dashTab === 'budget' ? budgetTab() : orderTab()}</div>
 `;
 
     const chartEl = (id) => document.getElementById(id);
@@ -840,8 +842,66 @@
     $('#demoClear')?.addEventListener('click', clearDemo);
     $('#expReport').addEventListener('click', () => exportReport(m));
     $('#expPdf').addEventListener('click', exportPdfReport);
+    $('#budgetAdd')?.addEventListener('click', () => budgetPopup());
+    $('[data-budget]', v).forEach((b) => b.addEventListener('click', () => budgetPopup(data.adbudget.find((x) => x.id === b.dataset.budget))));
     $('#adsDashPdf')?.addEventListener('click', () => (window.AdsCal ? window.AdsCal.pdf(from, to) : toast('Modul iklan belum termuat', true)));
     bindReport();
+  }
+
+  // ---------- ads budget: saldo per ad account, typed from each platform ----------
+  const BUDGET = [['shopee', 'Shopee Ads', 'Saldo Iklan di Shopee Seller Centre'], ['shopeeExt', 'Shopee External Ads (Iklan Meta)', 'Meta Saldo Iklan di menu Iklan Meta Shopee'],
+    ['tiktok', 'TikTok Ads', 'Available cash balance di Payment Portfolio'], ['metaCampaign', 'Meta Ads · saldo campaign', 'Akun "Campaign Ads" di Meta Billing'], ['metaCpas', 'Meta Ads · saldo CPAS', 'Akun "CPAS Shopee" di Meta Billing']];
+  const budgetLast = () => [...(data.adbudget || [])].sort((a, b) => b.date.localeCompare(a.date) || (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
+  function budgetTab() {
+    const list = [...(data.adbudget || [])].sort((a, b) => b.date.localeCompare(a.date));
+    const L = list[0], prev = list[1];
+    const tot = (x) => (x ? BUDGET.reduce((t, [k]) => t + (x[k] || 0), 0) : 0);
+    const canW = window.A.can('ads') && !window.A.me?.readOnly;
+    const card = ([k, l, src]) => `<div class="kpi solid"><div class="k-label">${esc(l)}</div><div class="k-value">${L ? money(L[k] || 0) : '–'}</div>${prev ? `<div class="k-delta">${fmtDate(prev.date)}: ${money(prev[k] || 0)}</div>` : ''}<div class="k-src">${esc(src)}</div></div>`;
+    return `
+      <div class="sec-head" style="--sec:#c2410c"><div><h2>Ads budget</h2><p>Sisa saldo tiap akun iklan, diisi dari dashboard masing-masing platform. ${L ? `Update terakhir ${fmtDate(L.date)}${L.updatedBy ? ` oleh ${esc(L.updatedBy)}` : ''}.` : 'Belum ada data.'}</p></div>${canW ? '<button class="btn sm btn-export" type="button" id="budgetAdd">+ Update saldo</button>' : ''}</div>
+      <div class="kpis">
+        <div class="kpi solid hero"><div class="k-label">Total saldo iklan</div><div class="k-value">${money(tot(L))}</div>${prev ? `<div class="k-delta">${fmtDate(prev.date)}: ${money(tot(prev))}</div>` : ''}</div>
+        ${BUDGET.slice(0, 3).map(card).join('')}
+        <div class="kpi solid"><div class="k-label">Meta Ads (total 2 saldo)</div><div class="k-value">${L ? money((L.metaCampaign || 0) + (L.metaCpas || 0)) : '–'}</div><div class="k-delta">campaign ${L ? money(L.metaCampaign || 0) : '–'} · CPAS ${L ? money(L.metaCpas || 0) : '–'}</div><div class="k-src">Meta Billing › Akun iklan</div></div>
+        ${BUDGET.slice(3).map(card).join('')}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Riwayat saldo</h2><span class="muted small">${canW ? 'klik baris untuk ubah' : ''}</span></div>
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Tanggal</th>${BUDGET.map(([, l]) => `<th class="num">${esc(l.replace(' (Iklan Meta)', ''))}</th>`).join('')}<th class="num">Total</th><th>Catatan</th></tr></thead>
+          <tbody>${list.map((x) => `<tr ${canW ? `data-budget="${x.id}" style="cursor:pointer"` : ''}><td>${fmtDate(x.date)}</td>${BUDGET.map(([k]) => `<td class="num">${money(x[k] || 0)}</td>`).join('')}<td class="num"><b>${money(tot(x))}</b></td><td>${esc(x.note || '')}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Belum ada data saldo.</td></tr>'}</tbody>
+        </table></div>
+      </section>`;
+  }
+  function budgetPopup(rec) {
+    const B0 = budgetLast();
+    const r = rec || { date: today(), ...(B0 ? Object.fromEntries(BUDGET.map(([k]) => [k, B0[k] || 0])) : {}) };
+    const box = document.createElement('div');
+    box.className = 'raw-pop';
+    box.innerHTML = `<div class="raw-card rep-pop">
+      <header><div><span class="muted small">Ads budget</span><h2>${rec ? 'Ubah' : 'Update'} saldo iklan</h2></div><button class="btn sm" type="button" data-close>✕</button></header>
+      <div class="raw-body">
+        <label>Tanggal<input type="date" id="bgDate" value="${esc(r.date)}"></label>
+        ${BUDGET.map(([k, l, src]) => `<label>${esc(l)} <small class="muted">· ${esc(src)}</small><input type="text" inputmode="numeric" data-bg="${k}" value="${r[k] ? Math.round(r[k]) : ''}" placeholder="0"></label>`).join('')}
+        <label>Catatan<input type="text" id="bgNote" value="${esc(r.note || '')}"></label>
+      </div>
+      <footer>${rec ? '<button class="btn sm danger" type="button" id="bgDel">Hapus</button>' : ''}<span class="spacer"></span><button class="btn sm" type="button" data-close>Batal</button><button class="btn sm btn-export" type="button" id="bgSave">Simpan</button></footer>
+    </div>`;
+    document.body.appendChild(box);
+    const close = () => box.remove();
+    box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) close(); });
+    const put = async (list) => { data.adbudget = await api('/api/adbudget', json('PUT', list)); close(); renderDashboard(); };
+    $('#bgSave', box).addEventListener('click', async () => {
+      const d = $('#bgDate', box).value; if (!d) { toast('Isi tanggal', true); return; }
+      const x = { id: rec?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), date: d, note: $('#bgNote', box).value,
+        updatedBy: window.A.me?.user?.name || window.A.me?.user?.username || '', updatedAt: new Date().toISOString().slice(0, 16) };
+      $('[data-bg]', box).forEach((el) => { x[el.dataset.bg] = Number(el.value.replace(/[^0-9]/g, '')) || 0; });
+      // one record per date: saving a date that already exists replaces it
+      const rest = (data.adbudget || []).filter((y) => y.id !== x.id && y.date !== d);
+      try { await put([...rest, x]); toast('Saldo iklan disimpan'); } catch (e) { toast(e.message, true); }
+    });
+    $('#bgDel', box)?.addEventListener('click', async () => { if (!confirm('Hapus data saldo tanggal ini?')) return; try { await put(data.adbudget.filter((y) => y.id !== rec.id)); } catch (e) { toast(e.message, true); } });
   }
 
   // ---------- ringkasan: one summary of every source, used by the dashboard and the PDF report ----------
@@ -1195,7 +1255,7 @@
       L(`GMV iklan : ${repMoney(c.adRevenue)}`),
       L(`ROAS iklan : ${repRatio(c.adSpend ? c.adRevenue / c.adSpend : NaN)}`),
       ...(S.live.sessions ? [L(`TikTok LIVE : ${repMoney(S.live.gmv)} (${num(S.live.sessions)} sesi)`)] : []),
-      ...SALDO.map(([k, l]) => L(`${l} : ${saldoText(r[k] || '') || '-'}`)),
+      ...SALDO.map(([k, l]) => { const b = budgetLast(), bk = { shopee: 'shopee', tiktok: 'tiktok', cpas: 'metaCpas' }[k]; return L(`${l} : ${saldoText(r[k] || '') || (b && b[bk] ? repMoney(b[bk]) : '-')}`); }),
       ...(top.length ? ['', '*Produk terlaris*', ...top.map((x, i) => `${i + 1}. ${x.name} : ${num(x.units)} pasang`)] : []),
     ].join('\n');
   }
