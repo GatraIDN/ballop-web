@@ -139,7 +139,45 @@
       body, note: 'At store = sent − returned − sold. Stock value at consignment price. Samples &amp; coach sponsorship are not counted as consignment stock.' });
   }
 
+  // ---------- Stock offline: only what is physically at each partner store (no sales / payments) ----------
+  const sst = { store: 'all' };
+  function renderStock() {
+    const v = $('#view-stockoff');
+    if (!v) return;
+    const ps = partners().map((p) => ({ ...p, stock: stockAt(p.rows) }));
+    if (sst.store !== 'all' && !ps.some((p) => p.name === sst.store)) sst.store = 'all';
+    const shown = sst.store === 'all' ? ps : ps.filter((p) => p.name === sst.store);
+    // models × sizes summed over the shown stores
+    const g = {};
+    shown.forEach((p) => p.stock.forEach((m) => { const x = g[m.k] = g[m.k] || { ...m, sizes: {}, sisa: 0 }; Object.entries(m.sizes).forEach(([s, q]) => { x.sizes[s] = (x.sizes[s] || 0) + q; }); x.sisa += m.sisa; }));
+    const models = Object.values(g).sort((a, b) => a.k.localeCompare(b.k));
+    const sizes = [...new Set(models.flatMap((m) => Object.keys(m.sizes)))].sort((a, b) => sizeNum(a) - sizeNum(b));
+    const tot = models.reduce((t, m) => t + m.sisa, 0);
+    const empty = models.reduce((t, m) => t + Object.values(m.sizes).filter((q) => q <= 0).length, 0);
+    const samples = shown.reduce((t, p) => t + p.t.sample, 0);
+    v.innerHTML = `
+      <header class="bar"><div><h1>Stock offline</h1><p class="muted">Stok Ballop yang ada di toko partner (konsinyasi) per model dan size. Sisa = dikirim − retur − terjual.</p></div></header>
+      <div class="st-cards">
+        <div class="st-card hero"><span>Total stok di toko</span><b>${num(tot)} psg</b><small>${num(shown.length)} toko · ${num(models.length)} model</small></div>
+        ${ps.slice(0, 5).map((p) => `<div class="st-card"><span>${esc(p.name)}</span><b>${num(p.t.sisa)}</b><small>psg di toko</small></div>`).join('')}
+      </div>
+      <section class="panel solid">
+        <div class="panel-head"><h2>Stok per size</h2>
+          <span class="seg glass">${[['all', 'Semua toko'], ...ps.map((p) => [p.name, p.name])].map(([k, l]) => `<button type="button" data-sto="${esc(k)}" class="${sst.store === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</span></div>
+        <div class="table-wrap"><table class="data csg-mx">
+          <thead><tr><th>Model</th>${sizes.map((s) => `<th class="num">${esc(s)}</th>`).join('')}<th class="num">Total</th></tr></thead>
+          <tbody>${models.map((m) => `<tr><td><span class="ch"><i style="background:${COLORS[m.color] || '#888'}"></i>${esc(m.product)} · ${esc(m.color)}</span></td>${sizes.map((s) => { const q = m.sizes[s]; return `<td class="num${q === 0 ? ' z' : ''}">${q === undefined ? '' : num(q)}</td>`; }).join('')}<td class="num"><b>${num(m.sisa)}</b></td></tr>`).join('') || '<tr><td class="muted">Belum ada stok.</td></tr>'}
+          <tr class="tot"><td>Total</td>${sizes.map((s) => `<td class="num">${num(models.reduce((t, m) => t + (m.sizes[s] || 0), 0))}</td>`).join('')}<td class="num">${num(tot)}</td></tr></tbody>
+        </table></div>
+        <p class="muted small" style="margin:8px 2px 0">Angka merah = size sudah habis di toko (${num(empty)} size). Sample display (${num(samples)} psg) tidak dihitung.</p>
+      </section>
+      ${sst.store === 'all' ? `<section class="panel solid"><div class="panel-head"><h2>Stok per toko</h2></div>
+        <div class="table-wrap"><table class="data"><thead><tr><th>Toko</th>${[...new Set(ps.flatMap((p) => p.stock.map((m) => m.k)))].sort().map((k) => `<th class="num">${esc(k.replace(/^Ballop Padel Pulse · /, 'Pulse '))}</th>`).join('')}<th class="num">Total</th></tr></thead>
+        <tbody>${(() => { const ks = [...new Set(ps.flatMap((p) => p.stock.map((m) => m.k)))].sort(); return ps.map((p) => `<tr><td><b>${esc(p.name)}</b></td>${ks.map((k) => { const m = p.stock.find((x) => x.k === k); return `<td class="num">${m ? num(m.sisa) : '–'}</td>`; }).join('')}<td class="num"><b>${num(p.t.sisa)}</b></td></tr>`).join(''); })()}</tbody></table></div></section>` : ''}`;
+    $$('[data-sto]', v).forEach((b) => b.addEventListener('click', () => { sst.store = b.dataset.sto; renderStock(); }));
+  }
+  B.registerView('stockoff', renderStock);
   B.registerView('consign', render);
-  window.Consign = { render, pdf: consignPdf, totals };
+  window.Consign = { render, renderStock, pdf: consignPdf, totals };
   document.addEventListener('admin:data', () => { if (!$('#view-consign')?.hidden) render(); });
 })();
