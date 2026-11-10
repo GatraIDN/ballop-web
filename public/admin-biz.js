@@ -1684,12 +1684,12 @@
         <button class="btn sm primary" type="button" data-act="add">${cfg.add}</button>
       </div>
       ${opts.before || ''}
-      <div class="table-wrap solid"><table class="data">
+      ${opts.byDate ? byDateTable(cfg, rows, st) : `<div class="table-wrap solid"><table class="data">
         <thead><tr>${cfg.columns.map((c) => `<th class="${c.num ? 'num' : ''}">${c.label}</th>`).join('')}</tr></thead>
         <tbody>${shown.map(({ x, i }) => `<tr class="click" data-i="${i}">${cfg.columns.map((c) => `<td class="${c.num ? 'num' : ''}">${c.get(x)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cfg.columns.length}" class="muted" style="text-align:center;padding:30px">Belum ada data di filter ini.</td></tr>`}</tbody>
         ${rows.length ? `<tfoot><tr>${cfg.columns.map((c, k) => `<td class="${c.num ? 'num' : ''}">${k === 0 ? `${num(rows.length)} baris` : totals[k] != null ? (c.fmt || num)(totals[k]) : ''}</td>`).join('')}</tr></tfoot>` : ''}
       </table></div>
-      ${rows.length > st.limit ? `<p style="text-align:center"><button class="btn sm" type="button" data-act="more">Tampilkan lebih banyak (${num(rows.length - st.limit)} lagi)</button></p>` : ''}`;
+      ${rows.length > st.limit ? `<p style="text-align:center"><button class="btn sm" type="button" data-act="more">Tampilkan lebih banyak (${num(rows.length - st.limit)} lagi)</button></p>` : ''}`}`;
 
     $$('[data-f]', root).forEach((el) => el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => {
       st[el.dataset.f] = el.value;
@@ -1697,6 +1697,8 @@
       if (el.tagName === 'INPUT') { clearTimeout(st.t); st.t = setTimeout(() => rerender(name), 250); } else rerender(name);
     }));
     $$('tr.click', root).forEach((tr) => tr.addEventListener('click', () => openRecord(name, Number(tr.dataset.i))));
+    $$('[data-day]', root).forEach((tr) => tr.addEventListener('click', () => { const o = st.open = st.open || {}; o[tr.dataset.day] = !o[tr.dataset.day]; rerender(name); }));
+    $('[data-act=hide]', root)?.addEventListener('click', () => { st.hidden = !st.hidden; try { localStorage.setItem(`ballopHide_${name}`, st.hidden ? '1' : '0'); } catch {} rerender(name); });
     $('[data-act=add]', root).addEventListener('click', () => openRecord(name, -1));
     $('[data-act=more]', root)?.addEventListener('click', () => { st.limit += 200; rerender(name); });
     $('[data-act=export]', root).addEventListener('click', () => exportLedger(name, rows.map((r) => r.x)));
@@ -1704,6 +1706,26 @@
     $('[data-act=import]', root).addEventListener('change', (e) => { importLedger(name, e.target.files[0]); e.target.value = ''; });
   }
 
+  function byDateTable(cfg, rows, st) {
+    if (st.hidden === undefined) { try { st.hidden = localStorage.getItem('ballopHide_ads') === '1'; } catch { st.hidden = false; } }
+    const days = {};
+    rows.forEach((r) => { (days[r.x.date] = days[r.x.date] || []).push(r); });
+    const list = Object.entries(days).sort((a, b) => b[0].localeCompare(a[0]));
+    const sum = (rs, k) => rs.reduce((t, { x }) => t + (x[k] || 0), 0);
+    const open = st.open || {};
+    const head = `<div class="panel-head" style="margin:6px 0 8px"><h2>Rincian iklan per tanggal</h2><span class="muted small">${num(list.length)} hari · ${num(rows.length)} campaign · klik tanggal untuk detail</span><button class="btn sm" type="button" data-act="hide">${st.hidden ? '▾ Tampilkan rincian' : '▴ Sembunyikan rincian'}</button></div>`;
+    if (st.hidden) return head;
+    return `${head}<div class="table-wrap solid"><table class="data ads-days">
+      <thead><tr><th style="width:28px"></th><th>Tanggal</th><th>Channel</th><th class="num">Campaign</th><th class="num">Spend</th><th class="num">Impresi</th><th class="num">Klik</th><th class="num">CTR</th><th class="num">Order</th><th class="num">Revenue</th><th class="num">ROAS</th></tr></thead>
+      <tbody>${list.slice(0, 60).map(([d, rs]) => {
+        const sp = sum(rs, 'spend'), rv = sum(rs, 'revenue'), im = sum(rs, 'impressions'), cl = sum(rs, 'clicks');
+        const chs = [...new Set(rs.map(({ x }) => x.channel))];
+        return `<tr class="ad-day${open[d] ? ' on' : ''}" data-day="${d}"><td>${open[d] ? '▾' : '▸'}</td><td><b>${fmtDate(d)}</b></td><td>${chs.map((c) => `<span class="ch"><i style="background:${(ADS_CH[c] || ADS_CH.other).color}"></i>${esc((ADS_CH[c] || ADS_CH.other).label)}</span>`).join(' ')}</td><td class="num">${num(rs.length)}</td><td class="num"><b>${money(sp)}</b></td><td class="num">${num(im)}</td><td class="num">${num(cl)}</td><td class="num">${im ? pct(cl / im) : '–'}</td><td class="num">${num(sum(rs, 'orders'))}</td><td class="num">${money(rv)}</td><td class="num">${ratio(sp ? rv / sp : NaN)}</td></tr>`
+          + (open[d] ? rs.sort((a, b) => b.x.spend - a.x.spend).map(({ x, i }) => `<tr class="click ad-sub" data-i="${i}"><td></td><td colspan="2"><span class="ch"><i style="background:${(ADS_CH[x.channel] || ADS_CH.other).color}"></i>${esc(x.campaign || '(tanpa nama)')}</span></td><td></td><td class="num">${money(x.spend)}</td><td class="num">${num(x.impressions)}</td><td class="num">${num(x.clicks)}</td><td class="num">${x.impressions ? pct(x.clicks / x.impressions) : '–'}</td><td class="num">${num(x.orders)}</td><td class="num">${money(x.revenue)}</td><td class="num">${ratio(x.spend ? x.revenue / x.spend : NaN)}</td></tr>`).join('') : '');
+      }).join('') || '<tr><td colspan="11" class="muted" style="text-align:center;padding:30px">Belum ada data di filter ini.</td></tr>'}</tbody>
+      ${rows.length ? `<tfoot><tr><td></td><td>Total</td><td></td><td class="num">${num(rows.length)}</td><td class="num">${money(sum(rows, 'spend'))}</td><td class="num">${num(sum(rows, 'impressions'))}</td><td class="num">${num(sum(rows, 'clicks'))}</td><td></td><td class="num">${num(sum(rows, 'orders'))}</td><td class="num">${money(sum(rows, 'revenue'))}</td><td class="num">${ratio(sum(rows, 'spend') ? sum(rows, 'revenue') / sum(rows, 'spend') : NaN)}</td></tr></tfoot>` : ''}
+    </table></div>`;
+  }
   function rerender(name) {
     const views = { stock: renderStock, stock3pl: () => extraViews.stock3pl?.(), offline: renderOffline, kol: renderKol, cashflow: renderFinance, sales: renderSales, ads: renderAds };
     if (views[name]) views[name]();
@@ -1934,7 +1956,7 @@
       const x = m.byAd[k];
       return `<div class="sum-card solid"><div class="k-label"><i style="width:8px;height:8px;border-radius:50%;background:${c.color};display:inline-block"></i>${c.label}</div><div class="k-value">${money(x.spend)}</div><div class="k-sub">ROAS ${ratio(x.revenue / x.spend)} · CPC ${x.clicks ? money(x.spend / x.clicks) : '–'}</div></div>`;
     }).join('');
-    renderLedger('ads', '#view-ads', { before: `${cards ? `<div class="sum-cards">${cards}</div>` : ''}<div id="adCal"></div>` });
+    renderLedger('ads', '#view-ads', { byDate: true, before: `${cards ? `<div class="sum-cards">${cards}</div>` : ''}<div id="adCal"></div>` });
     window.AdsCal?.mount('#adCal');
   }
   function renderSales() {
