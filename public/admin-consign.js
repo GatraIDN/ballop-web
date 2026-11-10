@@ -156,7 +156,7 @@
     const empty = models.reduce((t, m) => t + Object.values(m.sizes).filter((q) => q <= 0).length, 0);
     const samples = shown.reduce((t, p) => t + p.t.sample, 0);
     v.innerHTML = `
-      <header class="bar"><div><h1>Stock offline</h1><p class="muted">Stok Ballop yang ada di toko partner (konsinyasi) per model dan size. Sisa = dikirim − retur − terjual.</p></div></header>
+      <header class="bar"><div><h1>Stock offline</h1><p class="muted">Stok Ballop yang ada di toko partner (konsinyasi) per model dan size. Sisa = dikirim − retur − terjual.</p></div><div class="bar-actions"><button class="btn sm btn-export" type="button" id="stoPdf">⬇ Export PDF</button></div></header>
       <div class="st-cards">
         <div class="st-card hero"><span>Total stok di toko</span><b>${num(tot)} psg</b><small>${num(shown.length)} toko · ${num(models.length)} model</small></div>
         ${ps.slice(0, 5).map((p) => `<div class="st-card"><span>${esc(p.name)}</span><b>${num(p.t.sisa)}</b><small>psg di toko</small></div>`).join('')}
@@ -174,10 +174,38 @@
       ${sst.store === 'all' ? `<section class="panel solid"><div class="panel-head"><h2>Stok per toko</h2></div>
         <div class="table-wrap"><table class="data"><thead><tr><th>Toko</th>${[...new Set(ps.flatMap((p) => p.stock.map((m) => m.k)))].sort().map((k) => `<th class="num">${esc(k.replace(/^Ballop Padel Pulse · /, 'Pulse '))}</th>`).join('')}<th class="num">Total</th></tr></thead>
         <tbody>${(() => { const ks = [...new Set(ps.flatMap((p) => p.stock.map((m) => m.k)))].sort(); return ps.map((p) => `<tr><td><b>${esc(p.name)}</b></td>${ks.map((k) => { const m = p.stock.find((x) => x.k === k); return `<td class="num">${m ? num(m.sisa) : '–'}</td>`; }).join('')}<td class="num"><b>${num(p.t.sisa)}</b></td></tr>`).join(''); })()}</tbody></table></div></section>` : ''}`;
-    $$('[data-sto]', v).forEach((b) => b.addEventListener('click', () => { sst.store = b.dataset.sto; renderStock(); }));
+    $('[data-sto]', v).forEach((b) => b.addEventListener('click', () => { sst.store = b.dataset.sto; renderStock(); }));
+    $('#stoPdf').addEventListener('click', stockPdf);
+  }
+  // PDF (English): totals, the model × size matrix of the selected stores, then one matrix per store
+  function stockPdf() {
+    const R = window.PdfReport;
+    const ps = partners().map((p) => ({ ...p, stock: stockAt(p.rows) }));
+    const shown = sst.store === 'all' ? ps : ps.filter((p) => p.name === sst.store);
+    const matrix = (stores) => {
+      const g = {};
+      stores.forEach((p) => p.stock.forEach((m) => { const x = g[m.k] = g[m.k] || { ...m, sizes: {}, sisa: 0 }; Object.entries(m.sizes).forEach(([sz, q]) => { x.sizes[sz] = (x.sizes[sz] || 0) + q; }); x.sisa += m.sisa; }));
+      const models = Object.values(g).sort((a, b) => a.k.localeCompare(b.k));
+      const sizes = [...new Set(models.flatMap((m) => Object.keys(m.sizes)))].sort((a, b) => sizeNum(a) - sizeNum(b));
+      const tot = models.reduce((t, m) => t + m.sisa, 0);
+      const cell = (q) => (q === undefined ? '' : q <= 0 ? '<span style="color:#d93a3e;font-weight:700">0</span>' : R.num(q));
+      return { tot, html: R.table([['Model'], ...sizes.map((sz) => [esc(sz), 1]), ['Total', 1]],
+        models.map((m) => [`${R.dot(COLORS[m.color] || '#888')}${esc(m.product)} · ${esc(m.color)}`, ...sizes.map((sz) => cell(m.sizes[sz])), `<b>${R.num(m.sisa)}</b>`]),
+        ['Total', ...sizes.map((sz) => R.num(models.reduce((t, m) => t + (m.sizes[sz] || 0), 0))), R.num(tot)], 'No stock.') };
+    };
+    const all = matrix(shown);
+    const body = `
+      ${R.h2('Stock at partner stores', 'sent − returned − sold · samples not included')}
+      ${R.tiles([R.tile('Total stock', `${R.num(all.tot)} pairs`, `${R.num(shown.length)} stores`, true), ...shown.slice(0, 7).map((p) => R.tile(esc(p.name), `${R.num(p.t.sisa)} pairs`))], 4)}
+      ${R.h2(sst.store === 'all' ? 'All stores · by size' : `${esc(sst.store)} · by size`, 'red 0 = size sold out at the store')}
+      ${all.html}
+      ${shown.length > 1 ? shown.map((p) => `<div class="avoid">${R.h2(`${esc(p.name)}`, `${R.num(p.t.sisa)} pairs`)}${matrix([p]).html}</div>`).join('') : ''}`;
+    R.open({ title: 'Offline Stock Report', period: `as of ${R.longDate(today())}`,
+      meta: [['Stores', esc(shown.map((p) => p.name).join(', ') || '–')], ['Data', 'partner consignment workbooks']],
+      body, note: 'Stock at store = sent − returned − sold, from the consignment workbooks of each partner store. Display samples are not counted.' });
   }
   B.registerView('stockoff', renderStock);
   B.registerView('consign', render);
-  window.Consign = { render, renderStock, pdf: consignPdf, totals };
+  window.Consign = { render, renderStock, stockPdf, pdf: consignPdf, totals };
   document.addEventListener('admin:data', () => { if (!$('#view-consign')?.hidden) render(); });
 })();
