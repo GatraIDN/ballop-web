@@ -49,7 +49,7 @@
   const CONTENT = { menunggu: 'Menunggu', brief: 'Brief dikirim', draft: 'Draft', revisi: 'Revisi', posted: 'Sudah posting', tidak: 'Tidak posting' };
   const CASH_CATS = ['Penjualan offline', 'Penghasilan marketplace', 'Modal', 'Pembelian stok', 'Iklan', 'Gaji', 'Ongkir', 'Packaging', 'KOL / endorse', 'Event', 'Sewa', 'Pajak', 'Lainnya'];
 
-  const COLLS = ['sales', 'stock', 'ads', 'adbudget', 'expenses', 'orders', 'settlements', 'live', 'stockdaily', 'csdaily', 'flashsale', 'listings', 'offline', 'stock3pl', 'stockhist', 'kol', 'cashflow', 'contents', 'contentplans'];
+  const COLLS = ['sales', 'stock', 'ads', 'adbudget', 'consign', 'expenses', 'orders', 'settlements', 'live', 'stockdaily', 'csdaily', 'flashsale', 'listings', 'offline', 'stock3pl', 'stockhist', 'kol', 'cashflow', 'contents', 'contentplans'];
   const extraViews = {}; // views added by other admin modules (admin-konten.js)
   const data = Object.fromEntries(COLLS.map((c) => [c, []]));
   let loaded = false;
@@ -1126,6 +1126,7 @@
         ${kpi('Omzet offline', money(off.omzet), delta(off.omzet, P.off.omzet), true, 'menu Penjualan offline · transaksi selesai')}
         ${kpi('Transaksi', num(off.trx), delta(off.trx, P.off.trx))}
         ${kpi('Stock keluar offline', `${num(off.units)} pcs`, delta(off.units, P.off.units))}
+        ${(() => { const c = data.consign || []; const q = (t) => c.filter((r) => r.type === t).reduce((a, r) => a + r.qty, 0); const sisa = q('kirim') - q('retur') - q('jual'); return c.length ? kpi('Stok di toko konsinyasi', `${num(sisa)} psg`, `<div class="k-delta">terjual ${num(q('jual'))} psg di ${num(new Set(c.map((r) => r.partner)).size)} toko</div>`, false, 'menu Konsinyasi · posisi saat ini') : ''; })()}
         ${kpi('Per jenis', `<span style="font-size:15px">${Object.entries(off.byType).map(([k, q]) => `${esc(k)} ${num(q)}`).join(' · ') || '–'}</span>`, '', false, 'pcs keluar per jenis')}
       </div>`;
   }

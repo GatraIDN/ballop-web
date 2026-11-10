@@ -1088,3 +1088,7 @@ table.data tr.tot td { font-weight: 800; border-top: 2px solid var(--ink); }
 .cs-daily td { padding-top: 9px; padding-bottom: 9px; }
 .cs-daily td:first-child { white-space: nowrap; color: var(--muted); font-weight: 600; }
 .cs-daily tbody tr:hover { background: color-mix(in srgb, var(--line) 35%, transparent); }
+
+/* consignment size matrix */
+.csg-mx td.z { color: var(--danger); font-weight: 700; }
+.data tr.on td { background: color-mix(in srgb, #0e8a8a 10%, transparent); }
