@@ -174,7 +174,7 @@
       ${sst.store === 'all' ? `<section class="panel solid"><div class="panel-head"><h2>Stok per toko</h2></div>
         <div class="table-wrap"><table class="data"><thead><tr><th>Toko</th>${[...new Set(ps.flatMap((p) => p.stock.map((m) => m.k)))].sort().map((k) => `<th class="num">${esc(k.replace(/^Ballop Padel Pulse · /, 'Pulse '))}</th>`).join('')}<th class="num">Total</th></tr></thead>
         <tbody>${(() => { const ks = [...new Set(ps.flatMap((p) => p.stock.map((m) => m.k)))].sort(); return ps.map((p) => `<tr><td><b>${esc(p.name)}</b></td>${ks.map((k) => { const m = p.stock.find((x) => x.k === k); return `<td class="num">${m ? num(m.sisa) : '–'}</td>`; }).join('')}<td class="num"><b>${num(p.t.sisa)}</b></td></tr>`).join(''); })()}</tbody></table></div></section>` : ''}`;
-    $('[data-sto]', v).forEach((b) => b.addEventListener('click', () => { sst.store = b.dataset.sto; renderStock(); }));
+    $$('[data-sto]', v).forEach((b) => b.addEventListener('click', () => { sst.store = b.dataset.sto; renderStock(); }));
     $('#stoPdf').addEventListener('click', stockPdf);
   }
   // PDF (English): totals, the model × size matrix of the selected stores, then one matrix per store

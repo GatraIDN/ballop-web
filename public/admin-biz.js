@@ -843,7 +843,7 @@
     $('#expReport').addEventListener('click', () => exportReport(m));
     $('#expPdf').addEventListener('click', exportPdfReport);
     $('#budgetAdd')?.addEventListener('click', () => budgetPopup());
-    $('[data-budget]', v).forEach((b) => b.addEventListener('click', () => budgetPopup(data.adbudget.find((x) => x.id === b.dataset.budget))));
+    $$('[data-budget]', v).forEach((b) => b.addEventListener('click', () => budgetPopup(data.adbudget.find((x) => x.id === b.dataset.budget))));
     $('#adsDashPdf')?.addEventListener('click', () => (window.AdsCal ? window.AdsCal.pdf(from, to) : toast('Modul iklan belum termuat', true)));
     bindReport();
   }
@@ -874,6 +874,14 @@
         </table></div>
       </section>`;
   }
+  // own sidebar page "Sisa saldo iklan": same content as the dashboard tab
+  function renderBudgetPage() {
+    const v = $('#view-adbudget');
+    if (!v) return;
+    v.innerHTML = budgetTab();
+    $('#budgetAdd', v)?.addEventListener('click', () => budgetPopup());
+    $$('[data-budget]', v).forEach((b) => b.addEventListener('click', () => budgetPopup(data.adbudget.find((x) => x.id === b.dataset.budget))));
+  }
   function budgetPopup(rec) {
     const B0 = budgetLast();
     const r = rec || { date: today(), ...(B0 ? Object.fromEntries(BUDGET.map(([k]) => [k, B0[k] || 0])) : {}) };
@@ -895,15 +903,15 @@
     const close = () => box.remove();
     box.addEventListener('click', (e) => { if (e.target === box || e.target.closest('[data-close]')) close(); });
     const fmtIn = (el) => { const n = Number(el.value.replace(/[^0-9]/g, '')) || 0; el.value = n ? n.toLocaleString('id-ID') : ''; };
-    const sumIn = () => { $('#bgTotal', box).textContent = money($('[data-bg]', box).reduce((t, el) => t + (Number(el.value.replace(/[^0-9]/g, '')) || 0), 0)); };
-    $('[data-bg]', box).forEach((el) => el.addEventListener('input', () => { fmtIn(el); sumIn(); }));
+    const sumIn = () => { $('#bgTotal', box).textContent = money($$('[data-bg]', box).reduce((t, el) => t + (Number(el.value.replace(/[^0-9]/g, '')) || 0), 0)); };
+    $$('[data-bg]', box).forEach((el) => el.addEventListener('input', () => { fmtIn(el); sumIn(); }));
     sumIn();
-    const put = async (list) => { data.adbudget = await api('/api/adbudget', json('PUT', list)); close(); renderDashboard(); };
+    const put = async (list) => { data.adbudget = await api('/api/adbudget', json('PUT', list)); close(); if (!$('#view-adbudget')?.hidden) renderBudgetPage(); else renderDashboard(); };
     $('#bgSave', box).addEventListener('click', async () => {
       const d = $('#bgDate', box).value; if (!d) { toast('Isi tanggal', true); return; }
       const x = { id: rec?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())), date: d, note: $('#bgNote', box).value,
         updatedBy: window.A.me?.user?.name || window.A.me?.user?.username || '', updatedAt: new Date().toISOString().slice(0, 16) };
-      $('[data-bg]', box).forEach((el) => { x[el.dataset.bg] = Number(el.value.replace(/[^0-9]/g, '')) || 0; });
+      $$('[data-bg]', box).forEach((el) => { x[el.dataset.bg] = Number(el.value.replace(/[^0-9]/g, '')) || 0; });
       // one record per date: saving a date that already exists replaces it
       const rest = (data.adbudget || []).filter((y) => y.id !== x.id && y.date !== d);
       try { await put([...rest, x]); toast('Saldo iklan disimpan'); } catch (e) { toast(e.message, true); }
@@ -2291,7 +2299,7 @@
   function refresh() {
     const views = {
       dashboard: renderDashboard, sales: renderSales, ads: renderAds, stock: renderStock, online: renderOnline,
-      offline: renderOffline, kol: renderKol, finance: renderFinance,
+      offline: renderOffline, kol: renderKol, finance: renderFinance, adbudget: renderBudgetPage,
       expenses: () => renderLedger('expenses', '#view-expenses'),
     };
     const fn = views[current] || extraViews[current];
@@ -2318,5 +2326,6 @@
     fmtDate, fmtDay, money, num, compact, pct, esc, today, addDays, toCsv, prevRange, rangeBar, bindRangeBar, periodOf, summary, exportPdfReport, overviewTab,
     get loaded() { return loaded; },
     registerView(name, fn) { extraViews[name] = fn; },
+    renderBudgetPage,
   };
 })();
