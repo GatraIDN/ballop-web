@@ -84,6 +84,8 @@ if (require.main === module) (async () => {
     const net = rows.filter((r) => r.state === 'completed' || r.state === 'pending').reduce((s, r) => s + (r.net || 0), 0);
     console.log(`sheet "${sh.name}": ${KINDS[res.kind].label} -> ${target}, ${rows.length} baris`, JSON.stringify(months), target === 'orders' ? `omzet selesai+diproses ${Math.round(net).toLocaleString('id-ID')}` : '');
     const all = await store.get(target, []);
+    // LIVE sessions from the Analytics export have no Room ID: adopt the key of a stored session with the same date + start
+    if (target === 'live') rows.forEach((r) => { const same = all.find((a) => a.channel === r.channel && a.date === r.date && a.start === r.start); if (same) { r.key = same.key; for (const k of ['roomId', 'impressions', 'title']) if (r[k] == null && same[k] != null) r[k] = same[k]; } });
     const byKey = new Map(all.map((r, i) => [r.key, i]));
     const clean = rows.map(CLEAN[target]).filter((r) => r.key);
     const upd = clean.filter((r) => byKey.has(r.key)).length;

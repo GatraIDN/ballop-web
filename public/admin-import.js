@@ -241,6 +241,27 @@ window.MarketImport = (() => {
         };
       },
     },
+    // Seller Centre Analytics › LIVE › Details export ("Live Analysis<ts>.xlsx"): one row per LIVE, no Room ID.
+    // Key = date + start time; the CLI importer re-uses the key of an existing session with the same date/start.
+    tiktokLiveAnalysis: {
+      label: 'Live analysis TikTok (Seller Centre)', target: 'live',
+      match: (h) => h.includes('Launched Time') && h.includes('LIVE-attributed GMV (Rp)'),
+      map: (r) => {
+        const m = text(r['Launched Time']).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}):(\d{2})/);
+        if (!m) return null;
+        const date = `${m[1]}-${pad(m[2])}-${pad(m[3])}`, start = `${pad(m[4])}:${m[5]}`;
+        const dur = text(r.Duration).match(/(?:(\d+)h)?\s*(?:(\d+)\s*min)?/);
+        const minutes = (Number(dur?.[1]) || 0) * 60 + (Number(dur?.[2]) || 0);
+        const endMin = Number(m[4]) * 60 + Number(m[5]) + minutes;
+        return {
+          key: `tiktok:live:${date} ${start}`, channel: 'tiktok', title: text(r.Nickname), date, start,
+          end: `${pad(Math.floor(endMin / 60) % 24)}:${pad(endMin % 60)}`, minutes,
+          gmv: toNum(r['LIVE-attributed GMV (Rp)']), items: toNum(r['LIVE-attributed items sold']), orders: toNum(r['Orders Paid']), customers: toNum(r['Unique customers']),
+          views: toNum(r.Views), productImpressions: toNum(r['Product Impressions']), productClicks: toNum(r['Product Clicks']),
+          avgWatch: toNum(r['Average viewing duration (LIVE streams)']), followers: toNum(r['New followers (Creator video)']), comments: toNum(r.Comments), shares: toNum(r.Shares), likes: toNum(r['LIVE likes']),
+        };
+      },
+    },
     // "Adjustment" sheet of the Shopee income report: refunds after payout, compensations
     shopeeAdjust: {
       label: 'Penyesuaian Shopee', target: 'settlements',

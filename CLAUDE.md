@@ -82,6 +82,13 @@ tab yang sudah login), bukan download file:
   lalu: `cd C:/Claude/ballop-web; node --env-file=.env tools/import-ads-json.js shopee.json tiktok.json` (dry run) → `--write`.
 - Cek silang: total spend per hari harus sama dengan angka di dashboard Seller Centre.
 
+## Update data LIVE harian (TikTok)
+- `seller-id.tokopedia.com/compass/live-analysis/live-details` (Analytics › LIVE & video › LIVE › Details).
+  Date picker → mode **Month** → bulan berjalan. Hasilnya tanggal 1 sampai **kemarin**, karena data hari ini belum
+  tersedia → **Export** → ikon daftar export → Download (`Live Analysis<timestamp>.xlsx`).
+- Import: `node --env-file=.env tools/import-market-file.js "<file>"` (dry run) → `--write`. Satu baris per sesi LIVE,
+  key = tanggal + jam mulai. Sesi lama yang sudah punya Room ID dicocokkan lewat tanggal + jam mulai, jadi tidak dobel.
+
 ## Update saldo iklan harian (menu "Sisa saldo iklan", data `adbudget`)
 Satu record per tanggal: `shopee`, `shopeeExt`, `tiktok`, `metaCampaign`, `metaCpas`. Kalau tanggalnya sama, record lama diganti.
 - `shopee`: angka "Saldo Iklan" pertama di `seller.shopee.co.id/portal/marketing/pas/index`.
