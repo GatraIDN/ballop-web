@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 const { store, CLEAN } = require('../lib/api');
-const TYPE = { P: ['shopee', 'Iklan Produk'], S: ['shopee', 'Iklan Toko+'], L: ['shopee', 'Iklan Live'], B: ['shopee', 'Iklan Banner'], G: ['tiktok', 'GMV Max'] };
+const TYPE = { P: ['shopee', 'Iklan Produk'], S: ['shopee', 'Iklan Toko+'], L: ['shopee', 'Iklan Live'], B: ['shopee', 'Iklan Banner'], E: ['shopee', 'Iklan Eksternal'], G: ['tiktok', 'Product GMV Max'], GL: ['tiktok', 'LIVE GMV Max'] };
+const CAMPAIGN = { G: 'GMV Max Tiktok · Product', GL: 'GMV Max Tiktok · LIVE' };
 
 (async () => {
   const files = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -14,10 +15,12 @@ const TYPE = { P: ['shopee', 'Iklan Produk'], S: ['shopee', 'Iklan Toko+'], L: [
   const from = rows.map((r) => r[0]).sort()[0], to = rows.map((r) => r[0]).sort().pop();
   const fresh = rows.map(([date, t, title, spend, revenue, orders, impressions, clicks]) => {
     const [channel, kind] = TYPE[t];
-    return CLEAN.ads({ date, channel, campaign: t === 'G' ? 'GMV Max Tiktok' : `${kind} · ${title}`, spend, revenue, orders, impressions, clicks, note: `${kind} · dari Seller Centre` });
+    return CLEAN.ads({ date, channel, campaign: CAMPAIGN[t] || `${kind} · ${title}`, spend, revenue, orders, impressions, clicks, note: `${kind} · dari Seller Centre` });
   });
   const all = await store.get('ads', []);
-  const replaced = (a) => a.date >= from && a.date <= to && ((a.channel === 'shopee' && !/cpas/i.test(a.campaign)) || (a.channel === 'tiktok' && /gmv max/i.test(a.campaign)));
+  // Shopee: every row in range is replaced (CPAS too, once the file carries external ads as type E)
+  const hasExt = rows.some((r) => r[1] === 'E');
+  const replaced = (a) => a.date >= from && a.date <= to && ((a.channel === 'shopee' && (hasExt || !/cpas/i.test(a.campaign))) || (a.channel === 'tiktok' && /gmv max/i.test(a.campaign)));
   const keep = all.filter((a) => !replaced(a));
   const sum = (list, ch) => Math.round(list.filter((a) => a.channel === ch).reduce((s, a) => s + a.spend, 0));
   console.log(`periode ${from} – ${to} · baris baru ${fresh.length} · diganti ${all.length - keep.length} · tetap ${keep.length}`);
