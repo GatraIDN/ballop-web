@@ -174,6 +174,7 @@
       meta: [['Date', R.longDate(d)], ['Channel', 'Shopee Official · Shopee Global · TikTok Shop / Tokopedia'], ['Prepared by', esc(Object.values(recs).find((x) => x?.updatedBy)?.updatedBy || who())]],
       body, sign: ['Customer Service', 'Approved by'], note: 'Analytics copied from Shopee Seller Centre (Service › Chat) and TikTok/Tokopedia Seller Center (Service analytics). Time: GMT+7.' });
   }
+  window.CsPdf = { period: () => periodPdf() };
   function periodPdf() {
     const R = P();
     const r = B.periodOf(sst);
@@ -195,9 +196,12 @@
       ${chs.length > 1 ? `${R.h2('By channel')}${R.table([['Channel'], ['Days', 1], ['Chats', 1], ['Replied', 1], ['Response time', 1], ['CSAT', 1], ['Orders', 1], ['Sales', 1], ['Conversion', 1]],
         per.map(([k, x]) => [`${R.dot(CH[k].color)}${CH[k].label}`, nE(x.days), nE(x.chats), pE(x.rate), minE(x.responseTime), pE(x.csat), nE(x.orders), rpE(x.sales), Number.isFinite(x.conv) ? R.pct(x.conv) : '–']),
         ['Total', nE(all.days), nE(all.chats), pE(all.rate), minE(all.responseTime), pE(all.csat), nE(all.orders), rpE(all.sales), Number.isFinite(all.conv) ? R.pct(all.conv) : '–'])}` : ''}
-      ${R.h2('Daily')}
-      ${R.table([['Date'], ['Channel'], ['Visitors', 1], ['Chats', 1], ['Replied', 1], ['Response time', 1], ['CSAT', 1], ['Orders', 1], ['Sales', 1], ['Conversion', 1]],
-        days.flatMap((d) => chs.map((k) => rep(d, k)).filter(Boolean)).map((x) => [R.longDate(x.date), CH[x.channel].label, x.visitors ? nE(x.visitors) : '–', nE(x.chats), pE(x.responseRate), minE(x.responseTime), x.csat ? pE(x.csat) : '–', nE(x.orders), rpE(x.sales || 0), x.chatConv ? pE(x.chatConv) : '–']), null, 'No reports in this period.')}`;
+      ${R.h2('Daily', 'all channels combined per day · chats per channel in brackets')}
+      ${R.table([['Date'], ['Chats', 1], ['By channel'], ['Replied', 1], ['Response time', 1], ['CSAT', 1], ['Orders', 1], ['Sales', 1], ['Conversion', 1]],
+        days.map((d) => { const recs = chs.map((k) => rep(d, k)).filter(Boolean); recs.forEach((x) => syncRate(x.channel, x)); const t = chatTotals(recs);
+          return [R.longDate(d), `<b>${nE(t.chats)}</b>`, `<span class="muted">${recs.filter((x) => x.chats).map((x) => `${CH[x.channel].short} ${nE(x.chats)}`).join(' · ') || '–'}</span>`, pE(t.rate), minE(t.responseTime), pE(t.csat), nE(t.orders), t.sales ? rpE(t.sales) : '–', Number.isFinite(t.conv) && t.orders ? R.pct(t.conv) : '–']; }),
+        ['Total', nE(all.chats), '', pE(all.rate), minE(all.responseTime), pE(all.csat), nE(all.orders), rpE(all.sales), Number.isFinite(all.conv) ? R.pct(all.conv) : '–'], 'No reports in this period.')}
+      <p class="muted" style="margin:4px 0 0">S = Shopee Official · G = Shopee Global · T = TikTok Shop</p>`;
     R.open({ title: 'Customer Service Report', period: R.period(r.from, r.to), onePage: days.length <= 14,
       meta: [['Period', R.period(r.from, r.to)], ['Channel', sst.ch === 'all' ? 'All channels combined' : CH[sst.ch].label]],
       body, sign: ['Customer Service', 'Approved by'], note: 'Response time &amp; satisfaction are weighted by chats per day. Source: daily CS input from Seller Centre.' });
