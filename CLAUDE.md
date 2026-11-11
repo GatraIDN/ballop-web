@@ -82,6 +82,16 @@ tab yang sudah login), bukan download file:
   lalu: `cd C:/Claude/ballop-web; node --env-file=.env tools/import-ads-json.js shopee.json tiktok.json` (dry run) → `--write`.
 - Cek silang: total spend per hari harus sama dengan angka di dashboard Seller Centre.
 
+## Update saldo iklan harian (menu "Sisa saldo iklan", data `adbudget`)
+Satu record per tanggal: `shopee`, `shopeeExt`, `tiktok`, `metaCampaign`, `metaCpas`. Kalau tanggalnya sama, record lama diganti.
+- `shopee`: angka "Saldo Iklan" pertama di `seller.shopee.co.id/portal/marketing/pas/index`.
+- `shopeeExt`: "Meta Saldo Iklan" di `seller.shopee.co.id/portal/web-shopping-ads/dashboard`.
+- `tiktok`: "Available cash balance" di Payment Portfolio TikTok Business Center (BC "BALLOP INDONESIA").
+  Business Center sering minta **verifikasi 2 langkah**. User yang harus menyelesaikannya.
+- `metaCampaign` / `metaCpas`: Meta Billing › akun "Campaign Ads" dan "CPAS Shopee".
+- Simpan lewat admin (Sisa saldo iklan › Update saldo), atau lewat script node: `store.get('adbudget')`, tambah record
+  baru, `store.set` (backup dulu ke `data/`). Saldo yang tidak bisa dibaca, salin dari record terakhir dan tulis di `note`.
+
 ## Laporan penjualan Weekly Eagle (bulanan)
 Baca dulu `C:\Claude\data\sales\tools\TUTORIAL-weekly-eagle.md` (script `calc.py`, `ttread.py`, `build2.ps1`,
 template 3 channel). Raw data di `C:\Claude\data\sales\<YYYY-MM>\`. Channel: Shopee, TikTok, Tokopedia (Tokopedia

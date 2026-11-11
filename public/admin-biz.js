@@ -1189,15 +1189,6 @@
   ])}
   </div>
   <div class="avoid">
-  ${h2('Offline (separate from e-commerce)', 'store, distributor, reseller, event · offline sales menu')}
-  ${tiles([
-    tile('Offline revenue', rp(off.omzet), chg(off.omzet, P.off.omzet), true),
-    tile('Transactions', n(off.trx), chg(off.trx, P.off.trx)),
-    tile('Units out', `${n(off.units)} pcs`, chg(off.units, P.off.units)),
-    tile('By type', Object.entries(off.byType).map(([k, q]) => `${esc(k)} ${n(q)}`).join(' · ') || '–', 'pcs'),
-  ])}
-  </div>
-  <div class="avoid">
   ${h2('By channel')}
   <div class="mix">${S.channels.filter((c) => c.omzet).map((c) => `<i style="width:${(c.omzet / totOmzet) * 100}%;background:${c.color}"></i>`).join('')}</div>
   ${table([['Channel'], ['Order value', 1], ['Share', 1], ['Orders', 1], ['Units', 1], ['Cancelled', 1], ['Cancelled value', 1], ['Income value', 1], ['Ads', 1], ['ROAS', 1]],
