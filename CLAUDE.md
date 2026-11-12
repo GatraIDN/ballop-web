@@ -16,7 +16,9 @@ Semua yang dipakai adalah **file atau data terbaru yang di-download/diambil lang
 - File hasil download masuk ke `C:\Users\danan\Downloads`. Ambil yang paling baru (`Get-ChildItem … | Sort LastWriteTime`).
 - Setiap import: **dry run dulu**, cek angkanya masuk akal, baru `--write`. DB = production.
 - Ada **password atau verifikasi 2 langkah**? Lewati langkah itu, lanjutkan langkah lain, dan laporkan di akhir. Claude
-  tidak mengetik password atau kode verifikasi.
+  tidak mengetik password atau kode verifikasi, dan juga tidak memakai autofill browser untuk login/verifikasi.
+  Password Shopee sudah tersimpan di browser user: begitu popup muncul, **langsung kasih tahu user** (jangan tunggu
+  akhir) supaya user klik kolom password → autofill → Verifikasi sendiri, lalu Claude lanjutkan langkah itu.
 - Kasih update singkat ke user di tiap langkah. Di akhir, laporkan dalam satu tabel ringkasan (langkah, hasil, angka utama, yang dilewati).
 - Kalau ada **kode yang berubah**: commit + push langsung (author `GatraIDN <areloa.official@gmail.com>`).
   Import data saja tidak perlu commit.
