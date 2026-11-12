@@ -2,6 +2,41 @@
 
 Catatan kerja dari user (GatraIDN). Berlaku di akun Claude mana pun, jadi tidak perlu dijelaskan ulang.
 
+## ▶ DAILY ROUTINE BALLOP ("kerjakan daily routine ballop")
+Kalau user bilang **"kerjakan daily routine ballop"** (atau "daily routine", "update harian ballop"), jalankan
+semua langkah di bawah **berurutan tanpa bertanya lagi**. Detail tiap langkah ada di bagian-bagian di bawahnya.
+Semua yang dipakai adalah **file atau data terbaru yang di-download/diambil langsung hari itu**, bukan file lama.
+
+**Aturan umum**
+- Browser: Brave + Claude in Chrome. Mulai dengan `tabs_context_mcp {createIfEmpty:true}` dan kerjakan di tab group
+  sendiri. Shopee Seller Centre dan TikTok/Tokopedia Seller Centre sudah login. Tab group bisa hilang di tengah jalan;
+  kalau tool bilang tab tidak ada di group, panggil `tabs_context_mcp {createIfEmpty:true}` lagi.
+- Periode harian = **tanggal 1 bulan berjalan sampai hari ini** (LIVE: sampai kemarin). Diulang setiap hari; semua
+  importer upsert/replace sehingga tidak dobel.
+- File hasil download masuk ke `C:\Users\danan\Downloads`. Ambil yang paling baru (`Get-ChildItem … | Sort LastWriteTime`).
+- Setiap import: **dry run dulu**, cek angkanya masuk akal, baru `--write`. DB = production.
+- Ada **password atau verifikasi 2 langkah**? Lewati langkah itu, lanjutkan langkah lain, dan laporkan di akhir. Claude
+  tidak mengetik password atau kode verifikasi.
+- Kasih update singkat ke user di tiap langkah. Di akhir, laporkan dalam satu tabel ringkasan (langkah, hasil, angka utama, yang dilewati).
+- Kalau ada **kode yang berubah**: commit + push langsung (author `GatraIDN <areloa.official@gmail.com>`).
+  Import data saja tidak perlu commit.
+
+**Urutan langkah**
+1. **Stok gudang → dashboard.** Pakai file stok gudang hari ini (`Stock DD.MM.xlsx` terbaru di Downloads). Kalau file
+   hari ini belum ada, minta user mengirim filenya, atau minta link dashboard gudang lalu catat di sini. Import:
+   `import-stock-file.js --date=<hari ini>` (lihat "Excel harian").
+2. **Stok Shopee & TikTok = stok gudang.** `python -I tools/daily/wh-map.py "<Stock file>" <scratchpad>/wh.json`,
+   lalu jalankan `tools/daily/match.js` + `shopee-stock.js` di Shopee (semua halaman, 48/halaman) dan `tiktok-stock.js`
+   di TikTok (lihat "Sinkron stok"). Arsip/delist/bundle dilewati.
+3. **Order Shopee + TikTok** (export 1–hari ini) → `import-market-file.js`.
+4. **Income Shopee + TikTok** (export 1–hari ini) → `import-market-file.js`.
+5. **Spending iklan** Shopee (Produk, Toko, Banner, Live, Eksternal/Meta) + TikTok (Product & LIVE GMV Max), per hari
+   1–hari ini → `tools/daily/ads.js` → `import-ads-json.js`.
+6. **Saldo iklan** (Shopee, Iklan Meta Shopee, TikTok, Meta Billing) → `tools/daily/save-adbudget.js`.
+7. **Data LIVE TikTok** (export bulan berjalan, sampai kemarin) → `import-market-file.js`.
+8. **Laporan akhir** ke user: tabel per langkah, angka (order baru, omzet, spend, saldo, SKU stok yang berubah),
+   dan daftar yang dilewati atau perlu dicek.
+
 ## Repo & deploy
 - Repo `C:\Claude\ballop-web` → GitHub `GatraIDN/ballop-web`, branch `main`, auto-deploy Vercel ke **ballop.web.id**.
 - **Setiap perubahan kode langsung commit + push** ke `main` tanpa tanya (git user.name `GatraIDN`). Jangan pernah commit `.env`.
@@ -41,6 +76,10 @@ Permintaan rutin: "update stock di tiktok & shopee pake data gudang terbaru".
   ALL BLACK, Gradient White = OFF WHITE. Ukuran gudang seperti `235~240 (EU 36.5~37)` = Shopee `EU 36.5/37`.
   Kalau ragu, jangan diubah; laporkan ke user.
 - Shopee punya "Stok Dikunci untuk Promosi". Total stok tetap di-set sama dengan angka gudang.
+- Helper siap pakai di `tools/daily/`: `wh-map.py` (stok gudang → wh.json), `match.js` (pencocokan nama/warna/size),
+  `shopee-stock.js` (`__shopeeScan()` lalu `__shopeeApply()` per halaman), `tiktok-stock.js` (cara pakai ada di komentar
+  file: state disimpan di localStorage karena halaman sering reload; jalankan per 30 detik sampai `complete`, scroll
+  ke bawah untuk memuat produk lain). Output tool terpotong ±1.500 karakter, jadi ambil hasilnya sepotong-sepotong.
 
 ## Update order & income harian (Shopee + TikTok)
 Setiap hari export **dari tanggal 1 bulan berjalan sampai hari ini** (mis. tgl 11 → 1–11, besok 1–12). Import
@@ -78,6 +117,7 @@ tab yang sudah login), bukan download file:
   (`start_time` = `end_time` = `YYYY-MM-DD`, `campaign_shop_automation_type: 2`) dengan `external_type_list: ["304"]`
   = **Product GMV Max** (tipe G) dan `["305"]` = **LIVE GMV Max** (tipe GL). Metrics: `cost`,
   `onsite_roi2_shopping_value` (gross revenue), `onsite_roi2_shopping_sku` (order).
+- Helper siap pakai: `tools/daily/ads.js` (paste ke tab, ikuti komentar di file: hook → klik/ubah tanggal → panggil fungsi).
 - Simpan baris `[tanggal, tipe, judul, spend, gmv, order, impresi, klik]` ke `shopee.json` / `tiktok.json` (scratchpad),
   lalu: `cd C:/Claude/ballop-web; node --env-file=.env tools/import-ads-json.js shopee.json tiktok.json` (dry run) → `--write`.
 - Cek silang: total spend per hari harus sama dengan angka di dashboard Seller Centre.
@@ -96,8 +136,8 @@ Satu record per tanggal: `shopee`, `shopeeExt`, `tiktok`, `metaCampaign`, `metaC
 - `tiktok`: "Available cash balance" di Payment Portfolio TikTok Business Center (BC "BALLOP INDONESIA").
   Business Center sering minta **verifikasi 2 langkah**. User yang harus menyelesaikannya.
 - `metaCampaign` / `metaCpas`: Meta Billing › akun "Campaign Ads" dan "CPAS Shopee".
-- Simpan lewat admin (Sisa saldo iklan › Update saldo), atau lewat script node: `store.get('adbudget')`, tambah record
-  baru, `store.set` (backup dulu ke `data/`). Saldo yang tidak bisa dibaca, salin dari record terakhir dan tulis di `note`.
+- Simpan: `node --env-file=.env tools/daily/save-adbudget.js YYYY-MM-DD shopee=… shopeeExt=… [tiktok=…] [metaCampaign=…] [metaCpas=…]`
+  (dry run) → tambah `--write`. Saldo yang tidak diisi otomatis disalin dari record terakhir dan dicatat di `note`.
 
 ## Laporan penjualan Weekly Eagle (bulanan)
 Baca dulu `C:\Claude\data\sales\tools\TUTORIAL-weekly-eagle.md` (script `calc.py`, `ttread.py`, `build2.ps1`,
