@@ -267,6 +267,26 @@
     t.cogs = t.price * cogsRate();
     return t;
   }
+
+  // pending income = marketplace orders created in the range (not cancelled/returned) with no income row yet;
+  // estimate = order value × payout/product-price ratio of what was already paid out
+  function pendingIncome(from, to) {
+    const paid = new Set(data.settlements.filter((s) => s.orderId && s.type !== 'Penyesuaian').map((s) => `${s.channel}:${s.orderId}`));
+    const t = { value: 0, orders: new Set(), byCh: {} };
+    data.orders.filter((o) => o.date >= from && o.date <= to && (o.state === 'completed' || o.state === 'pending')).forEach((o) => {
+      const k = `${o.channel}:${o.orderId}`;
+      if (paid.has(k)) return;
+      const c = t.byCh[o.channel] = t.byCh[o.channel] || { value: 0, orders: new Set() };
+      t.value += o.net; c.value += o.net; t.orders.add(k); c.orders.add(k);
+    });
+    const all = data.settlements.filter((s) => s.type !== 'Penyesuaian');
+    const pr = all.reduce((s, x) => s + (x.productPrice || 0), 0);
+    t.rate = pr ? all.reduce((s, x) => s + x.payout, 0) / pr : NaN;
+    t.est = Number.isFinite(t.rate) ? t.value * t.rate : NaN;
+    t.orders = t.orders.size;
+    Object.values(t.byCh).forEach((c) => { c.orders = c.orders.size; c.est = Number.isFinite(t.rate) ? c.value * t.rate : NaN; });
+    return t;
+  }
   function computeLive(from, to) {
     const rows = (data.live || []).filter((l) => l.date >= from && l.date <= to);
     const t = { rows, sessions: rows.length, minutes: 0, gmv: 0, orders: 0, items: 0, views: 0, impressions: 0, pImp: 0, pClicks: 0, followers: 0, likes: 0, comments: 0, shares: 0, watch: 0 };
@@ -1163,6 +1183,7 @@
     const enDate = (s) => (s ? R.longDate(s) : '–');
     const trendLabel = (t) => (unit === 'month' ? t.label : t.from === t.to ? R.longDate(t.from) : `${R.longDate(t.from)} – ${R.longDate(t.to)}`);
     const cmp = `vs ${R.period(P.from, P.to)}`;
+    const PI = pendingIncome(S.from, S.to);
     const body = `
   ${h2('E-commerce key figures', `Shopee, TikTok Shop, Tokopedia · ▲▼ compared with the same dates last month (${R.period(P.from, P.to)})`)}
   ${tiles([
@@ -1173,7 +1194,7 @@
     tile('Cancelled', `${n(m.cancelled)} · ${rp(m.cancelValue)}`, `orders · value ${chg(m.cancelValue, P.m.cancelValue, true)}`),
     tile('AOV', rp(m.aov), chg(m.aov, P.m.aov)),
     tile('Ad spend · ROAS', rp(m.adSpend), `ROAS ${x(m.adRoas)} ${chg(m.adSpend, P.m.adSpend, true)}`),
-    tile('Total income (online + offline)', rp(inc.payout + off.omzet), `e-com ${rp(inc.payout)} + offline ${rp(off.omzet)} ${chg(inc.payout + off.omzet, P.inc.payout + P.off.omzet)}`),
+    tile('Pending income', rp(PI.value), `${n(PI.orders)} orders not paid out yet · est. after fees ${rp(PI.est)}`),
   ])}
   <div class="avoid">
   ${h2('Comparison', cmp)}
@@ -1208,6 +1229,12 @@
     [`${dot('#2a78d6')}E-commerce income value`, rp(inc.payout), pc(inc.payout + off.omzet ? inc.payout / (inc.payout + off.omzet) : NaN), rp(P.inc.payout), chg(inc.payout, P.inc.payout)],
     [`${dot('#0e8a8a')}Offline revenue`, rp(off.omzet), pc(inc.payout + off.omzet ? off.omzet / (inc.payout + off.omzet) : NaN), rp(P.off.omzet), chg(off.omzet, P.off.omzet)],
   ], ['Total income', `<b>${rp(inc.payout + off.omzet)}</b>`, '100%', rp(P.inc.payout + P.off.omzet), chg(inc.payout + off.omzet, P.inc.payout + P.off.omzet)])}
+  </div>
+  <div class="avoid">
+  ${h2('Pending income', `orders placed in this period (not cancelled/returned) with no payout in the income file yet · est. after fees uses the paid-out ratio ${pc(PI.rate)}`)}
+  ${table([['Channel'], ['Orders', 1], ['Order value', 1], ['Est. income after fees', 1]],
+    Object.entries(PI.byCh).map(([k, c]) => [`${dot(SALES_CH[k]?.color || '#888')}${esc(SALES_CH[k]?.label || k)}`, n(c.orders), rp(c.value), rp(c.est)]),
+    ['Total pending', n(PI.orders), `<b>${rp(PI.value)}</b>`, `<b>${rp(PI.est)}</b>`], 'No pending income.')}
   </div>
   ${(() => { const FD = feeDetail(S.from, S.to); return ['shopee', 'tiktok', 'tokopedia'].filter((k) => FD[k]).map((k) => `<div class="avoid">${h2(`${dot(SALES_CH[k].color)}Fee details · ${SALES_CH[k].label}`, `marketplace fees ${rp(-FD[k].fee)} · all deductions ${rp(-FD[k].all)} · income file, payout date`)}
   ${table([['Line in income file'], ['Type'], ['What it is'], ['Amount', 1]], FD[k].rows.map((r) => [`<b>${esc(r.k)}</b>`, r.type === 'fee' ? `<span class="chip bad">${FEE_TYPE[r.type][0]}</span>` : `<span class="chip">${FEE_TYPE[r.type][0]}</span>`, esc(r.en || '–'), rp(r.v)]),
