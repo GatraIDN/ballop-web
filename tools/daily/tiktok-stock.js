@@ -1,21 +1,23 @@
 // TikTok/Tokopedia stock sync, run in the tab seller-id.tokopedia.com/product/manage?tab=active.
 // The page often re-renders and drops globals, so state lives in localStorage and each call runs ~30 s:
 //   1. once:  localStorage.__WH = '<wh.json content>'; localStorage.__MATCH = '<match.js>'; localStorage.__RUN = '<this whole file>';
-//             localStorage.__doneT = '{}'; localStorage.__logT = '[]'; localStorage.__unT = '{}';
-//   2. repeat: eval(localStorage.__RUN); await new Promise(r => setTimeout(r, 34000)); localStorage.__state
+//             sessionStorage.__doneT = '{}'; sessionStorage.__logT = '[]'; sessionStorage.__unT = '{}';
+//   2. repeat: eval(localStorage.__RUN); await new Promise(r => setTimeout(r, 34000)); sessionStorage.__state
 //      until __state === 'complete' AND every product is loaded (scroll to the bottom between runs: lazy list, 46+ products).
-//   3. read results: JSON.parse(localStorage.__logT) (changes), JSON.parse(localStorage.__unT) (unmatched SKUs).
+//   3. read results: JSON.parse(sessionStorage.__logT) (changes), JSON.parse(sessionStorage.__unT) (unmatched SKUs).
+// Progress lives in sessionStorage (localStorage on this site is near its quota). UI may be English or Indonesian.
+// Some products only render their SKU rows after their own "Buka" click with the row in view: re-click until none are empty.
 // Compares with "Total stock" in the popover (list number = available only, without reserved).
 (async () => {
   window.__WH = JSON.parse(localStorage.__WH);
   if (!window.__matchKey && localStorage.__MATCH) eval(localStorage.__MATCH);
-  if (!window.__matchKey) { localStorage.__state = 'need match.js in localStorage.__MATCH'; return; }
+  if (!window.__matchKey) { sessionStorage.__state = 'need match.js in localStorage.__MATCH'; return; }
   const sl = (ms) => new Promise((r) => setTimeout(r, ms)); const T0 = Date.now();
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-  const done = JSON.parse(localStorage.__doneT || '{}'), log = JSON.parse(localStorage.__logT || '[]'), un = JSON.parse(localStorage.__unT || '{}');
-  const save = () => { localStorage.__doneT = JSON.stringify(done); localStorage.__logT = JSON.stringify(log); localStorage.__unT = JSON.stringify(un); };
-  const vis = () => [...document.querySelectorAll('.core-popover-inner-content')].filter((e) => e.offsetParent && /Total stock/.test(e.innerText));
-  const cancel = (p) => [...p.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Cancel')?.click();
+  const done = JSON.parse(sessionStorage.__doneT || '{}'), log = JSON.parse(sessionStorage.__logT || '[]'), un = JSON.parse(sessionStorage.__unT || '{}');
+  const save = () => { sessionStorage.__doneT = JSON.stringify(done); sessionStorage.__logT = JSON.stringify(log); sessionStorage.__unT = JSON.stringify(un); };
+  const vis = () => [...document.querySelectorAll('.core-popover-inner-content')].filter((e) => e.offsetParent && /Total sto/.test(e.innerText));
+  const cancel = (p) => [...p.querySelectorAll('button')].find((b) => /^(Cancel|Batalkan)$/.test(b.innerText.trim()))?.click();
   async function upd(inp, want) {
     for (const p of vis()) { cancel(p); await sl(200); }
     inp.scrollIntoView({ block: 'center' }); await sl(300);
@@ -29,17 +31,17 @@
     ti.focus(); setter.call(ti, String(want));
     ti.dispatchEvent(new Event('input', { bubbles: true })); ti.dispatchEvent(new Event('change', { bubbles: true }));
     await sl(300);
-    const sb = [...pop.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Save');
+    const sb = [...pop.querySelectorAll('button')].find((b) => /^(Save|Simpan)$/.test(b.innerText.trim()));
     if (!sb || sb.disabled) return 'savedisabled';
     sb.click(); for (let i = 0; i < 20; i++) { await sl(250); if (!pop.offsetParent) break; }
     await sl(500);
     return `ok total ${tot}>${want}`;
   }
-  [...document.querySelectorAll('*')].filter((e) => e.children.length <= 2 && /^Expand$/.test((e.innerText || '').trim())).forEach((e) => e.click());
+  [...document.querySelectorAll('tr.core-table-expand-content *')].filter((e) => e.children.length <= 2 && /^(Expand|Buka)$/.test((e.innerText || '').trim())).forEach((e) => e.click());
   await sl(1500);
   let name = null, pid = null;
   for (const tr of document.querySelectorAll('tr')) {
-    if (Date.now() - T0 > 30000) { localStorage.__state = 'partial'; save(); return; }
+    if (Date.now() - T0 > 30000) { sessionStorage.__state = 'partial'; save(); return; }
     const t = tr.innerText || ''; const idm = t.match(/ID:(\d{10,})/);
     if (idm && !/_skuRow/.test(tr.className)) { name = t.split('\n').map((s) => s.trim()).filter(Boolean)[0]; pid = idm[1]; continue; }
     if (!pid || !/_skuRow/.test(tr.className)) continue;
@@ -54,5 +56,5 @@
     if (res !== 'same') log.push(`${name.slice(6, 34)}|${v}|list ${inp.value}|${res}`);
     save();
   }
-  localStorage.__state = 'complete'; save();
+  sessionStorage.__state = 'complete'; save();
 })();
