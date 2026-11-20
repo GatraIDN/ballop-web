@@ -27,7 +27,8 @@ function readXlsx(file) {
   const z = unzip(fs.readFileSync(file));
   const ss = z['xl/sharedStrings.xml'] ? [...z['xl/sharedStrings.xml'].toString().matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => dec([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((t) => t[1]).join(''))) : [];
   const wb = z['xl/workbook.xml'].toString(), rels = z['xl/_rels/workbook.xml.rels'].toString();
-  return [...wb.matchAll(/<sheet [^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g)].map(([, name, rid]) => {
+  // attribute order differs per exporter (name before or after r:id)
+  return [...wb.matchAll(/<sheet [^>]*>/g)].map(([tag]) => [, (tag.match(/\bname="([^"]+)"/) || [])[1], (tag.match(/\br:id="([^"]+)"/) || [])[1]]).filter((x) => x[1] && x[2]).map(([, name, rid]) => {
     const t = rels.match(new RegExp(`Id="${rid}"[^>]*Target="([^"]+)"`)) || rels.match(new RegExp(`Target="([^"]+)"[^>]*Id="${rid}"`));
     const xml = z[`xl/${t[1].replace(/^\/?xl\//, '')}`].toString();
     // place every cell by its own address (A1, B7 …): some exports (TikTok) write one <row> block per cell
