@@ -22,8 +22,16 @@ window.__matchKey = (name, variant) => {
   // only one colour left is required, otherwise the size could belong to several colours
   if (new Set(keys.map((k) => k.split(' - ').slice(-2, -1)[0])).size > 1) return null;
   const eu = norm((variant.match(/[\d.\/]+/) || [''])[0]);
+  // warehouse typos like "41~31.5" -> 41/41.5
+  const parts = (k) => { const p = ek(k).split('/').filter(Boolean); if (p.length === 2 && +p[1] < +p[0]) p[1] = String(+p[0] + 0.5); return p; };
   let m = keys.filter((k) => ek(k) === eu);
-  if (m.length !== 1) { const f = eu.split('/')[0]; const m2 = keys.filter((k) => ek(k).split('/')[0] === f); if (m2.length === 1) m = m2; }
+  if (m.length !== 1) { const f = eu.split('/')[0]; const m2 = keys.filter((k) => parts(k)[0] === f); if (m2.length === 1) m = m2; }
+  // a single listing size inside a warehouse range ("EU 37" vs "36.5~37")
+  if (!m.length) m = keys.filter((k) => eu.split('/').some((x) => parts(k).includes(x)));
+  // same size listed twice in the warehouse (typo in mm): equal values are safe, otherwise take the stocked one
+  if (m.length > 1) m = [m.reduce((a, b) => (WH[b] > WH[a] ? b : a))];
+  // product + colour known but the size is not in the warehouse at all -> 0
+  if (!m.length && keys.length && /^\d+(\.\d+)?(\/\d+(\.\d+)?)?$/.test(eu)) { WH.__ZERO__ = 0; return '__ZERO__'; }
   return m.length === 1 ? m[0] : null;
 };
 'matcher ready';

@@ -19,9 +19,10 @@
         let j = i - 1, parent = '';
         const pm = L[j].match(/^(SKU Induk|Parent SKU):(.*)/); if (pm) { parent = pm[2].trim(); j--; }
         cur = { name: L[j], parent, id: L[i].match(/\d+/)[0], vars: [] }; out.push(cur);
-      } else if (cur && /^(Kode Variasi|Model ID):/.test(L[i])) {
+      } else if (cur && (/^(Model ID|ID Model):/.test(L[i]) || (/^Kode Variasi:/.test(L[i]) && !/^(Model ID|ID Model):/.test(L[i + 1] || '')))) {
+        let lj = i - 1; while (lj > 0 && /^(SKU:|Kode Variasi:)/.test(L[lj])) lj--;
         const s = L.slice(i + 1, i + 7).find((x) => /^\d+( \((Tersedia|Available) \d+\))?$/.test(x));
-        cur.vars.push({ v: L[i - 1].startsWith('SKU:') ? L[i - 2] : L[i - 1], stock: parseInt(s, 10) });
+        cur.vars.push({ v: L[lj], stock: parseInt(s, 10) });
       }
     }
     return out;
