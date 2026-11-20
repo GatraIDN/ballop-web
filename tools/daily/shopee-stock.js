@@ -7,7 +7,7 @@
   const sl = (ms) => new Promise((r) => setTimeout(r, ms));
   const BUNDLE = /bundle|complete set|match set|flex set|play & recover|recovery set|payday/i;
   async function expandAll() {
-    const els = [...document.querySelectorAll('*')].filter((e) => /^Lihat Semua \(/.test((e.textContent || '').trim()) && ![...e.children].some((c) => /^Lihat Semua \(/.test(c.textContent.trim())));
+    const els = [...document.querySelectorAll('*')].filter((e) => /^(Lihat Semua|View All|View More) \(/.test((e.textContent || '').trim()) && ![...e.children].some((c) => /^(Lihat Semua|View All|View More) \(/.test(c.textContent.trim())));
     els.forEach((e) => e.click());
     await sl(4000);
   }
@@ -15,13 +15,13 @@
     const L = document.body.innerText.split('\n').map((s) => s.trim()).filter(Boolean);
     const out = []; let cur = null;
     for (let i = 0; i < L.length; i++) {
-      if (/^ID Produk: \d+/.test(L[i])) {
+      if (/^(ID Produk|Item ID): \d+/.test(L[i])) {
         let j = i - 1, parent = '';
-        if (L[j].startsWith('SKU Induk:')) { parent = L[j].slice(10).trim(); j--; }
+        const pm = L[j].match(/^(SKU Induk|Parent SKU):(.*)/); if (pm) { parent = pm[2].trim(); j--; }
         cur = { name: L[j], parent, id: L[i].match(/\d+/)[0], vars: [] }; out.push(cur);
-      } else if (cur && L[i].startsWith('Kode Variasi:')) {
-        const s = L.slice(i + 2, i + 7).find((x) => /^\d+( \(Tersedia \d+\))?$/.test(x));
-        cur.vars.push({ v: L[i - 1], stock: parseInt(s, 10) });
+      } else if (cur && /^(Kode Variasi|Model ID):/.test(L[i])) {
+        const s = L.slice(i + 1, i + 7).find((x) => /^\d+( \((Tersedia|Available) \d+\))?$/.test(x));
+        cur.vars.push({ v: L[i - 1].startsWith('SKU:') ? L[i - 2] : L[i - 1], stock: parseInt(s, 10) });
       }
     }
     return out;
@@ -33,7 +33,7 @@
     for (const p of prods) {
       const row = rowOf(p.id);
       if (BUNDLE.test(p.name + ' ' + p.parent)) continue;
-      if (!row?.querySelector('.quick-edit-icon') || /Diarsipkan|Delist/.test(row.innerText)) { archived.push(p.name.slice(0, 50)); continue; }
+      if (!row?.querySelector('.quick-edit-icon') || /Diarsipkan|Delist|Archived/.test(row.innerText)) { archived.push(p.name.slice(0, 50)); continue; }
       for (const v of p.vars) {
         const k = window.__matchKey(`${p.name} ${p.parent}`, v.v);
         if (!k) { unmatched.push(`${p.name.slice(0, 40)} | ${v.v} = ${v.stock}`); continue; }
@@ -63,7 +63,7 @@
     }
     await sl(400);
     const btn = (t) => [...m.querySelectorAll('button')].find((b) => b.innerText.trim() === t);
-    if (!log.length) { btn('Batal').click(); await sl(500); return 'nochange'; }
+    if (!log.length) { (btn('Batal') || btn('Cancel')).click(); await sl(500); return 'nochange'; }
     btn('Update').click();
     for (let i = 0; i < 40 && m.offsetParent; i++) await sl(250);
     return (m.offsetParent ? 'STILL OPEN ' : 'ok ') + log.join(', ');
