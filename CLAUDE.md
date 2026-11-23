@@ -11,6 +11,10 @@ Semua yang dipakai adalah **file atau data terbaru yang di-download/diambil lang
 - Browser: Brave + Claude in Chrome. Mulai dengan `tabs_context_mcp {createIfEmpty:true}` dan kerjakan di tab group
   sendiri. Shopee Seller Centre dan TikTok/Tokopedia Seller Centre sudah login. Tab group bisa hilang di tengah jalan;
   kalau tool bilang tab tidak ada di group, panggil `tabs_context_mcp {createIfEmpty:true}` lagi.
+  Bisa ada beberapa browser terhubung (Chrome + Brave) dan namanya ("Browser 1/2") bisa tertukar: cek dengan
+  `list_connected_browsers`, pilih satu, lalu pastikan `!!navigator.brave === true` di tab sebelum mengubah apa pun.
+- Download dari JS (blob) di seller-id.tokopedia.com bisa diblokir Brave. Untuk data kecil (mis. baris iklan TikTok)
+  cetak ringkas per potongan dari `javascript_tool`, lalu tulis JSON-nya di scratchpad.
 - Periode harian = **tanggal 1 bulan berjalan sampai hari ini** (LIVE: sampai kemarin). Diulang setiap hari; semua
   importer upsert/replace sehingga tidak dobel.
 - File hasil download masuk ke `C:\Users\danan\Downloads`. Ambil yang paling baru (`Get-ChildItem … | Sort LastWriteTime`).
@@ -119,9 +123,13 @@ upsert berdasarkan key, jadi data yang diulang tidak dobel. Buka di tab baru (Br
 2. **Shopee income**: `seller.shopee.co.id/portal/finance/income` → tab "Sudah Dilepas" → periode "Dalam bulan ini"
    → Export → ikon daftar laporan → Download (`Income.sudah dilepas.id.….xlsx`).
 3. **TikTok order**: `seller-id.tokopedia.com/order` → tab All → Filter → Time created "Current month" → Apply →
-   Export → format Excel → Export → Download (`All order-YYYY-MM-DD-HH_MM.xlsx`).
+   Export → format Excel → Export → Download (`All order-YYYY-MM-DD-HH_MM.xlsx`). UI Indonesia (2026-11-23):
+   Filter → Waktu dibuat → "Bulan ini" → Terapkan → Ekspor → Excel → Unduh → Unduh di riwayat
+   (`Semua pesanan-YYYY-MM-DD-HH_MM.xlsx`).
 4. **TikTok income**: `seller-id.tokopedia.com/finance/bills` → Statements → View by statements → Export → "This month"
-   → OK → Export → Export history → Download (`income_<timestamp>(UTC+7).xlsx`).
+   → OK → Export → Export history → Download (`income_<timestamp>(UTC+7).xlsx`). UI baru (2026-11-23): halaman
+   Keuangan › Transaksi tab "Selesai" → Unduh → "Bulan ini" → OK → Ekspor → Riwayat ekspor → Unduh. Datanya di sheet
+   "Detail pesanan" (sheet lain dilewati importer, itu normal).
 5. Import tiap file (dry run dulu, lalu `--write`):
    `cd C:/Claude/ballop-web; node --env-file=.env tools/import-market-file.js "<file>" --write`
    Order Tokopedia otomatis dipisah dari export TikTok (kolom Purchase Channel / Order source).
