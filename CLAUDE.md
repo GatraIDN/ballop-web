@@ -27,9 +27,8 @@ Semua yang dipakai adalah **file atau data terbaru yang di-download/diambil lang
 1. **Stok gudang → dashboard.** Pakai file stok gudang hari ini (`Stock DD.MM.xlsx` terbaru di Downloads). Kalau file
    hari ini belum ada, minta user mengirim filenya, atau minta link dashboard gudang lalu catat di sini. Import:
    `import-stock-file.js --date=<hari ini>` (lihat "Excel harian").
-2. **Stok Shopee & TikTok = stok gudang.** `python -I tools/daily/wh-map.py "<Stock file>" <scratchpad>/wh.json`,
-   lalu jalankan `tools/daily/match.js` + `shopee-stock.js` di Shopee (semua halaman, 48/halaman) dan `tiktok-stock.js`
-   di TikTok (lihat "Sinkron stok"). Arsip/delist/bundle dilewati.
+2. **Stok Shopee & TikTok = stok gudang, lewat BigSeller saja** (mulai 2026-11-23, lihat "Sinkron stok via
+   BigSeller"). Jangan edit stok di Seller Centre lagi kecuali BigSeller bermasalah (cara lama di "Sinkron stok").
 3. **Order Shopee + TikTok** (export 1–hari ini) → `import-market-file.js`.
 4. **Income Shopee + TikTok** (export 1–hari ini) → `import-market-file.js`.
 5. **Spending iklan** Shopee (Produk, Toko, Banner, Live, Eksternal/Meta) + TikTok (Product & LIVE GMV Max), per hari
@@ -57,7 +56,36 @@ User mengirim Excel harian di `Downloads`. Update data ke kode/DB lalu commit + 
 - Format lain: cek dulu `tools/` (`import-market-file.js`, `import-ads-json.js`, `import-consign.js`, `ops-to-json.py`,
   `stocktaking-to-json.py`, `apply-bundle.js`, `split-tokopedia.js`) sebelum membuat importer baru.
 
-## Sinkron stok Shopee & TikTok dari data gudang
+## Sinkron stok via BigSeller (cara utama, mulai 2026-11-23)
+BigSeller (bigseller.com, login di Brave profil ballop) terhubung ke Shopee "Ballop Official Store" dan TikTok
+"Ballop Tiktok". Setup yang sudah dibuat:
+- **Merchant SKU** = kode Pickpack `GBI-SPRT-xxxxxx` (347 item gudang), judul `BALLOP <nama item gudang>`.
+  Kode diambil dari `C:\Claude\gudang-ballop\Gudang-Ballop.xlsx` sheet Master SKU. SKU lama `A0001`–`A0034` bukan
+  milik gudang, jangan dipakai.
+- **Mapping**: 362 varian Shopee + 353 varian TikTok sudah di-mapping ke Merchant SKU (pencocokan `match.js`).
+  Listing bundle/set (Play & Recover, Match Set, Flex Set, Complete Set, Recovery Set, + Gift) dan Add-On Gift
+  sengaja TIDAK di-mapping, jadi stoknya tidak disentuh BigSeller. Ukuran yang tidak ada di gudang juga tidak di-mapping.
+- **Push rule** "STOK PUSH" (free plan: 1 rule, maks 500 SKU) = semua Merchant SKU yang ter-mapping, Default
+  Warehouse, 100% available, status ON (auto push).
+- Harga tidak pernah diubah lewat BigSeller.
+
+**Update harian (langkah 2 daily routine):**
+1. `cd C:/Claude/ballop-web; python -I tools/daily/bigseller-stock.py "<Stock file>" <scratchpad>/bs`
+   → `bs-count-skus.xlsx`, `bs-count-results.xlsx` (+ `bs-new-skus.xlsx` kalau ada item gudang baru).
+2. BigSeller › Inventory › Warehouse › **Stock Count** › Add Count Task › By Merchant SKU › Import & Update
+   (`bs-count-skus.xlsx`) › Generate Task › Start Counting.
+3. Di task Counting: Import & Export › Import Counting (`bs-count-results.xlsx`) › Continue › **Finish Counting**.
+   On Hand BigSeller menjadi = gudang, dan rule otomatis push ke Shopee & TikTok.
+4. Cek Push Inventory › **Push Record** › filter Failed. "Too many requests" (rate limit TikTok) → tunggu ±1 menit,
+   centang semua → Push Again. "participated in a promotion ... reserved" = stok promo Shopee lebih besar dari stok
+   gudang; laporkan ke user (harus dikurangi di Seller Centre), jangan diubah sendiri.
+- Ada produk/varian baru di toko: Sync Product di BigSeller, lalu mapping varian baru ke Merchant SKU-nya
+  (SKU Mapping › Map Merchant SKU › Import to Edit Mapping: export "No Merchant SKU Mapped", isi kolom Merchant SKU,
+  import). Item gudang baru: buat Merchant SKU dulu (Merchant SKU › Import & Export › Create Merchant SKU) lalu tambahkan
+  ke rule STOK PUSH. Kalau ragu cocoknya, jangan di-mapping; laporkan.
+- Download dari bigseller.com di Brave harus diizinkan (multiple downloads); sudah diizinkan user 2026-11-23.
+
+## Sinkron stok Shopee & TikTok dari data gudang (cara lama, cadangan)
 Permintaan rutin: "update stock di tiktok & shopee pake data gudang terbaru".
 - Sumber angka: file stok gudang terbaru. **Stok = jumlah `Ending` gudang NORMAL** (Bintaro + Gunung Sindur);
   gudang DAMAGED tidak dihitung.
