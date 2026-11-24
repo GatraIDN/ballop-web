@@ -19,8 +19,9 @@
   // Korean mm sizes first (numeric), then letter / other sizes
   const sizeKey = (s) => { const n = parseFloat(s); return Number.isFinite(n) ? n : 1e4 + ['XS', 'S', 'M', 'L', 'XL', 'XXL'].indexOf(String(s).toUpperCase()); };
   // same order as the STOK TERKINI sheet (Padel Pulse first …); new SKUs go after their product
-  const byItem = (a, b) => (a.order || 1e6) - (b.order || 1e6) || a.product.localeCompare(b.product) || a.color.localeCompare(b.color) || sizeKey(a.sizeKr || a.size) - sizeKey(b.sizeKr || b.size);
-  const rowsAll = () => B.data.stock3pl.map((r) => ({ ...r, product: r.product || r.name || r.sku, color: r.color || '', category: r.category || 'Lainnya' }));
+  const isPadel = (r) => /PADEL PULSE/i.test(r.product || '');
+  const byItem = (a, b) => isPadel(b) - isPadel(a) || (a.order || 1e6) - (b.order || 1e6) || a.product.localeCompare(b.product) || a.color.localeCompare(b.color) || sizeKey(a.sizeKr || a.size) - sizeKey(b.sizeKr || b.size);
+  const rowsAll = () => B.data.stock3pl.map((r) => ({ ...r, product: r.product || r.name || r.sku, color: r.color || '', category: r.category || 'Lainnya' })).sort(byItem);
   const remember = () => { try { localStorage.setItem('ballopStock', JSON.stringify({ tab: st.tab, cat: st.cat, product: st.product, color: st.color, status: st.status })); } catch {} };
 
   function filtered(all) {
@@ -223,11 +224,11 @@
       cells[cells[eu] ? `${eu} · ${r.sizeKr}` : eu] = r;
     });
     const legend = `<div class="pmx-legend"><span><i class="habis"></i>Out (0)</span><span><i class="tipis"></i>Low (≤ ${low()})</span><span><i class="aman"></i>Safe</span><span class="muted">Column = EU size, number = good stock, small = KR size. Hatched = size not made for this colour.</span></div>`;
-    const tables = [...prods.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([prod, cols]) => {
+    const tables = [...prods.entries()].map(([prod, cols]) => {
       const sizes = [...new Set([...cols.values()].flatMap((c) => Object.keys(c)))].sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b));
       const tot = Object.fromEntries(sizes.map((s) => [s, 0]));
       let all = 0;
-      const body = [...cols.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([color, c]) => {
+      const body = [...cols.entries()].map(([color, c]) => {
         let t = 0;
         const tds = sizes.map((s) => {
           const r = c[s];
@@ -254,6 +255,29 @@
       .pmx-tot{width:46px;text-align:right;font-weight:800;border:0}
       .pmx-table tfoot td,.pmx-table tfoot th{border-top:1px solid #e5e7eb;font-weight:800;text-align:center;color:#111}
       .pmx-table tfoot .pmx-tot{text-align:right}
+    </style>`;
+  }
+
+  // PDF: models with empty sizes, only the empty sizes (Padel Pulse first, then sheet order)
+  function outTable(list) {
+    if (!list.length) return '<p class="muted">Nothing out of stock.</p>';
+    const sorted = (g) => [...g.habis].sort((a, b) => sizeKey(a) - sizeKey(b) || String(a).localeCompare(b));
+    const rows = list.map((g, i) => {
+      const all = g.habis.length === g.sizes.length;
+      return `<tr><td class="pox-no">${i + 1}</td><td class="pox-name"><b>${esc(g.product)}</b><span>${esc(g.color || '–')}</span></td>
+        <td class="pox-sz">${sorted(g).map((z) => `<span>${esc(z)}</span>`).joinum('')}</td>
+        <td class="pox-st">${all ? '<em class="all">All sizes out</em>' : `<em>${num(g.habis.length)} of ${num(g.sizes.length)} sizes</em><small>${num(g.good)} pcs left</small>`}</td></tr>`;
+    }).joinum('');
+    return `<table class="pox"><thead><tr><th class="pox-no">#</th><th>Model · colour</th><th>Sizes out of stock (EU)</th><th class="pox-st">Status</th></tr></thead><tbody>${rows}</tbody></table>
+    <style>
+      .pox{width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 14px}
+      .pox thead th{font-size:9px;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:.03em;text-align:left;padding:6px 8px;background:#f3f4f6;border:0}
+      .pox td{padding:7px 8px;border:0;border-bottom:1px solid #eef0f3;vertical-align:middle}
+      .pox tr{page-break-inside:avoid;break-inside:avoid}
+      .pox .pox-no{width:22px;color:#9ca3af;font-weight:700;text-align:center}
+      .pox-name{width:200px}.pox-name b{display:block;font-size:10px;color:#111}.pox-name span{font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase}
+      .pox-sz span{display:inline-block;min-width:30px;text-align:center;margin:2px 3px 2px 0;padding:3px 6px;border-radius:5px;background:#fde8e8;color:#b91c1c;font-weight:800;font-size:10px}
+      .pox .pox-st{width:110px;text-align:right}.pox-st em{font-style:normal;font-weight:800;color:#b45309;display:block}.pox-st em.all{color:#b91c1c}.pox-st small{color:#6b7280;font-size:9px}
     </style>`;
   }
 
@@ -288,9 +312,7 @@
       ${P.h2('📦 Stock by model & size', `${n(D.gs.length)} models · ${n(D.totGood)} pcs good`)}
       ${pdfMatrix(rows)}
       ${P.h2('⛔ Out of stock', `${n(D.habisAll.length)} models empty · ${n(D.habisPart.length)} models with size gaps`)}
-      ${legend}<div class="szl">${[...D.habisAll, ...D.habisPart].map((g) => sizeRowEn(g, 'habis')).join('') || '<p class="muted">Nothing out of stock.</p>'}</div>
-      ${P.h2('⚠ Low stock', `good ≤ ${low()} per size`)}
-      <div class="szl">${D.tipis.filter((g) => !g.habis.length).map((g) => sizeRowEn(g, 'tipis')).join('') || '<p class="muted">No models that are only low.</p>'}</div>
+      ${outTable([...D.gs].filter((g) => g.habis.length))}
       <style>${SZ_PDF_CSS}</style>`;
     P.open({ title: 'Warehouse Stock Report', period: `as of ${P.longDate(asOf)}`,
       meta: [['Stock as of', P.longDate(asOf)], ['Warehouse', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
