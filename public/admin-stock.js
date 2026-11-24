@@ -212,7 +212,52 @@
     ].join('\n');
   }
 
-  // PDF (English): current stock, its condition, and what went out offline this month
+  // PDF: one size table per product (rows = colour, columns = EU size, small = KR size)
+  function pdfMatrix(rows) {
+    const prods = new Map();
+    rows.forEach((r) => {
+      if (!prods.has(r.product)) prods.set(r.product, new Map());
+      const cols = prods.get(r.product);
+      if (!cols.has(r.color)) cols.set(r.color, {});
+      const cells = cols.get(r.color), eu = (r.size && r.size !== '-' ? r.size : r.sizeKr || '-').replace(/^[A-Z]+\s+(?=\d)/i, '');
+      cells[cells[eu] ? `${eu} · ${r.sizeKr}` : eu] = r;
+    });
+    const legend = `<div class="pmx-legend"><span><i class="habis"></i>Out (0)</span><span><i class="tipis"></i>Low (≤ ${low()})</span><span><i class="aman"></i>Safe</span><span class="muted">Column = EU size, number = good stock, small = KR size. Hatched = size not made for this colour.</span></div>`;
+    const tables = [...prods.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([prod, cols]) => {
+      const sizes = [...new Set([...cols.values()].flatMap((c) => Object.keys(c)))].sort((a, b) => sizeKey(a) - sizeKey(b) || a.localeCompare(b));
+      const tot = Object.fromEntries(sizes.map((s) => [s, 0]));
+      let all = 0;
+      const body = [...cols.entries()].sort((a, b) => String(a[0]).localeCompare(String(b[0]))).map(([color, c]) => {
+        let t = 0;
+        const tds = sizes.map((s) => {
+          const r = c[s];
+          if (!r) return '<td class="pmx-none"></td>';
+          const v = Math.max(0, r.available || 0); t += v; tot[s] += v;
+          return `<td class="pmx ${status(v)}"><b>${num(v)}</b>${r.sizeKr && r.sizeKr !== '-' ? `<small>KR ${esc(r.sizeKr)}</small>` : ''}</td>`;
+        }).join('');
+        all += t;
+        return `<tr><th class="pmx-name"><b>${esc(prod)}</b><span>${esc(color || '–')}</span></th>${tds}<td class="pmx-tot">${num(t)}</td></tr>`;
+      }).join('');
+      const foot = cols.size > 1 ? `<tfoot><tr><th class="pmx-name">Total</th>${sizes.map((s) => `<td>${num(tot[s])}</td>`).join('')}<td class="pmx-tot">${num(all)}</td></tr></tfoot>` : '';
+      return `<table class="pmx-table"><thead><tr><th class="pmx-name">Product · colour</th>${sizes.map((s) => `<th>${esc(s)}</th>`).join('')}<th class="pmx-tot">Total</th></tr></thead><tbody>${body}</tbody>${foot}</table>`;
+    }).join('');
+    return `${legend}${tables}<style>
+      .pmx-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:10px;font-weight:600;margin:4px 0 10px}
+      .pmx-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+      .pmx-legend i.habis,.pmx.habis{background:#fde8e8}.pmx-legend i.tipis,.pmx.tipis{background:#fff4d6}.pmx-legend i.aman,.pmx.aman{background:#e7f6ee}
+      .pmx-table{width:100%;border-collapse:separate;border-spacing:3px;margin:0 0 12px;page-break-inside:avoid;break-inside:avoid;font-size:10px;table-layout:fixed}
+      .pmx-table th{font-size:9px;font-weight:800;color:#6b7280;padding:3px 2px;text-align:center;background:none;border:0}
+      .pmx-table .pmx-name{text-align:left;width:170px;padding:3px 6px 3px 0}
+      .pmx-name b{display:block;font-size:10px;color:#111}.pmx-name span{font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase}
+      .pmx{text-align:center;border-radius:6px;padding:4px 2px;border:0}.pmx b{display:block;font-size:11px}.pmx small{display:block;font-size:7px;color:#6b7280}
+      .pmx-none{background:repeating-linear-gradient(45deg,transparent 0 3px,rgba(17,19,24,.06) 3px 6px);border-radius:6px;border:0}
+      .pmx-tot{width:46px;text-align:right;font-weight:800;border:0}
+      .pmx-table tfoot td,.pmx-table tfoot th{border-top:1px solid #e5e7eb;font-weight:800;text-align:center;color:#111}
+      .pmx-table tfoot .pmx-tot{text-align:right}
+    </style>`;
+  }
+
+  // PDF (English): current stock and its condition per model & size
   function stockPdf() {
     const P = window.PdfReport;
     const rows = rowsAll();
@@ -225,44 +270,31 @@
     rows.forEach((r) => { const k = status(r.available || 0); cnt[k][0]++; cnt[k][1] += Math.max(0, r.available || 0); });
     const sizeRowEn = (g, kind) => sizeRow(g, kind).replace(/HABIS semua size/, 'OUT in every size').replace(/(\d+) size habis · sisa/, '$1 sizes out · left').replace(/(\d+) size tipis · sisa/, '$1 sizes low · left').replace(/>habis</g, '>out<').replace(/ pcs</g, ' pcs<');
     const legend = `<div class="sz-legend"><span class="sz out"><b>40</b><i>out</i></span> out of stock <span class="sz low"><b>40</b><i>3</i></span> low (≤ ${low()}) <span class="sz ok"><b>40</b><i>12</i></span> safe</div>`;
-    // offline stock out: completed offline sales from the 1st of the month to the stock date
-    const mFrom = `${asOf.slice(0, 8)}01`;
-    const offRows = (B.data.offline || []).filter((x) => x.status === 'completed' && x.date >= mFrom && x.date <= asOf);
-    const offUnits = offRows.reduce((t, x) => t + (x.qty || 0), 0);
-    const TYPE = { toko: 'Store', distributor: 'Distributor', reseller: 'Reseller', event: 'Event / bazaar' };
-    const byType = {}, byProd = {};
-    offRows.forEach((x) => { const t = TYPE[x.type] || x.type || 'Other'; byType[t] = byType[t] || { q: 0, trx: new Set() }; byType[t].q += x.qty || 0; byType[t].trx.add(x.invoice || x.id); const p = B.pname(x.productId); byProd[p] = (byProd[p] || 0) + (x.qty || 0); });
     const body = `
       ${P.h2('Stock summary', `as of ${P.longDate(asOf)}`)}
       ${P.tiles([
         P.tile('Good stock', `${n(D.totGood)} pcs`, `${n(rows.length)} SKUs · ${n(D.gs.length)} models`, true),
         P.tile('Damaged', `${n(dmg)} pcs`, `${P.pct(D.totGood + dmg ? dmg / (D.totGood + dmg) : NaN)} of all stock`),
-        P.tile('Out offline (MTD)', `${n(offUnits)} pcs`, `${P.longDate(mFrom)} – ${P.longDate(asOf)}`),
         P.tile('Models out of stock', n(D.habisAll.length), 'every size empty'),
         P.tile('Models with gaps', n(D.habisPart.length), 'some sizes empty'),
-      ], 5)}
-      <div class="two">
-        <div>${P.h2('Stock condition', 'per SKU (size)')}
+      ], 4)}
+      <div>${P.h2('Stock condition', 'per SKU (size)')}
           ${P.table([['Condition'], ['SKUs', 1], ['Pcs', 1], ['Share of SKUs', 1]], [
             ['<span class="chip ok">Safe</span> more than ' + low() + ' pcs', n(cnt.aman[0]), n(cnt.aman[1]), P.pct(rows.length ? cnt.aman[0] / rows.length : NaN)],
             ['<span class="chip warn">Low</span> 1–' + low() + ' pcs', n(cnt.tipis[0]), n(cnt.tipis[1]), P.pct(rows.length ? cnt.tipis[0] / rows.length : NaN)],
             ['<span class="chip bad">Out of stock</span>', n(cnt.habis[0]), '0', P.pct(rows.length ? cnt.habis[0] / rows.length : NaN)],
             ['<span class="chip">Damaged</span> (damaged warehouse)', '–', n(dmg), '–'],
           ], ['Total good', n(rows.length), n(D.totGood), '100%'])}</div>
-        <div>${P.h2('Offline stock out', `${P.longDate(mFrom)} – ${P.longDate(asOf)}`)}
-          ${P.table([['Channel'], ['Transactions', 1], ['Pcs out', 1]], Object.entries(byType).sort((a, b2) => b2[1].q - a[1].q).map(([t, v]) => [esc(t), n(v.trx.size), `<b>${n(v.q)}</b>`]), offRows.length ? ['Total', n(new Set(offRows.map((x) => x.invoice || x.id)).size), n(offUnits)] : null, 'No offline sales this month.')}
-          ${Object.keys(byProd).length ? P.table([['Product (offline)'], ['Pcs', 1]], Object.entries(byProd).sort((a, b2) => b2[1] - a[1]).slice(0, 8).map(([p, q]) => [esc(p), n(q)])) : ''}</div>
-      </div>
-      ${P.h2('📦 Stock by model', `${n(D.gs.length)} models · A–Z, out of stock at the bottom`)}
-      ${P.table([['Model'], ['Sizes', 1], ['Condition'], ['Stock', 1]], [...D.gs].sort((x, y) => (x.good <= 0) - (y.good <= 0) || `${x.product} ${x.color}`.localeCompare(`${y.product} ${y.color}`)).map((g, k) => [`<span class="rank">${k + 1}</span>${nm(g)}`, n(g.sizes.length), g.good <= 0 ? '<span class="chip bad">out</span>' : g.habis.length ? `<span class="chip bad">${n(g.habis.length)} sizes out</span>` : g.tipis.length ? `<span class="chip warn">${n(g.tipis.length)} sizes low</span>` : '<span class="chip ok">safe</span>', g.good > 0 ? `<b>${n(g.good)}</b> pcs` : '0']), ['Total', n(D.gs.reduce((t, g) => t + g.sizes.length, 0)), '', `${n(D.totGood)} pcs`])}
+      ${P.h2('📦 Stock by model & size', `${n(D.gs.length)} models · ${n(D.totGood)} pcs good`)}
+      ${pdfMatrix(rows)}
       ${P.h2('⛔ Out of stock', `${n(D.habisAll.length)} models empty · ${n(D.habisPart.length)} models with size gaps`)}
       ${legend}<div class="szl">${[...D.habisAll, ...D.habisPart].map((g) => sizeRowEn(g, 'habis')).join('') || '<p class="muted">Nothing out of stock.</p>'}</div>
       ${P.h2('⚠ Low stock', `good ≤ ${low()} per size`)}
       <div class="szl">${D.tipis.filter((g) => !g.habis.length).map((g) => sizeRowEn(g, 'tipis')).join('') || '<p class="muted">No models that are only low.</p>'}</div>
       <style>${SZ_PDF_CSS}</style>`;
     P.open({ title: 'Warehouse Stock Report', period: `as of ${P.longDate(asOf)}`,
-      meta: [['Stock as of', P.longDate(asOf)], ['Warehouse', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')], ['Offline out', `${n(offUnits)} pcs this month`]],
-      body, note: 'Good = NORMAL warehouse, damaged = DAMAGED warehouse, from the latest imported 3PL stock balance file. Offline out = completed sales in the Offline sales menu.' });
+      meta: [['Stock as of', P.longDate(asOf)], ['Warehouse', esc([...new Set(rows.map((r) => r.warehouse))].filter(Boolean).join(', ') || '3PL')]],
+      body, note: 'Good = NORMAL warehouse, damaged = DAMAGED warehouse, from the latest imported 3PL stock balance file.' });
   }
 
   // ---------- daily import of the 3PL stock balance export ----------
