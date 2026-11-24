@@ -265,9 +265,9 @@
     const rows = list.map((g, i) => {
       const all = g.habis.length === g.sizes.length;
       return `<tr><td class="pox-no">${i + 1}</td><td class="pox-name"><b>${esc(g.product)}</b><span>${esc(g.color || '–')}</span></td>
-        <td class="pox-sz">${sorted(g).map((z) => `<span>${esc(z)}</span>`).joinum('')}</td>
+        <td class="pox-sz">${sorted(g).map((z) => `<span>${esc(z)}</span>`).join('')}</td>
         <td class="pox-st">${all ? '<em class="all">All sizes out</em>' : `<em>${num(g.habis.length)} of ${num(g.sizes.length)} sizes</em><small>${num(g.good)} pcs left</small>`}</td></tr>`;
-    }).joinum('');
+    }).join('');
     return `<table class="pox"><thead><tr><th class="pox-no">#</th><th>Model · colour</th><th>Sizes out of stock (EU)</th><th class="pox-st">Status</th></tr></thead><tbody>${rows}</tbody></table>
     <style>
       .pox{width:100%;border-collapse:collapse;font-size:10px;margin:4px 0 14px}
