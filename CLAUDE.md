@@ -83,6 +83,9 @@ BigSeller (bigseller.com, login di Brave profil ballop) terhubung ke Shopee "Bal
 4. Cek Push Inventory › **Push Record** › filter Failed. "Too many requests" (rate limit TikTok) → tunggu ±1 menit,
    centang semua → Push Again. "participated in a promotion ... reserved" = stok promo Shopee lebih besar dari stok
    gudang; laporkan ke user (harus dikurangi di Seller Centre), jangan diubah sendiri.
+5. Cek task di tab Completed. Kalau statusnya "Partially Successful", buka Details › Count Failed (mis. "count qty is
+   less than allocated stock + reserved inventory"). SKU yang gagal itu **langsung edit manual** di Shopee & TikTok
+   Seller Centre (cara lama di "Sinkron stok ... cara lama") ke angka gudang, tanpa tanya user dulu, lalu laporkan.
 - Ada produk/varian baru di toko: Sync Product di BigSeller, lalu mapping varian baru ke Merchant SKU-nya
   (SKU Mapping › Map Merchant SKU › Import to Edit Mapping: export "No Merchant SKU Mapped", isi kolom Merchant SKU,
   import). Item gudang baru: buat Merchant SKU dulu (Merchant SKU › Import & Export › Create Merchant SKU) lalu tambahkan
